@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { authApi } from "@/lib/api";
-import { AlertCircle, Brain, ShieldCheck, Sparkles } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 
 const TABS = [
   {
@@ -83,9 +83,6 @@ export default function Login() {
     >
       {/* Header */}
       <div className="mb-7 text-center">
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white shadow-lg backdrop-blur">
-          <Brain className="h-7 w-7" />
-        </div>
         <h1 className="text-5xl font-extrabold tracking-tight text-white">IntelliHire</h1>
         <p className="mt-3 text-[15px] font-normal text-slate-400">
           AI-Powered Campus Recruitment Platform
@@ -108,23 +105,6 @@ export default function Login() {
             {tab.label}
           </button>
         ))}
-      </div>
-
-      <div className="mb-4 grid w-full max-w-[460px] grid-cols-2 gap-3">
-        <div className="rounded-lg border border-white/15 bg-white/10 px-4 py-3 text-white backdrop-blur">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase text-emerald-100">
-            <ShieldCheck className="h-4 w-4" />
-            Secure Login
-          </div>
-          <div className="mt-1 text-xs text-slate-200">JWT and bcrypt protected</div>
-        </div>
-        <div className="rounded-lg border border-white/15 bg-white/10 px-4 py-3 text-white backdrop-blur">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase text-blue-100">
-            <Sparkles className="h-4 w-4" />
-            Role Based
-          </div>
-          <div className="mt-1 text-xs text-slate-200">Admin, TPO, recruiter, student</div>
-        </div>
       </div>
 
       {/* Login card */}
