@@ -1,0 +1,17 @@
+{
+  "name": "intellihire",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Single entry point for the IntelliHire recruitment platform.",
+  "scripts": {
+    "dev": "npm --prefix recruitexam_v2_updated/app run dev:full",
+    "server": "npm --prefix recruitexam_v2_updated/app run server",
+    "server:dev": "npm --prefix recruitexam_v2_updated/app run server:dev",
+    "client": "npm --prefix recruitexam_v2_updated/app run dev",
+    "build": "npm --prefix recruitexam_v2_updated/app run build",
+    "check": "npm --prefix recruitexam_v2_updated/app run check",
+    "lint": "npm --prefix recruitexam_v2_updated/app run lint",
+    "preview": "npm --prefix recruitexam_v2_updated/app run preview",
+    "start": "npm --prefix recruitexam_v2_updated/app run start"
+  }
+}
