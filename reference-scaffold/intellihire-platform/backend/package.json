@@ -1,0 +1,40 @@
+{
+  "name": "intellihire-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.104.0",
+    "axios": "^1.15.2",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "csv-parse": "^5.6.0",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.2.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "mammoth": "^1.10.0",
+    "multer": "^2.0.2",
+    "openai": "^6.8.1",
+    "pdf-parse": "^1.1.1",
+    "xlsx": "^0.18.5",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.0.0",
+    "@types/node": "^24.10.1",
+    "@types/pdf-parse": "^1.1.5",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

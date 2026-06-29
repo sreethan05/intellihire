@@ -1,0 +1,20 @@
+# Exclude React frontend and components from language statistics
+src/**/* linguist-vendored
+
+# Exclude documentation files from language statistics
+docs/**/* linguist-documentation
+*.md linguist-documentation
+
+# Exclude config and builder files from language statistics
+*.json linguist-documentation
+*.yaml linguist-documentation
+*.bat linguist-documentation
+*.js linguist-documentation
+*.tsbuildinfo linguist-documentation
+.gitattributes linguist-documentation
+.gitignore linguist-documentation
+vite.config.ts linguist-documentation
+check_db.ts linguist-documentation
+
+# Exclude legacy scaffold/archive folder from language statistics
+reference-scaffold/**/* linguist-vendored

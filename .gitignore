@@ -1,0 +1,44 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Node modules
+node_modules/
+**/node_modules/
+
+# Build output
+dist/
+**/dist/
+dist-ssr/
+**/dist-ssr/
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# Local scratch and temp folders
+scratch/
+**/scratch/
+Thumbs.db
+
+# Environment variables - never commit secrets!
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

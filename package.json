@@ -1,0 +1,21 @@
+{
+  "name": "intellihire",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "client": "npm --prefix client run dev",
+    "server": "npm --prefix server run start",
+    "server:dev": "npm --prefix server run dev",
+    "build": "npm --prefix client run build",
+    "check": "npm --prefix client run check",
+    "lint": "npm --prefix client run lint",
+    "preview": "npm --prefix client run preview",
+    "start": "npm --prefix server run start",
+    "test": "npm --prefix server run test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
