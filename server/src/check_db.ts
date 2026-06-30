@@ -5,7 +5,7 @@ import { isPostgresConfigured, pool } from "./lib/postgres.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-dotenv.config({ path: resolve(__dirname, "../.env") });
+dotenv.config({ path: resolve(__dirname, "../../.env") });
 
 async function checkDatabase() {
   if (!isPostgresConfigured()) {

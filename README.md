@@ -136,7 +136,7 @@ npm run start         # Production server start
 
 ## Testing
 
-- **Unit tests**: `server/lib/validation.test.ts`, `server/tests/*.test.ts`
+- **Unit tests**: `server/src/lib/validation.test.ts`, `server/tests/*.test.ts`
 - **Integration tests**: `server/tests/health.test.ts`, `server/tests/auth.test.ts`
 - **E2E tests**: `e2e/*.spec.ts` (Playwright)
 - **CI/CD**: GitHub Actions runs lint, type check, tests, build, and E2E on every PR

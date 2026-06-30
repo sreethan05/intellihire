@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import request from "supertest";
-import { app } from "../app.js";
+import { app } from "../src/app.js";
 
 describe("GET /api/health", () => {
   it("returns 200 with service status", async () => {

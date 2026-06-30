@@ -4,9 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "nodemon --exec tsx index.ts",
-    "start": "tsx index.ts",
-    "test": "tsx --test \"tests/**/*.test.ts\" \"lib/**/*.test.ts\"",
+    "dev": "nodemon --watch src --ext ts,json --exec tsx src/index.ts",
+    "start": "tsx src/index.ts",
+    "test": "tsx --test \"tests/**/*.test.ts\" \"src/lib/**/*.test.ts\"",
     "lint": "eslint .",
     "check": "tsc --noEmit"
   },
