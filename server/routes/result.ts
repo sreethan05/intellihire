@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { supabase } from "../lib/supabase";
-import { authMiddleware, type AuthRequest } from "../middleware/auth";
-import { gradingQueue } from "../lib/queue";
-import { runPlagiarismCheck } from "../lib/plagiarism";
+import { db } from "../lib/postgres.js";
+import { authMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { gradingQueue } from "../lib/queue.js";
+import { runPlagiarismCheck } from "../lib/plagiarism.js";
 
 const router = Router();
 
@@ -17,7 +17,7 @@ router.post("/submit-mcq", async (req: AuthRequest, res) => {
       return;
     }
 
-    const { data: attempt, error: attemptErr } = await supabase
+    const { data: attempt, error: attemptErr } = await db
       .from("attempts")
       .select("candidate_id, status, exams:exam_id(negative_marking)")
       .eq("id", attempt_id)
@@ -38,7 +38,7 @@ router.post("/submit-mcq", async (req: AuthRequest, res) => {
       return;
     }
 
-    const { data: question, error: qErr } = await supabase
+    const { data: question, error: qErr } = await db
       .from("questions")
       .select("correct_option, marks")
       .eq("id", question_id)
@@ -54,7 +54,7 @@ router.post("/submit-mcq", async (req: AuthRequest, res) => {
     const negativeMarking = Math.max(0, Number(exam?.negative_marking || 0));
     const marks_obtained = is_correct ? question.marks : -negativeMarking;
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("answers")
       .upsert(
         {
@@ -90,7 +90,7 @@ router.post("/submit-code", async (req: AuthRequest, res) => {
       return;
     }
 
-    const { data: attempt, error: attemptErr } = await supabase
+    const { data: attempt, error: attemptErr } = await db
       .from("attempts")
       .select("candidate_id, status")
       .eq("id", attempt_id)
@@ -111,7 +111,7 @@ router.post("/submit-code", async (req: AuthRequest, res) => {
       return;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("coding_submissions")
       .upsert(
         {
@@ -148,7 +148,7 @@ router.post("/update-code-score", async (req: AuthRequest, res) => {
       return;
     }
 
-    const { data: attempt, error: attemptErr } = await supabase
+    const { data: attempt, error: attemptErr } = await db
       .from("attempts")
       .select("candidate_id, status")
       .eq("id", attempt_id)
@@ -169,7 +169,7 @@ router.post("/update-code-score", async (req: AuthRequest, res) => {
       return;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("coding_submissions")
       .upsert(
         {
@@ -206,7 +206,7 @@ router.post("/submit-exam", async (req: AuthRequest, res) => {
       return;
     }
 
-    const { data: attempt, error: attErr } = await supabase
+    const { data: attempt, error: attErr } = await db
       .from("attempts")
       .select("candidate_id, status")
       .eq("id", attempt_id)
@@ -229,7 +229,7 @@ router.post("/submit-exam", async (req: AuthRequest, res) => {
 
     // Instantly mark the attempt as completed in the database.
     // The background worker will grade all pending submissions and finalize the score.
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("attempts")
       .update({
         status: "completed",
@@ -264,7 +264,7 @@ router.get("/attempt/:attemptId", async (req: AuthRequest, res) => {
   try {
     const { attemptId } = req.params;
 
-    const { data: attempt, error: attErr } = await supabase
+    const { data: attempt, error: attErr } = await db
       .from("attempts")
       .select("*, exams:exam_id(*), users:candidate_id(name, email)")
       .eq("id", attemptId)
@@ -275,12 +275,12 @@ router.get("/attempt/:attemptId", async (req: AuthRequest, res) => {
       return;
     }
 
-    const { data: answers } = await supabase
+    const { data: answers } = await db
       .from("answers")
       .select("*, questions:question_id(*)")
       .eq("attempt_id", attemptId);
 
-    const { data: submissions } = await supabase
+    const { data: submissions } = await db
       .from("coding_submissions")
       .select("*, coding_questions:coding_question_id(*)")
       .eq("attempt_id", attemptId);
@@ -302,7 +302,7 @@ router.get("/all", async (req: AuthRequest, res) => {
     const { role, id } = req.user!;
     const collegeId = req.query.collegeId as string | undefined;
 
-    let query = supabase
+    let query = db
       .from("attempts")
       .select("*, users:candidate_id(name, email), exams:exam_id(title, total_marks, pass_marks)")
       .order("started_at", { ascending: false });
@@ -312,7 +312,7 @@ router.get("/all", async (req: AuthRequest, res) => {
     }
 
     if (collegeId) {
-      const { data: profiles } = await supabase
+      const { data: profiles } = await db
         .from("candidate_profiles")
         .select("user_id")
         .eq("college_id", collegeId);
@@ -343,7 +343,7 @@ router.get("/:examId", async (req: AuthRequest, res) => {
     const { role, id } = req.user!;
     const collegeId = req.query.collegeId as string | undefined;
 
-    let query = supabase
+    let query = db
       .from("attempts")
       .select("*, users:candidate_id(name, email), exams:exam_id(title, total_marks, pass_marks)")
       .eq("exam_id", examId);
@@ -353,7 +353,7 @@ router.get("/:examId", async (req: AuthRequest, res) => {
     }
 
     if (collegeId) {
-      const { data: profiles } = await supabase
+      const { data: profiles } = await db
         .from("candidate_profiles")
         .select("user_id")
         .eq("college_id", collegeId);
@@ -390,7 +390,7 @@ router.post("/plagiarism/run/:attemptId", async (req: AuthRequest, res) => {
     }
 
     const { attemptId } = req.params;
-    await runPlagiarismCheck(attemptId);
+    await runPlagiarismCheck(attemptId as string);
 
     res.json({ message: "Plagiarism check completed successfully" });
   } catch (err) {
@@ -411,7 +411,7 @@ router.get("/plagiarism/exam/:examId", async (req: AuthRequest, res) => {
     }
 
     // 1. Fetch all attempts for the specified exam
-    const { data: attempts, error: attErr } = await supabase
+    const { data: attempts, error: attErr } = await db
       .from("attempts")
       .select("id")
       .eq("exam_id", examId);
@@ -428,7 +428,7 @@ router.get("/plagiarism/exam/:examId", async (req: AuthRequest, res) => {
     }
 
     // 2. Fetch plagiarism flags associated with these attempts
-    const { data: flags, error: flagErr } = await supabase
+    const { data: flags, error: flagErr } = await db
       .from("plagiarism_flags")
       .select(`
         *,
@@ -472,7 +472,7 @@ router.get("/plagiarism/attempt/:attemptId", async (req: AuthRequest, res) => {
       return;
     }
 
-    const { data: flags, error: flagErr } = await supabase
+    const { data: flags, error: flagErr } = await db
       .from("plagiarism_flags")
       .select(`
         *,

@@ -1,0 +1,31 @@
+node_modules
+**/node_modules
+dist
+**/dist
+dist-ssr
+**/*.tsbuildinfo
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Editor
+.vscode
+.idea
+
+# Docs & scratch
+scratch
+docs
+
+# CI
+.github
+
+# Docker
+Dockerfile
+.dockerignore

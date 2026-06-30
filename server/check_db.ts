@@ -1,35 +1,27 @@
-import axios from "axios";
 import dotenv from "dotenv";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
+import { isPostgresConfigured, pool } from "./lib/postgres.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 dotenv.config({ path: resolve(__dirname, "../.env") });
 
-async function checkRPC() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !key) {
-    console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+async function checkDatabase() {
+  if (!isPostgresConfigured()) {
+    console.error("Missing PostgreSQL configuration. Set DATABASE_URL or PGHOST/PGUSER/PGDATABASE.");
     return;
   }
 
   try {
-    const response = await axios.get(`${url}/rest/v1/`, {
-      headers: {
-        apikey: key,
-        Authorization: `Bearer ${key}`
-      }
-    });
-
-    const paths = Object.keys(response.data.paths || {});
-    const rpcs = paths.filter(p => p.startsWith("/rpc/"));
-    console.log("Available RPC endpoints:", rpcs);
-  } catch (err: any) {
-    console.error("Error fetching Swagger spec:", err.message);
+    const response = await pool.query("select current_database() as database, current_user as user, version()");
+    console.log("PostgreSQL connection OK:", response.rows[0]);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("PostgreSQL connection failed:", message);
+  } finally {
+    await pool.end();
   }
 }
 
-checkRPC();
+checkDatabase();

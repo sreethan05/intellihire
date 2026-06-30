@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { db } from "./postgres.js";
 
 // A set of core programming keywords across Python, JS, C++, and Java to analyze structural syntax similarity.
 const PROGRAMMING_KEYWORDS = new Set([
@@ -147,7 +147,7 @@ export function getSimilarityScore(code1: string, code2: string): number {
 export async function runPlagiarismCheck(attemptId: string): Promise<void> {
   try {
     // 1. Fetch coding submissions for this attempt
-    const { data: currentSubmissions, error: curErr } = await supabase
+    const { data: currentSubmissions, error: curErr } = await db
       .from("coding_submissions")
       .select("*, coding_questions(title)")
       .eq("attempt_id", attemptId);
@@ -157,7 +157,7 @@ export async function runPlagiarismCheck(attemptId: string): Promise<void> {
     }
 
     // 2. Fetch target candidate name for audit logs
-    const { data: curAttempt } = await supabase
+    const { data: curAttempt } = await db
       .from("attempts")
       .select("users(name)")
       .eq("id", attemptId)
@@ -169,14 +169,14 @@ export async function runPlagiarismCheck(attemptId: string): Promise<void> {
       if (!sub.code || !sub.code.trim()) continue;
 
       // 3. Clear existing plagiarism flags for this specific submission to ensure fresh runs
-      await supabase
+      await db
         .from("plagiarism_flags")
         .delete()
         .eq("attempt_id", attemptId)
         .eq("coding_submission_id", sub.id);
 
       // 4. Fetch all other candidates' submissions for the same coding question
-      const { data: otherSubmissions, error: othErr } = await supabase
+      const { data: otherSubmissions, error: othErr } = await db
         .from("coding_submissions")
         .select("*, attempts(id, candidate_id, users(name))")
         .eq("coding_question_id", sub.coding_question_id)
@@ -196,7 +196,7 @@ export async function runPlagiarismCheck(attemptId: string): Promise<void> {
 
           const notes = `High code similarity (${similarity}%) detected on "${questionTitle}" with ${otherCandidateName}'s submission.`;
 
-          await supabase.from("plagiarism_flags").insert({
+          await db.from("plagiarism_flags").insert({
             attempt_id: attemptId,
             coding_submission_id: sub.id,
             similarity_score: similarity,
@@ -206,7 +206,7 @@ export async function runPlagiarismCheck(attemptId: string): Promise<void> {
           });
 
           // Also flag the match symmetrically on the other candidate's side if not flagged already
-          const { data: existingSymmetric } = await supabase
+          const { data: existingSymmetric } = await db
             .from("plagiarism_flags")
             .select("id")
             .eq("attempt_id", otherSub.attempt_id)
@@ -215,7 +215,7 @@ export async function runPlagiarismCheck(attemptId: string): Promise<void> {
             .maybeSingle();
 
           if (!existingSymmetric) {
-            await supabase.from("plagiarism_flags").insert({
+            await db.from("plagiarism_flags").insert({
               attempt_id: otherSub.attempt_id,
               coding_submission_id: otherSub.id,
               similarity_score: similarity,

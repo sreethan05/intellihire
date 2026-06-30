@@ -499,7 +499,7 @@ export default function TakeExam() {
       window.removeEventListener("paste", onClipboard);
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [registerViolation, started, submitting]);
+  }, [registerViolation, started, submitting, captureSnapshot, logProctoringEvent]);
 
   const startExam = async () => {
     if (!examId) return;

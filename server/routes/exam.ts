@@ -1,7 +1,11 @@
 import { Router } from "express";
-import { supabase } from "../lib/supabase";
-import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth";
-import { getExamValidationError } from "../lib/validation";
+import { db } from "../lib/postgres.js";
+import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { getExamValidationError } from "../lib/validation.js";
+import { sendExamAssignedEmail } from "../lib/email.js";
+import { logger } from "../lib/logger.js";
+
+const APP_URL = process.env.VITE_API_URL?.replace("/api", "") || "http://localhost:3000";
  
 const router = Router();
 router.use(authMiddleware);
@@ -41,7 +45,26 @@ router.post("/create", recruiterOrAdmin, async (req: AuthRequest, res) => {
     if (available_from) payload.available_from = available_from;
     if (available_until) payload.available_until = available_until;
 
-    const { data, error } = await supabase.from("exams").insert(payload).select().single();
+    let data: any = null;
+    let error: any = null;
+    let attempts = 0;
+    while (attempts < 10) {
+      const res = await db.from("exams").insert(payload).select().single();
+      if (res.error) {
+        const match = res.error.message.match(/Could not find the '([^']+)' column/);
+        if (match && match[1]) {
+          const col = match[1];
+          logger.warn(`Omitting missing column ${col} from exams insert payload`);
+          delete payload[col];
+          attempts++;
+          continue;
+        }
+        error = res.error;
+        break;
+      }
+      data = res.data;
+      break;
+    }
     if (error) { res.status(400).json({ error: error.message }); return; }
     res.json({ message: "Exam created", exam: data });
   } catch (err) { console.error("Create exam error:", err); res.status(500).json({ error: "Server error" }); }
@@ -51,26 +74,26 @@ router.post("/create", recruiterOrAdmin, async (req: AuthRequest, res) => {
  
 router.get("/bank/mcq", recruiterOrAdmin, async (req: AuthRequest, res) => {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("questions")
       .select("*")
       .eq("created_by", req.user!.id)
       .order("created_at", { ascending: false });
     if (error) { res.status(400).json({ error: error.message }); return; }
     res.json({ questions: data || [] });
-  } catch (_err) { res.status(500).json({ error: "Server error" }); }
+  } catch { res.status(500).json({ error: "Server error" }); }
 });
  
 router.get("/bank/coding", recruiterOrAdmin, async (req: AuthRequest, res) => {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("coding_questions")
       .select("*")
       .eq("created_by", req.user!.id)
       .order("created_at", { ascending: false });
     if (error) { res.status(400).json({ error: error.message }); return; }
     res.json({ coding_questions: data || [] });
-  } catch (_err) { res.status(500).json({ error: "Server error" }); }
+  } catch { res.status(500).json({ error: "Server error" }); }
 });
  
 // Link existing bank questions to exam (no re-insert)
@@ -81,10 +104,10 @@ router.post("/bank/link-mcq", recruiterOrAdmin, async (req: AuthRequest, res) =>
       res.status(400).json({ error: "exam_id and question_ids required" }); return;
     }
     const rows = question_ids.map((qid: string) => ({ exam_id, question_id: qid, marks: 1 }));
-    const { error } = await supabase.from("exam_questions").upsert(rows, { onConflict: "exam_id,question_id", ignoreDuplicates: true });
+    const { error } = await db.from("exam_questions").upsert(rows, { onConflict: "exam_id,question_id", ignoreDuplicates: true });
     if (error) { res.status(400).json({ error: error.message }); return; }
     res.json({ message: "Questions linked to exam" });
-  } catch (_err) { res.status(500).json({ error: "Server error" }); }
+  } catch { res.status(500).json({ error: "Server error" }); }
 });
  
 router.post("/bank/link-coding", recruiterOrAdmin, async (req: AuthRequest, res) => {
@@ -94,10 +117,10 @@ router.post("/bank/link-coding", recruiterOrAdmin, async (req: AuthRequest, res)
       res.status(400).json({ error: "exam_id and coding_question_ids required" }); return;
     }
     const rows = coding_question_ids.map((qid: string) => ({ exam_id, coding_question_id: qid, marks: 10 }));
-    const { error } = await supabase.from("exam_coding_questions").upsert(rows, { onConflict: "exam_id,coding_question_id", ignoreDuplicates: true });
+    const { error } = await db.from("exam_coding_questions").upsert(rows, { onConflict: "exam_id,coding_question_id", ignoreDuplicates: true });
     if (error) { res.status(400).json({ error: error.message }); return; }
     res.json({ message: "Coding questions linked to exam" });
-  } catch (_err) { res.status(500).json({ error: "Server error" }); }
+  } catch { res.status(500).json({ error: "Server error" }); }
 });
 
 router.post("/bank/add-mcqs", recruiterOrAdmin, async (req: AuthRequest, res) => {
@@ -107,9 +130,9 @@ router.post("/bank/add-mcqs", recruiterOrAdmin, async (req: AuthRequest, res) =>
       res.status(400).json({ error: "Questions array required" });
       return;
     }
-    const inserted = [];
+    const inserted: any[] = [];
     for (const q of questions) {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("questions")
         .insert({
           question_text: q.question_text,
@@ -139,7 +162,7 @@ router.post("/bank/add-coding", recruiterOrAdmin, async (req: AuthRequest, res) 
       res.status(400).json({ error: "Question object required" });
       return;
     }
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("coding_questions")
       .insert({
         title: question.title,
@@ -171,11 +194,11 @@ router.post("/add-questions", recruiterOrAdmin, async (req: AuthRequest, res) =>
     if (!exam_id || !Array.isArray(questions) || questions.length === 0) {
       res.status(400).json({ error: "exam_id and questions array required" }); return;
     }
-    const insertedQuestions = [];
+    const insertedQuestions: any[] = [];
     for (const q of questions) {
-      const { data: questionData, error: qErr } = await supabase.from("questions").insert({ question_text: q.question_text, option_a: q.option_a, option_b: q.option_b, option_c: q.option_c, option_d: q.option_d, correct_option: q.correct_option, marks: q.marks || 1, created_by: req.user!.id }).select().single();
+      const { data: questionData, error: qErr } = await db.from("questions").insert({ question_text: q.question_text, option_a: q.option_a, option_b: q.option_b, option_c: q.option_c, option_d: q.option_d, correct_option: q.correct_option, marks: q.marks || 1, created_by: req.user!.id }).select().single();
       if (qErr || !questionData) continue;
-      const { data: linkData, error: linkErr } = await supabase.from("exam_questions").insert({ exam_id, question_id: questionData.id, marks: q.marks || 1 }).select().single();
+      const { data: linkData, error: linkErr } = await db.from("exam_questions").insert({ exam_id, question_id: questionData.id, marks: q.marks || 1 }).select().single();
       if (!linkErr) insertedQuestions.push(linkData);
     }
     res.json({ message: "Questions added", questions: insertedQuestions });
@@ -188,11 +211,11 @@ router.post("/add-coding-questions", recruiterOrAdmin, async (req: AuthRequest, 
     if (!exam_id || !Array.isArray(coding_questions) || coding_questions.length === 0) {
       res.status(400).json({ error: "exam_id and coding_questions array required" }); return;
     }
-    const insertedQuestions = [];
+    const insertedQuestions: any[] = [];
     for (const q of coding_questions) {
-      const { data: questionData, error: qErr } = await supabase.from("coding_questions").insert({ title: q.title, description: q.description, difficulty: q.difficulty || "medium", starter_code: q.starter_code || "", test_cases: q.test_cases || [], marks: q.marks || 10, created_by: req.user!.id }).select().single();
+      const { data: questionData, error: qErr } = await db.from("coding_questions").insert({ title: q.title, description: q.description, difficulty: q.difficulty || "medium", starter_code: q.starter_code || "", test_cases: q.test_cases || [], marks: q.marks || 10, created_by: req.user!.id }).select().single();
       if (qErr || !questionData) continue;
-      const { data: linkData, error: linkErr } = await supabase.from("exam_coding_questions").insert({ exam_id, coding_question_id: questionData.id, marks: q.marks || 10 }).select().single();
+      const { data: linkData, error: linkErr } = await db.from("exam_coding_questions").insert({ exam_id, coding_question_id: questionData.id, marks: q.marks || 10 }).select().single();
       if (!linkErr) insertedQuestions.push(linkData);
     }
     res.json({ message: "Coding questions added", questions: insertedQuestions });
@@ -206,11 +229,31 @@ router.post("/assign", recruiterOrAdmin, async (req: AuthRequest, res) => {
       res.status(400).json({ error: "exam_id and candidate_ids required" }); return;
     }
     const assignments = candidate_ids.map((candidate_id) => ({ exam_id, candidate_id, assigned_by: req.user!.id }));
-    const { data, error } = await supabase.from("exam_assignments").upsert(assignments, { onConflict: "exam_id,candidate_id", ignoreDuplicates: true }).select();
+    const { data, error } = await db.from("exam_assignments").upsert(assignments, { onConflict: "exam_id,candidate_id", ignoreDuplicates: true }).select();
     if (error) { res.status(400).json({ error: error.message }); return; }
     const newCount = data?.length ?? 0;
     const skipped = assignments.length - newCount;
     const message = skipped > 0 ? `${newCount} candidate(s) assigned. ${skipped} already had this exam (skipped).` : "Exam assigned successfully.";
+
+    // Send email notifications to newly assigned candidates (fire-and-forget)
+    if (newCount > 0 && data) {
+      const { data: examData } = await db.from("exams").select("title").eq("id", exam_id).single();
+      const examTitle = examData?.title || "Untitled Exam";
+
+      const candidateIds = data.map((a: any) => a.candidate_id);
+      const { data: users } = await db
+        .from("users")
+        .select("id, name, email")
+        .in("id", candidateIds);
+
+      for (const user of users || []) {
+        if (user.email) {
+          sendExamAssignedEmail(user.email, user.name || "Candidate", examTitle, APP_URL)
+            .catch((err) => logger.error({ err, userId: user.id }, "Failed to send exam assignment email"));
+        }
+      }
+    }
+
     res.json({ message, assignments: data });
   } catch (err) { console.error("Assign exam error:", err); res.status(500).json({ error: "Server error" }); }
 });
@@ -218,7 +261,7 @@ router.post("/assign", recruiterOrAdmin, async (req: AuthRequest, res) => {
 router.get("/list", async (req: AuthRequest, res) => {
   try {
     const { role, id } = req.user!;
-    let query = supabase.from("exams").select("*");
+    let query = db.from("exams").select("*");
     if (role === "recruiter") query = query.eq("created_by", id);
     if (!["admin", "recruiter"].includes(role)) {
       res.status(403).json({ error: "Forbidden" });
@@ -234,9 +277,9 @@ router.post("/start", async (req: AuthRequest, res) => {
   try {
     const { exam_id } = req.body;
     if (!exam_id) { res.status(400).json({ error: "exam_id required" }); return; }
-    const { data: assignment, error: assignErr } = await supabase.from("exam_assignments").select("*").eq("exam_id", exam_id).eq("candidate_id", req.user!.id).single();
+    const { data: assignment, error: assignErr } = await db.from("exam_assignments").select("*").eq("exam_id", exam_id).eq("candidate_id", req.user!.id).single();
     if (assignErr || !assignment) { res.status(403).json({ error: "Exam not assigned to you" }); return; }
-    const { data: examWindow, error: windowErr } = await supabase.from("exams").select("available_from, available_until").eq("id", exam_id).single();
+    const { data: examWindow, error: windowErr } = await db.from("exams").select("available_from, available_until").eq("id", exam_id).single();
     if (!windowErr && examWindow) {
       const now = Date.now();
       if (examWindow.available_from && new Date(examWindow.available_from).getTime() > now) {
@@ -248,13 +291,13 @@ router.post("/start", async (req: AuthRequest, res) => {
         return;
       }
     }
-    const { data: existingAttempt } = await supabase.from("attempts").select("*").eq("exam_id", exam_id).eq("candidate_id", req.user!.id).eq("status", "in_progress").maybeSingle();
+    const { data: existingAttempt } = await db.from("attempts").select("*").eq("exam_id", exam_id).eq("candidate_id", req.user!.id).eq("status", "in_progress").maybeSingle();
     if (existingAttempt) { res.json({ attempt: existingAttempt }); return; }
-    const { data: completedAttempt } = await supabase.from("attempts").select("*").eq("exam_id", exam_id).eq("candidate_id", req.user!.id).eq("status", "completed").maybeSingle();
+    const { data: completedAttempt } = await db.from("attempts").select("*").eq("exam_id", exam_id).eq("candidate_id", req.user!.id).eq("status", "completed").maybeSingle();
     if (completedAttempt) { res.status(400).json({ error: "Exam already completed" }); return; }
-    const { data: exam, error: examErr } = await supabase.from("exams").select("created_by").eq("id", exam_id).single();
+    const { data: exam, error: examErr } = await db.from("exams").select("created_by").eq("id", exam_id).single();
     if (examErr || !exam) { res.status(404).json({ error: "Exam not found" }); return; }
-    const { data, error } = await supabase.from("attempts").insert({ exam_id, candidate_id: req.user!.id, recruiter_id: exam.created_by, status: "in_progress", score: 0, started_at: new Date().toISOString() }).select().single();
+    const { data, error } = await db.from("attempts").insert({ exam_id, candidate_id: req.user!.id, recruiter_id: exam.created_by, status: "in_progress", score: 0, started_at: new Date().toISOString() }).select().single();
     if (error) { res.status(400).json({ error: error.message }); return; }
     res.json({ attempt: data });
   } catch (err) { console.error("Start exam error:", err); res.status(500).json({ error: "Server error" }); }
@@ -263,10 +306,10 @@ router.post("/start", async (req: AuthRequest, res) => {
 router.get("/:examId", recruiterOrAdmin, async (req: AuthRequest, res) => {
   try {
     const { examId } = req.params;
-    const { data, error } = await supabase.from("exams").select("*").eq("id", examId).single();
+    const { data, error } = await db.from("exams").select("*").eq("id", examId).single();
     if (error || !data) { res.status(404).json({ error: "Exam not found" }); return; }
-    const { data: mcqQuestions } = await supabase.from("exam_questions").select("*, questions:question_id(*)").eq("exam_id", examId);
-    const { data: codingQuestions } = await supabase.from("exam_coding_questions").select("*, coding_questions:coding_question_id(*)").eq("exam_id", examId);
+    const { data: mcqQuestions } = await db.from("exam_questions").select("*, questions:question_id(*)").eq("exam_id", examId);
+    const { data: codingQuestions } = await db.from("exam_coding_questions").select("*, coding_questions:coding_question_id(*)").eq("exam_id", examId);
     res.json({ exam: data, mcqQuestions: mcqQuestions || [], codingQuestions: codingQuestions || [] });
   } catch (err) { console.error("Get exam error:", err); res.status(500).json({ error: "Server error" }); }
 });

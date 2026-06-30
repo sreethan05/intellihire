@@ -1,4 +1,4 @@
-import { scanMarksheetOCR } from "./ocr";
+import { scanMarksheetOCR } from "./ocr.js";
 
 type MarksheetFile = {
   name: string;

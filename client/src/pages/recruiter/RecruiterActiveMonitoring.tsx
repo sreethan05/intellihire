@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useCollege } from "@/context/CollegeContext";
 import { 
   Activity, 
@@ -42,7 +42,7 @@ export default function RecruiterActiveMonitoring() {
   }, []);
 
   // Fetch active candidate list
-  const loadActiveMonitoring = async (examId = selectedExam, silent = false) => {
+  const loadActiveMonitoring = useCallback(async (examId = selectedExam, silent = false) => {
     if (!examId) {
       setAttempts([]);
       return;
@@ -60,7 +60,7 @@ export default function RecruiterActiveMonitoring() {
       setLoading(false);
       setIsRefreshing(false);
     }
-  };
+  }, [selectedExam, selectedCollegeId]);
 
   // Re-establish polling when the selected exam changes
   useEffect(() => {
@@ -86,7 +86,7 @@ export default function RecruiterActiveMonitoring() {
         pollIntervalRef.current = null;
       }
     };
-  }, [selectedExam, selectedCollegeId]);
+  }, [selectedExam, loadActiveMonitoring]);
 
   // Recruiter triggers unlock bypass
   const handleOverride = async (attemptId: string) => {

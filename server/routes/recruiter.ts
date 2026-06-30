@@ -1,15 +1,18 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { supabase } from "../lib/supabase";
-import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth";
-import { generateAiJson, hasAiKey } from "../lib/ai";
-import { getPasswordValidationError, isValidEmail } from "../lib/validation";
-
+import { db } from "../lib/postgres.js";
+import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { generateAiJson, hasAiKey } from "../lib/ai.js";
+import { getPasswordValidationError, isValidEmail } from "../lib/validation.js";
+import { sendDriveRegisteredEmail } from "../lib/email.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 
 router.use(authMiddleware);
 router.use(roleMiddleware(["recruiter"]));
+
+const APP_URL = process.env.VITE_API_URL?.replace("/api", "") || "http://localhost:3000";
 
 const formatDate = (date?: string | null) => date ? new Date(date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "";
 
@@ -42,7 +45,7 @@ router.post("/create-candidate", async (req: AuthRequest, res) => {
     }
 
     const password_hash = await bcrypt.hash(password, 10);
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("users")
       .insert({
         name,
@@ -68,7 +71,7 @@ router.post("/create-candidate", async (req: AuthRequest, res) => {
 
 router.get("/candidates", async (req: AuthRequest, res) => {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("users")
       .select("id, name, email, created_at")
       .eq("role", "candidate");
@@ -87,7 +90,7 @@ router.get("/candidates", async (req: AuthRequest, res) => {
 
 router.get("/colleges", async (_req: AuthRequest, res) => {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("colleges")
       .select("id, name, code, location, created_at")
       .order("name");
@@ -109,7 +112,7 @@ router.get("/colleges-summary", async (req: AuthRequest, res) => {
     const recruiterId = req.user!.id;
 
     // 1. Fetch colleges
-    const { data: colleges, error: colErr } = await supabase
+    const { data: colleges, error: colErr } = await db
       .from("colleges")
       .select("id, name, code, location, created_at")
       .order("name");
@@ -120,7 +123,7 @@ router.get("/colleges-summary", async (req: AuthRequest, res) => {
     }
 
     // 2. Fetch recruiter's jobs
-    const { data: jobs } = await supabase
+    const { data: jobs } = await db
       .from("jobs")
       .select("id, title, company_name, college_id, company_description, status")
       .eq("created_by", recruiterId);
@@ -129,7 +132,7 @@ router.get("/colleges-summary", async (req: AuthRequest, res) => {
     const jobIds = jobList.map(j => j.id);
 
     // 3. Fetch candidate profiles
-    const { data: profiles } = await supabase
+    const { data: profiles } = await db
       .from("candidate_profiles")
       .select("user_id, college_id, cgpa, branch");
 
@@ -138,7 +141,7 @@ router.get("/colleges-summary", async (req: AuthRequest, res) => {
     // 4. Fetch candidate statuses for recruiter's jobs
     let pipelineList: any[] = [];
     if (jobIds.length > 0) {
-      const { data: pipelineData } = await supabase
+      const { data: pipelineData } = await db
         .from("candidate_status")
         .select("job_id, candidate_id, status")
         .in("job_id", jobIds);
@@ -146,7 +149,7 @@ router.get("/colleges-summary", async (req: AuthRequest, res) => {
     }
 
     // 5. Fetch exam attempts under recruiter
-    const { data: attempts } = await supabase
+    const { data: attempts } = await db
       .from("attempts")
       .select("id, exam_id, candidate_id, score, status")
       .eq("recruiter_id", recruiterId);
@@ -154,7 +157,7 @@ router.get("/colleges-summary", async (req: AuthRequest, res) => {
     const attemptList = attempts || [];
 
     // 6. Fetch AI interviews
-    const { data: aiInterviews } = await supabase
+    const { data: aiInterviews } = await db
       .from("ai_interviews")
       .select("id, candidate_id, score, status");
 
@@ -190,7 +193,7 @@ router.get("/colleges-summary", async (req: AuthRequest, res) => {
       const registeredCount = collegePipeline.length;
       const attemptsCount = collegeAttempts.length;
       const completedAttemptsCount = completedAttempts.length;
-      const passCount = completedAttempts.filter(a => (a.score ?? 0) >= 40).length; // general default pass bar
+      const passCount = completedAttempts.filter(a => (a.score ?? 0) >= 40).length;
       const offersCount = collegePipeline.filter(p => p.status === "offered").length;
       const aiInterviewsCount = collegeInterviews.length;
 
@@ -244,7 +247,7 @@ export function deserializeDriveColleges(description: string) {
           temperature: 0.4
         }
       };
-    } catch (e) {
+    } catch {
       // Ignore
     }
   }
@@ -300,7 +303,7 @@ router.post("/drives", async (req: AuthRequest, res) => {
 
     const finalDescription = serializeDriveColleges(company_description || "", finalCollegeIds);
 
-    const { data: drive, error } = await supabase
+    const { data: drive, error } = await db
       .from("jobs")
       .insert({
         title,
@@ -328,7 +331,7 @@ router.post("/drives", async (req: AuthRequest, res) => {
 
     const eligible = await findEligibleCandidates(drive);
     if (eligible.length > 0) {
-      await supabase.from("candidate_status").upsert(
+      await db.from("candidate_status").upsert(
         eligible.map((candidate) => ({
           job_id: drive.id,
           candidate_id: candidate.user_id,
@@ -338,7 +341,7 @@ router.post("/drives", async (req: AuthRequest, res) => {
       );
 
       if (drive.exam_id) {
-        await supabase.from("exam_assignments").upsert(
+        await db.from("exam_assignments").upsert(
           eligible.map((candidate) => ({
             exam_id: drive.exam_id,
             candidate_id: candidate.user_id,
@@ -348,12 +351,21 @@ router.post("/drives", async (req: AuthRequest, res) => {
           { onConflict: "exam_id,candidate_id", ignoreDuplicates: true }
         );
       }
+
+      // Send drive registration emails to eligible candidates (fire-and-forget)
+      for (const candidate of eligible) {
+        const user = (candidate as any).user;
+        if (user?.email) {
+          sendDriveRegisteredEmail(user.email, user.name || "Candidate", title, company_name, APP_URL)
+            .catch((err) => logger.error({ err, userId: user.id }, "Failed to send drive registration email"));
+        }
+      }
     }
 
     const parsedDesc = deserializeDriveColleges(drive.company_description);
     let collegesList: any[] = [];
     if (finalCollegeIds.length > 0) {
-      const { data } = await supabase.from("colleges").select("id, name, code").in("id", finalCollegeIds);
+      const { data } = await db.from("colleges").select("id, name, code").in("id", finalCollegeIds);
       collegesList = data || [];
     }
 
@@ -373,7 +385,7 @@ router.post("/drives", async (req: AuthRequest, res) => {
 
 router.get("/drives", async (req: AuthRequest, res) => {
   try {
-    const { data: rawDrives, error } = await supabase
+    const { data: rawDrives, error } = await db
       .from("jobs")
       .select("*, college:college_id(id, name, code), exam:exam_id(id, title)")
       .eq("created_by", req.user!.id)
@@ -395,7 +407,7 @@ router.get("/drives", async (req: AuthRequest, res) => {
     const allCollegeIds = Array.from(allCollegeIdsSet);
     const collegesMap: Record<string, any> = {};
     if (allCollegeIds.length > 0) {
-      const { data: collegesList } = await supabase
+      const { data: collegesList } = await db
         .from("colleges")
         .select("id, name, code, location")
         .in("id", allCollegeIds);
@@ -425,7 +437,7 @@ router.get("/drives", async (req: AuthRequest, res) => {
 
 router.get("/drives/:driveId/eligible-candidates", async (req: AuthRequest, res) => {
   try {
-    const { data: drive, error } = await supabase
+    const { data: drive, error } = await db
       .from("jobs")
       .select("*")
       .eq("id", req.params.driveId)
@@ -448,7 +460,7 @@ router.get("/drives/:driveId/eligible-candidates", async (req: AuthRequest, res)
 router.post("/drives/:driveId/assign-exam", async (req: AuthRequest, res) => {
   try {
     const { exam_id } = req.body;
-    const { data: drive, error } = await supabase
+    const { data: drive, error } = await db
       .from("jobs")
       .select("*")
       .eq("id", req.params.driveId)
@@ -461,9 +473,9 @@ router.post("/drives/:driveId/assign-exam", async (req: AuthRequest, res) => {
     }
 
     const eligible = await findEligibleCandidates(drive);
-    await supabase.from("jobs").update({ exam_id }).eq("id", drive.id);
+    await db.from("jobs").update({ exam_id }).eq("id", drive.id);
 
-    const { data, error: assignError } = await supabase.from("exam_assignments").upsert(
+    const { data, error: assignError } = await db.from("exam_assignments").upsert(
       eligible.map((candidate) => ({
         exam_id,
         candidate_id: candidate.user_id,
@@ -491,7 +503,7 @@ async function findEligibleCandidates(drive: any) {
 
   if (collegeIds.length === 0) return [];
 
-  let query = supabase
+  let query = db
     .from("candidate_profiles")
     .select("*, user:user_id(id, name, email, roll_number, profile_complete)")
     .in("college_id", collegeIds)
@@ -511,7 +523,7 @@ router.get("/dashboard", async (req: AuthRequest, res) => {
     const recruiterId = req.user!.id;
     const collegeId = req.query.collegeId as string | undefined;
 
-    const { data: drives } = await supabase
+    const { data: drives } = await db
       .from("jobs")
       .select("id, title, company_name, college_id, min_cgpa, allowed_branches, status, drive_date, exam_id, company_description")
       .eq("created_by", recruiterId);
@@ -527,7 +539,7 @@ router.get("/dashboard", async (req: AuthRequest, res) => {
     const driveIds = driveList.map(d => d.id);
 
     // Get candidate profile list to get user_ids of this college
-    let profilesQuery = supabase
+    let profilesQuery = db
       .from("candidate_profiles")
       .select("id, user_id, branch, cgpa, profile_complete, documents_verified, college_id");
     if (collegeId) {
@@ -537,7 +549,7 @@ router.get("/dashboard", async (req: AuthRequest, res) => {
     const profileList = profiles || [];
     const collegeCandidateUserIds = profileList.map(p => p.user_id);
 
-    let candidatesQuery = supabase
+    let candidatesQuery = db
       .from("users")
       .select("id, name, email, created_at")
       .eq("role", "candidate");
@@ -545,13 +557,13 @@ router.get("/dashboard", async (req: AuthRequest, res) => {
       if (collegeCandidateUserIds.length > 0) {
         candidatesQuery = candidatesQuery.in("id", collegeCandidateUserIds);
       } else {
-        candidatesQuery = candidatesQuery.eq("id", "00000000-0000-0000-0000-000000000000"); // select nothing
+        candidatesQuery = candidatesQuery.eq("id", "00000000-0000-0000-0000-000000000000");
       }
     }
     const { data: candidates } = await candidatesQuery;
     const candidateList = candidates || [];
 
-    let pipelineQuery = supabase.from("candidate_status").select("id, job_id, candidate_id, status");
+    let pipelineQuery = db.from("candidate_status").select("id, job_id, candidate_id, status");
     if (driveIds.length > 0) {
       pipelineQuery = pipelineQuery.in("job_id", driveIds);
     } else {
@@ -566,7 +578,7 @@ router.get("/dashboard", async (req: AuthRequest, res) => {
     }
     const { data: pipelineData } = await pipelineQuery;
 
-    let assignmentsQuery = supabase.from("exam_assignments").select("exam_id, candidate_id").eq("assigned_by", recruiterId);
+    let assignmentsQuery = db.from("exam_assignments").select("exam_id, candidate_id").eq("assigned_by", recruiterId);
     if (collegeId) {
       if (collegeCandidateUserIds.length > 0) {
         assignmentsQuery = assignmentsQuery.in("candidate_id", collegeCandidateUserIds);
@@ -576,7 +588,7 @@ router.get("/dashboard", async (req: AuthRequest, res) => {
     }
     const { data: assignments } = await assignmentsQuery;
 
-    let attemptsQuery = supabase
+    let attemptsQuery = db
       .from("attempts")
       .select("id, exam_id, candidate_id, status, score, started_at, submitted_at, exams:exam_id(title, total_marks, pass_marks), users:candidate_id(name, email)")
       .eq("recruiter_id", recruiterId)
@@ -590,7 +602,7 @@ router.get("/dashboard", async (req: AuthRequest, res) => {
     }
     const { data: attempts } = await attemptsQuery;
 
-    const { data: exams } = await supabase
+    const { data: exams } = await db
       .from("exams")
       .select("id, title, total_marks, pass_marks, created_at, available_from, available_until")
       .eq("created_by", recruiterId);
@@ -784,7 +796,7 @@ router.get("/dashboard", async (req: AuthRequest, res) => {
 // GET /api/recruiter/drives/:driveId/ai-config
 router.get("/drives/:driveId/ai-config", async (req: AuthRequest, res) => {
   try {
-    const { data: drive, error } = await supabase
+    const { data: drive, error } = await db
       .from("jobs")
       .select("id, company_description")
       .eq("id", req.params.driveId)
@@ -813,7 +825,7 @@ router.post("/drives/:driveId/ai-config", async (req: AuthRequest, res) => {
       return;
     }
 
-    const { data: drive, error } = await supabase
+    const { data: drive, error } = await db
       .from("jobs")
       .select("id, company_description, college_id")
       .eq("id", req.params.driveId)
@@ -830,7 +842,7 @@ router.post("/drives/:driveId/ai-config", async (req: AuthRequest, res) => {
 
     const updatedDescription = serializeDriveColleges(description, collegeIds, aiConfig);
 
-    const { data, error: updateError } = await supabase
+    const { data, error: updateError } = await db
       .from("jobs")
       .update({ company_description: updatedDescription })
       .eq("id", drive.id)

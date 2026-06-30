@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { supabase } from "../lib/supabase";
-import { generateAiJson, hasAiKey } from "../lib/ai";
-import { authMiddleware, type AuthRequest } from "../middleware/auth";
+import { db } from "../lib/postgres.js";
+import { generateAiJson, hasAiKey } from "../lib/ai.js";
+import { authMiddleware, type AuthRequest } from "../middleware/auth.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -25,10 +25,7 @@ type CodingDraft = {
   marks: number;
 };
 
-const topicTemplates: Record<string, string[]> = {
-  aptitude: ["percentages", "time and work", "profit and loss", "probability", "number series"],
-  technical: ["data structures", "databases", "operating systems", "networks", "oops"],
-};
+
 
 function normalizeWords(value: string) {
   return String(value || "")
@@ -399,7 +396,7 @@ function cleanCoding(value: unknown, topic: string, difficulty: string) {
 function cleanCodingList(value: unknown, topic: string, difficulty: string, count: number): CodingDraft[] {
   const candidate = value as { questions?: Array<Partial<CodingDraft>> };
   const questions = Array.isArray(candidate.questions) ? candidate.questions : [];
-  const cleaned = questions.slice(0, count).map((q, idx) => cleanCoding({ question: q }, topic, difficulty));
+  const cleaned = questions.slice(0, count).map((q) => cleanCoding({ question: q }, topic, difficulty));
   
   if (cleaned.length) return cleaned;
   return Array.from({ length: count }).map((_, idx) => fallbackCoding(topic, difficulty, idx));
@@ -523,7 +520,7 @@ router.post("/improvement-report", async (req: AuthRequest, res) => {
       return;
     }
 
-    const { data: attempt } = await supabase
+    const { data: attempt } = await db
       .from("attempts")
       .select("id, candidate_id, score, exams:exam_id(title, total_marks, pass_marks)")
       .eq("id", attempt_id)
@@ -542,7 +539,7 @@ router.post("/improvement-report", async (req: AuthRequest, res) => {
       : ["Revise core DSA patterns", "Practice MCQs with negative marking", "Run sample tests before submission"];
     const content = `You scored ${percentage}% in ${exam?.title || "the assessment"}. Focus next on ${improvements.slice(0, 2).join(" and ")}.`;
 
-    const { data } = await supabase
+    const { data } = await db
       .from("ai_feedback_reports")
       .insert({
         candidate_id: req.user!.id,
@@ -568,10 +565,10 @@ router.get("/profile-stats", async (req: AuthRequest, res) => {
 
     if (role === "candidate") {
       const [{ count: attemptsCount }, { data: attempts }, { count: assignmentsCount }, { data: profile }] = await Promise.all([
-        supabase.from("attempts").select("id", { count: "exact", head: true }).eq("candidate_id", userId).eq("status", "completed"),
-        supabase.from("attempts").select("score, exams:exam_id(total_marks)").eq("candidate_id", userId).eq("status", "completed"),
-        supabase.from("exam_assignments").select("id", { count: "exact", head: true }).eq("candidate_id", userId),
-        supabase.from("candidate_profiles").select("cgpa, branch").eq("user_id", userId).maybeSingle(),
+        db.from("attempts").select("id", { count: "exact", head: true }).eq("candidate_id", userId).eq("status", "completed"),
+        db.from("attempts").select("score, exams:exam_id(total_marks)").eq("candidate_id", userId).eq("status", "completed"),
+        db.from("exam_assignments").select("id", { count: "exact", head: true }).eq("candidate_id", userId),
+        db.from("candidate_profiles").select("cgpa, branch").eq("user_id", userId).maybeSingle(),
       ]);
 
       const totalAttempts = attemptsCount || 0;
@@ -605,7 +602,7 @@ router.get("/profile-stats", async (req: AuthRequest, res) => {
     }
 
     if (role === "tpo") {
-      const { data: user } = await supabase.from("users").select("college_id").eq("id", userId).single();
+      const { data: user } = await db.from("users").select("college_id").eq("id", userId).single();
       const collegeId = user?.college_id;
 
       if (!collegeId) {
@@ -614,16 +611,16 @@ router.get("/profile-stats", async (req: AuthRequest, res) => {
       }
 
       const [{ count: studentsCount }, { count: verifiedCount }, { count: drivesCount }, { data: collegeJobs }] = await Promise.all([
-        supabase.from("candidate_profiles").select("id", { count: "exact", head: true }).eq("college_id", collegeId),
-        supabase.from("candidate_profiles").select("id", { count: "exact", head: true }).eq("college_id", collegeId).eq("documents_verified", true),
-        supabase.from("jobs").select("id", { count: "exact", head: true }).eq("college_id", collegeId),
-        supabase.from("jobs").select("id").eq("college_id", collegeId),
+        db.from("candidate_profiles").select("id", { count: "exact", head: true }).eq("college_id", collegeId),
+        db.from("candidate_profiles").select("id", { count: "exact", head: true }).eq("college_id", collegeId).eq("documents_verified", true),
+        db.from("jobs").select("id", { count: "exact", head: true }).eq("college_id", collegeId),
+        db.from("jobs").select("id").eq("college_id", collegeId),
       ]);
 
       let placedCount = 0;
       const jobIds = collegeJobs?.map((j: any) => j.id) || [];
       if (jobIds.length > 0) {
-        const { count } = await supabase
+        const { count } = await db
           .from("candidate_status")
           .select("id", { count: "exact", head: true })
           .in("job_id", jobIds)
@@ -645,16 +642,16 @@ router.get("/profile-stats", async (req: AuthRequest, res) => {
 
     if (role === "recruiter") {
       const [{ count: examsCount }, { count: drivesCount }, { count: assignmentsCount }, { data: recruiterExams }] = await Promise.all([
-        supabase.from("exams").select("id", { count: "exact", head: true }).eq("created_by", userId),
-        supabase.from("jobs").select("id", { count: "exact", head: true }).eq("created_by", userId),
-        supabase.from("exam_assignments").select("id", { count: "exact", head: true }).eq("assigned_by", userId),
-        supabase.from("exams").select("id").eq("created_by", userId),
+        db.from("exams").select("id", { count: "exact", head: true }).eq("created_by", userId),
+        db.from("jobs").select("id", { count: "exact", head: true }).eq("created_by", userId),
+        db.from("exam_assignments").select("id", { count: "exact", head: true }).eq("assigned_by", userId),
+        db.from("exams").select("id").eq("created_by", userId),
       ]);
 
       let gradedInterviewsCount = 0;
       const examIds = recruiterExams?.map((e: any) => e.id) || [];
       if (examIds.length > 0) {
-        const { count } = await supabase
+        const { count } = await db
           .from("ai_interviews")
           .select("id", { count: "exact", head: true })
           .in("exam_id", examIds)
@@ -676,10 +673,10 @@ router.get("/profile-stats", async (req: AuthRequest, res) => {
 
     if (role === "admin") {
       const [{ count: collegesCount }, { count: tposCount }, { count: recruitersCount }, { count: candidatesCount }] = await Promise.all([
-        supabase.from("colleges").select("id", { count: "exact", head: true }),
-        supabase.from("users").select("id", { count: "exact", head: true }).eq("role", "tpo"),
-        supabase.from("users").select("id", { count: "exact", head: true }).eq("role", "recruiter"),
-        supabase.from("users").select("id", { count: "exact", head: true }).eq("role", "candidate"),
+        db.from("colleges").select("id", { count: "exact", head: true }),
+        db.from("users").select("id", { count: "exact", head: true }).eq("role", "tpo"),
+        db.from("users").select("id", { count: "exact", head: true }).eq("role", "recruiter"),
+        db.from("users").select("id", { count: "exact", head: true }).eq("role", "candidate"),
       ]);
 
       res.json({

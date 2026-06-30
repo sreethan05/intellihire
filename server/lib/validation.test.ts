@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getExamValidationError, getPasswordValidationError, isValidEmail } from "./validation";
+import { getExamValidationError, getPasswordValidationError, isValidEmail } from "./validation.js";
 
 test("validates email format", () => {
   assert.equal(isValidEmail("admin@intellihire.com"), true);

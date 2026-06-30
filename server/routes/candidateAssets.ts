@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { supabase } from "../lib/supabase";
-import { authMiddleware, type AuthRequest } from "../middleware/auth";
+import { db } from "../lib/postgres.js";
+import { authMiddleware, type AuthRequest } from "../middleware/auth.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -9,7 +9,7 @@ router.get("/certificates", async (req: AuthRequest, res) => {
   try {
     const candidateId = req.user!.id;
 
-    const { data: attempts } = await supabase
+    const { data: attempts } = await db
       .from("attempts")
       .select("id, exam_id, score, submitted_at, exams:exam_id(id, title, total_marks, pass_marks)")
       .eq("candidate_id", candidateId)
@@ -22,14 +22,14 @@ router.get("/certificates", async (req: AuthRequest, res) => {
     });
 
     for (const attempt of passed as any[]) {
-      await supabase.from("certificates").upsert({
+      await db.from("certificates").upsert({
         candidate_id: candidateId,
         exam_id: attempt.exam_id,
         certificate_url: `/certificate/${candidateId}/${attempt.exam_id}`,
       }, { onConflict: "candidate_id,exam_id" });
     }
 
-    const { data: certificates } = await supabase
+    const { data: certificates } = await db
       .from("certificates")
       .select("*, exam:exam_id(title, total_marks)")
       .eq("candidate_id", candidateId)
@@ -45,7 +45,7 @@ router.get("/certificates", async (req: AuthRequest, res) => {
 router.get("/badges", async (req: AuthRequest, res) => {
   try {
     const candidateId = req.user!.id;
-    const { data: attempts } = await supabase
+    const { data: attempts } = await db
       .from("attempts")
       .select("score, exams:exam_id(total_marks)")
       .eq("candidate_id", candidateId)
@@ -66,7 +66,7 @@ router.get("/badges", async (req: AuthRequest, res) => {
     ].filter(Boolean) as Array<{ name: string; description: string }>;
 
     for (const badge of earned) {
-      const { data: existing } = await supabase
+      const { data: existing } = await db
         .from("badges")
         .select("id")
         .eq("candidate_id", candidateId)
@@ -74,11 +74,11 @@ router.get("/badges", async (req: AuthRequest, res) => {
         .maybeSingle();
 
       if (!existing) {
-        await supabase.from("badges").insert({ candidate_id: candidateId, ...badge });
+        await db.from("badges").insert({ candidate_id: candidateId, ...badge });
       }
     }
 
-    const { data } = await supabase
+    const { data } = await db
       .from("badges")
       .select("*")
       .eq("candidate_id", candidateId)

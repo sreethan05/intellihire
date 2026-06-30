@@ -12,7 +12,7 @@ import json
 SKILLS_DB = {
     "frontend": ["react", "vue", "angular", "html", "css", "javascript", "typescript", "tailwind", "nextjs", "vite"],
     "backend": ["node", "express", "python", "django", "flask", "fastapi", "java", "springboot", "go", "php", "ruby", "c#", "dotnet"],
-    "database": ["postgresql", "mysql", "mongodb", "sqlite", "redis", "oracle", "supabase", "mariadb", "cassandra"],
+    "database": ["postgresql", "mysql", "mongodb", "sqlite", "redis", "oracle", "mariadb", "cassandra"],
     "devops": ["docker", "kubernetes", "aws", "gcp", "azure", "jenkins", "cicd", "terraform", "ansible", "linux"],
     "ml_ai": ["tensorflow", "pytorch", "keras", "opencv", "nltk", "scikit-learn", "pandas", "numpy", "gemini", "openai"]
 }

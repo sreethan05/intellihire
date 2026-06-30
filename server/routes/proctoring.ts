@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { supabase } from "../lib/supabase";
-import { authMiddleware, type AuthRequest } from "../middleware/auth";
-import { hasAiKey, verifyWebcamSnapshot } from "../lib/ai";
+import { db } from "../lib/postgres.js";
+import { authMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { hasAiKey, verifyWebcamSnapshot } from "../lib/ai.js";
 
 const router = Router();
 
@@ -12,14 +12,14 @@ async function verifyAndLogSnapshotViolation(
   examId: string,
   candidateId: string,
   snapshotData: string,
-  currentViolationCount: number
+  _currentViolationCount: number
 ) {
   try {
     const analysis = await verifyWebcamSnapshot(snapshotData);
     console.log(`[AI Proctoring] Snapshot verified:`, analysis);
 
     // Check if candidate is currently taking an AI interview
-    const { data: activeInterview } = await supabase
+    const { data: activeInterview } = await db
       .from("ai_interviews")
       .select("id")
       .eq("candidate_id", candidateId)
@@ -42,7 +42,7 @@ async function verifyAndLogSnapshotViolation(
 
     if (violationMessage) {
       // Find the latest override event for this attempt
-      const { data: latestOverride, error: overrideErr } = await supabase
+      const { data: latestOverride, error: overrideErr } = await db
         .from("proctoring_snapshots")
         .select("captured_at")
         .eq("attempt_id", attemptId)
@@ -56,7 +56,7 @@ async function verifyAndLogSnapshotViolation(
       }
 
       // Query the database for the current violation count dynamically relative to latest override
-      let countQuery = supabase
+      let countQuery = db
         .from("proctoring_snapshots")
         .select("id", { count: "exact", head: true })
         .eq("attempt_id", attemptId)
@@ -76,7 +76,7 @@ async function verifyAndLogSnapshotViolation(
       console.log(`[AI Proctoring] Security anomaly flagged. Incrementing warnings to ${nextViolationCount}.`);
 
       // Log the violation in the proctoring snapshots table
-      await supabase.from("proctoring_snapshots").insert({
+      await db.from("proctoring_snapshots").insert({
         attempt_id: attemptId,
         exam_id: examId,
         candidate_id: candidateId,
@@ -87,7 +87,7 @@ async function verifyAndLogSnapshotViolation(
       });
 
       // Fetch recruiter ID and candidate name to trigger notification
-      const { data: attemptData } = await supabase
+      const { data: attemptData } = await db
         .from("attempts")
         .select("recruiter_id, users:candidate_id(name)")
         .eq("id", attemptId)
@@ -95,7 +95,7 @@ async function verifyAndLogSnapshotViolation(
 
       if (attemptData?.recruiter_id) {
         const candidateName = (attemptData.users as any)?.name || "Candidate";
-        await supabase.from("notifications").insert({
+        await db.from("notifications").insert({
           user_id: attemptData.recruiter_id,
           title: isInterview ? `AI Interview Security Violation - ${candidateName}` : `Security Violation Flagged - ${candidateName}`,
           body: `${violationMessage} (Warning ${nextViolationCount}/3)`,
@@ -106,7 +106,7 @@ async function verifyAndLogSnapshotViolation(
       if (nextViolationCount >= 3) {
         if (isInterview) {
           console.log(`[AI Proctoring] Violation limit reached for AI Interview ${activeInterview.id}. Auto-submitting.`);
-          await supabase
+          await db
             .from("ai_interviews")
             .update({
               status: "completed",
@@ -119,7 +119,7 @@ async function verifyAndLogSnapshotViolation(
         } else {
           console.log(`[AI Proctoring] Violation limit reached for attempt ${attemptId}. Auto-submitting exam.`);
           // Finalize the attempt overall score using background queue
-          await supabase
+          await db
             .from("attempts")
             .update({
               status: "completed",
@@ -127,7 +127,7 @@ async function verifyAndLogSnapshotViolation(
             })
             .eq("id", attemptId);
 
-          const { gradingQueue } = await import("../lib/queue");
+          const { gradingQueue } = await import("../lib/queue.js");
           gradingQueue.push(attemptId);
         }
       }
@@ -146,7 +146,7 @@ router.post("/events", async (req: AuthRequest, res) => {
       return;
     }
 
-    const { data: attempt, error: attemptError } = await supabase
+    const { data: attempt, error: attemptError } = await db
       .from("attempts")
       .select("id, candidate_id, exam_id")
       .eq("id", attempt_id)
@@ -162,7 +162,7 @@ router.post("/events", async (req: AuthRequest, res) => {
       return;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("proctoring_snapshots")
       .insert({
         attempt_id,
@@ -185,7 +185,7 @@ router.post("/events", async (req: AuthRequest, res) => {
     if (violation_count >= 3) {
       if (message && message.includes("[AI Interview]")) {
         console.log(`[AI Proctoring] Frontend flagged 3 violations. Auto-submitting AI interview.`);
-        await supabase
+        await db
           .from("ai_interviews")
           .update({
             status: "completed",
@@ -198,7 +198,7 @@ router.post("/events", async (req: AuthRequest, res) => {
           .eq("status", "in_progress");
       } else {
         console.log(`[AI Proctoring] Frontend flagged 3 violations. Auto-submitting exam.`);
-        await supabase
+        await db
           .from("attempts")
           .update({
             status: "completed",
@@ -225,7 +225,7 @@ router.get("/attempt/:attemptId", async (req: AuthRequest, res) => {
     const { attemptId } = req.params;
     const { role, id } = req.user!;
 
-    const { data: attempt, error: attemptError } = await supabase
+    const { data: attempt, error: attemptError } = await db
       .from("attempts")
       .select("id, candidate_id, recruiter_id")
       .eq("id", attemptId)
@@ -246,7 +246,7 @@ router.get("/attempt/:attemptId", async (req: AuthRequest, res) => {
       return;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("proctoring_snapshots")
       .select("*")
       .eq("attempt_id", attemptId)
@@ -274,7 +274,7 @@ router.get("/exam/:examId/summary", async (req: AuthRequest, res) => {
     const { examId } = req.params;
     const collegeId = req.query.collegeId as string | undefined;
 
-    let attemptsQuery = supabase
+    let attemptsQuery = db
       .from("attempts")
       .select("id, candidate_id, recruiter_id, status, score, users:candidate_id(name, email)")
       .eq("exam_id", examId);
@@ -284,7 +284,7 @@ router.get("/exam/:examId/summary", async (req: AuthRequest, res) => {
     }
 
     if (collegeId) {
-      const { data: profiles } = await supabase
+      const { data: profiles } = await db
         .from("candidate_profiles")
         .select("user_id")
         .eq("college_id", collegeId);
@@ -304,7 +304,7 @@ router.get("/exam/:examId/summary", async (req: AuthRequest, res) => {
 
     const attemptIds = (attempts || []).map((attempt) => attempt.id);
     const { data: events } = attemptIds.length
-      ? await supabase
+      ? await db
           .from("proctoring_snapshots")
           .select("attempt_id, event_type, violation_count, message, captured_at")
           .in("attempt_id", attemptIds)
@@ -343,7 +343,7 @@ router.get("/exam/:examId/active-monitoring", async (req: AuthRequest, res) => {
     const { examId } = req.params;
     const collegeId = req.query.collegeId as string | undefined;
 
-    let attemptsQuery = supabase
+    let attemptsQuery = db
       .from("attempts")
       .select("id, candidate_id, recruiter_id, status, started_at, users:candidate_id(name, email)")
       .eq("exam_id", examId)
@@ -354,7 +354,7 @@ router.get("/exam/:examId/active-monitoring", async (req: AuthRequest, res) => {
     }
 
     if (collegeId) {
-      const { data: profiles } = await supabase
+      const { data: profiles } = await db
         .from("candidate_profiles")
         .select("user_id")
         .eq("college_id", collegeId);
@@ -374,7 +374,7 @@ router.get("/exam/:examId/active-monitoring", async (req: AuthRequest, res) => {
 
     const attemptIds = (attempts || []).map((attempt) => attempt.id);
     const { data: events } = attemptIds.length
-      ? await supabase
+      ? await db
           .from("proctoring_snapshots")
           .select("attempt_id, event_type, violation_count, message, captured_at")
           .in("attempt_id", attemptIds)
@@ -431,7 +431,7 @@ router.post("/attempt/:attemptId/override", async (req: AuthRequest, res) => {
     const { attemptId } = req.params;
     const { role, id: userId } = req.user!;
 
-    const { data: attempt, error: attemptError } = await supabase
+    const { data: attempt, error: attemptError } = await db
       .from("attempts")
       .select("id, exam_id, candidate_id, recruiter_id")
       .eq("id", attemptId)
@@ -447,7 +447,7 @@ router.post("/attempt/:attemptId/override", async (req: AuthRequest, res) => {
       return;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("proctoring_snapshots")
       .insert({
         attempt_id: attemptId,

@@ -1,32 +1,85 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { supabase } from "../lib/supabase";
-import { generateToken } from "../middleware/auth";
-import { isValidEmail } from "../lib/validation";
+import { db } from "../lib/postgres.js";
+import { generateToken } from "../middleware/auth.js";
+import { isValidEmail } from "../lib/validation.js";
+import { loginSchema } from "../lib/schemas.js";
+
+/**
+ * @openapi
+ * /api/auth/login:
+ *   post:
+ *     summary: Authenticate a user and get a JWT token
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/LoginRequest'
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/LoginResponse'
+ *       400:
+ *         description: Invalid input
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Invalid credentials
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       429:
+ *         description: Too many login attempts (rate limited)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
 
 const router = Router();
 
 router.post("/login", async (req, res) => {
   try {
-    const { email, password } = req.body;
-    const identifier = String(email || "").trim();
-    if (!identifier || !password) {
-      res.status(400).json({ error: "Username/email and password required" });
-      return;
-    }
-    if (identifier.includes("@") && !isValidEmail(identifier)) {
-      res.status(400).json({ error: "Enter a valid email address" });
+    // Zod validation
+    const parsed = loginSchema.safeParse(req.body);
+    if (!parsed.success) {
+      const firstError = parsed.error.issues[0];
+      res.status(400).json({
+        error: firstError.message,
+        field: firstError.path.join("."),
+      });
       return;
     }
 
-    let { data: users, error } = await supabase
+    const { email, password } = parsed.data;
+    const identifier = email.trim();
+
+    // Check if it is a roll number (alphanumeric, 5-20 characters)
+    const isRollNumber = /^[a-zA-Z0-9]{5,20}$/.test(identifier);
+
+    // Validate identifier format
+    if (!isRollNumber && !isValidEmail(identifier)) {
+      res.status(400).json({ error: "Enter a valid email address or roll number" });
+      return;
+    }
+
+    // Lookup by email first, then by roll number
+    let { data: users, error } = await db
       .from("users")
       .select("*")
       .eq("email", identifier)
       .limit(1);
 
     if ((!users || users.length === 0) && !error) {
-      const rollLookup = await supabase
+      const rollLookup = await db
         .from("users")
         .select("*")
         .eq("roll_number", identifier)
@@ -36,6 +89,7 @@ router.post("/login", async (req, res) => {
     }
 
     if (error || !users || users.length === 0) {
+      // Generic message to avoid user enumeration
       res.status(401).json({ error: "Invalid credentials" });
       return;
     }

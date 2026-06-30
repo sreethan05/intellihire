@@ -1,8 +1,8 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { supabase } from "../lib/supabase";
-import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth";
-import { getPasswordValidationError } from "../lib/validation";
+import { db } from "../lib/postgres.js";
+import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { getPasswordValidationError } from "../lib/validation.js";
  
 const router = Router();
  
@@ -25,12 +25,12 @@ const monthsBack = (count: number) => {
 router.get("/profile", async (req: AuthRequest, res) => {
   try {
     const [{ data: user }, { data: profile }] = await Promise.all([
-      supabase
+      db
         .from("users")
         .select("id, name, email, roll_number, college_id, profile_complete, must_change_password")
         .eq("id", req.user!.id)
         .single(),
-      supabase
+      db
         .from("candidate_profiles")
         .select("*, college:college_id(id, name, code)")
         .eq("user_id", req.user!.id)
@@ -59,11 +59,11 @@ router.post("/onboarding", async (req: AuthRequest, res) => {
 
     const password_hash = await bcrypt.hash(password, 10);
     const [{ error: userError }, { data: profile, error: profileError }] = await Promise.all([
-      supabase
+      db
         .from("users")
         .update({ password_hash, must_change_password: false, profile_complete: true })
         .eq("id", req.user!.id),
-      supabase
+      db
         .from("candidate_profiles")
         .update({
           phone,
@@ -94,7 +94,7 @@ router.get("/dashboard", async (req: AuthRequest, res) => {
   try {
     const candidateId = req.user!.id;
  
-    const { data: assignments, error } = await supabase
+    const { data: assignments, error } = await db
       .from("exam_assignments")
       .select("*, exam:exam_id(id, title, description, duration, total_marks, pass_marks, available_from, available_until, status, shuffle_questions, negative_marking, created_at)")
       .eq("candidate_id", candidateId);
@@ -106,7 +106,7 @@ router.get("/dashboard", async (req: AuthRequest, res) => {
  
     const examIds = (assignments || []).map((assignment: { exam_id: string }) => assignment.exam_id);
     const { data: attempts } = examIds.length
-      ? await supabase
+      ? await db
           .from("attempts")
           .select("id, exam_id, status, score, started_at, submitted_at")
           .eq("candidate_id", candidateId)
@@ -267,7 +267,7 @@ router.get("/dashboard", async (req: AuthRequest, res) => {
       .slice(0, 4);
 
     const { data: leaderboardAttempts } = examIds.length
-      ? await supabase
+      ? await db
           .from("attempts")
           .select("candidate_id, score, status, submitted_at, users:candidate_id(id, name, email), exams:exam_id(total_marks)")
           .eq("status", "completed")
@@ -339,7 +339,7 @@ router.get("/dashboard", async (req: AuthRequest, res) => {
  
 router.get("/exams", async (req: AuthRequest, res) => {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("exam_assignments")
       .select("*, exam:exam_id(*)")
       .eq("candidate_id", req.user!.id);
@@ -361,7 +361,7 @@ router.get("/exam/:examId", async (req: AuthRequest, res) => {
     const { examId } = req.params;
     const candidateId = req.user!.id;
  
-    const { data: assignment, error: assignErr } = await supabase
+    const { data: assignment, error: assignErr } = await db
       .from("exam_assignments")
       .select("*")
       .eq("exam_id", examId)
@@ -373,7 +373,7 @@ router.get("/exam/:examId", async (req: AuthRequest, res) => {
       return;
     }
  
-    const { data: exam, error: examErr } = await supabase
+    const { data: exam, error: examErr } = await db
       .from("exams")
       .select("*")
       .eq("id", examId)
@@ -384,12 +384,12 @@ router.get("/exam/:examId", async (req: AuthRequest, res) => {
       return;
     }
  
-    const { data: mcqQuestions } = await supabase
+    const { data: mcqQuestions } = await db
       .from("exam_questions")
       .select("*, questions:question_id(*)")
       .eq("exam_id", examId);
  
-    const { data: codingQuestions } = await supabase
+    const { data: codingQuestions } = await db
       .from("exam_coding_questions")
       .select("*, coding_questions:coding_question_id(*)")
       .eq("exam_id", examId);

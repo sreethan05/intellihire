@@ -130,6 +130,7 @@ export default function CreateRecruiter() {
                   <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     id="recruiter-name"
+                    name="name"
                     type="text"
                     required
                     value={name}
@@ -146,6 +147,7 @@ export default function CreateRecruiter() {
                   <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     id="recruiter-email"
+                    name="email"
                     type="email"
                     required
                     value={email}
@@ -162,6 +164,7 @@ export default function CreateRecruiter() {
                   <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     id="recruiter-password"
+                    name="password"
                     type="password"
                     required
                     value={password}

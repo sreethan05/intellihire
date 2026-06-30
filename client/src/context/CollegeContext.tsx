@@ -64,7 +64,7 @@ export function CollegeProvider({ children }: { children: ReactNode }) {
         if (user.role === "recruiter") {
           void refreshColleges();
         }
-      } catch (e) {
+      } catch {
         // ignore
       }
     }

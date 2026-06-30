@@ -1,9 +1,9 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { supabase } from "../lib/supabase";
-import { scanMarksheetOCR } from "../lib/ocr";
-import { scanMarksheet, hasAiKey } from "../lib/ai";
-import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth";
+import { db } from "../lib/postgres.js";
+import { scanMarksheetOCR } from "../lib/ocr.js";
+import { scanMarksheet, hasAiKey } from "../lib/ai.js";
+import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -25,7 +25,7 @@ type TpoCollege = {
 };
 
 async function getTpoCollege(tpoId: string) {
-  const { data: tpo, error } = await supabase
+  const { data: tpo, error } = await db
     .from("users")
     .select("college_id, college:college_id(code)")
     .eq("id", tpoId)
@@ -41,8 +41,8 @@ async function getTpoCollege(tpoId: string) {
 async function provisionCandidateAccounts(rows: StudentRow[], tpo: TpoCollege, tpoUserId: string) {
   const college = Array.isArray(tpo.college) ? tpo.college[0] : tpo.college;
   const collegeCode = college?.code || "college";
-  const created = [];
-  const failed = [];
+  const created: any[] = [];
+  const failed: any[] = [];
 
   for (const row of rows) {
     const rollNumber = String(row.roll_number || "").trim().toUpperCase();
@@ -58,7 +58,7 @@ async function provisionCandidateAccounts(rows: StudentRow[], tpo: TpoCollege, t
 
     const email = row.email || `${rollNumber.toLowerCase()}@${String(collegeCode).toLowerCase()}.student.local`;
     const password_hash = await bcrypt.hash(rollNumber, 10);
-    const { data: user, error: userError } = await supabase
+    const { data: user, error: userError } = await db
       .from("users")
       .upsert({
         name,
@@ -79,7 +79,7 @@ async function provisionCandidateAccounts(rows: StudentRow[], tpo: TpoCollege, t
       continue;
     }
 
-    const { error: profileError } = await supabase
+    const { error: profileError } = await db
       .from("candidate_profiles")
       .upsert({
         user_id: user.id,
@@ -103,7 +103,7 @@ async function provisionCandidateAccounts(rows: StudentRow[], tpo: TpoCollege, t
 
 router.get("/dashboard", async (req: AuthRequest, res) => {
   try {
-    const { data: tpo } = await supabase
+    const { data: tpo } = await db
       .from("users")
       .select("college_id, college:college_id(id, name, code)")
       .eq("id", req.user!.id)
@@ -114,7 +114,7 @@ router.get("/dashboard", async (req: AuthRequest, res) => {
       return;
     }
 
-    const { data: drives } = await supabase
+    const { data: drives } = await db
       .from("jobs")
       .select("id, title, company_name, drive_date, status")
       .eq("college_id", tpo.college_id)
@@ -124,14 +124,14 @@ router.get("/dashboard", async (req: AuthRequest, res) => {
     const driveIds = driveList.map(d => d.id);
 
     const [{ data: profiles }, { data: statuses }, { data: attempts }] = await Promise.all([
-      supabase
+      db
         .from("candidate_profiles")
         .select("id, user_id, branch, cgpa, profile_complete, documents_verified")
         .eq("college_id", tpo.college_id),
       driveIds.length > 0
-        ? supabase.from("candidate_status").select("id, status, job_id").in("job_id", driveIds)
+        ? db.from("candidate_status").select("id, status, job_id").in("job_id", driveIds)
         : Promise.resolve({ data: [] }),
-      supabase
+      db
         .from("attempts")
         .select("id, candidate_id, status, score, exams:exam_id(total_marks)")
         .eq("status", "completed"),
@@ -220,7 +220,7 @@ router.post("/scan-marksheets", async (req: AuthRequest, res) => {
     }
 
     const scanned: StudentRow[] = [];
-    const failed = [];
+    const failed: any[] = [];
 
     for (const file of files) {
       try {
@@ -265,13 +265,13 @@ router.post("/scan-marksheets", async (req: AuthRequest, res) => {
 
 router.get("/students", async (req: AuthRequest, res) => {
   try {
-    const { data: tpo } = await supabase.from("users").select("college_id").eq("id", req.user!.id).single();
+    const { data: tpo } = await db.from("users").select("college_id").eq("id", req.user!.id).single();
     if (!tpo?.college_id) {
       res.status(400).json({ error: "TPO is not linked to a college" });
       return;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("candidate_profiles")
       .select("*, user:user_id(id, name, email, roll_number, profile_complete, created_at)")
       .eq("college_id", tpo.college_id)
@@ -293,8 +293,8 @@ router.patch("/students/:profileId/verification", async (req: AuthRequest, res) 
   try {
     const { profileId } = req.params;
     const { documents_verified } = req.body;
-    const { data: tpo } = await supabase.from("users").select("college_id").eq("id", req.user!.id).single();
-    const { data, error } = await supabase
+    const { data: tpo } = await db.from("users").select("college_id").eq("id", req.user!.id).single();
+    const { data, error } = await db
       .from("candidate_profiles")
       .update({ documents_verified: Boolean(documents_verified) })
       .eq("id", profileId)

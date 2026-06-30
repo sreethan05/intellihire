@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { supabase } from "../lib/supabase";
-import { generateAiJson, hasAiKey } from "../lib/ai";
-import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth";
-import { deserializeDriveColleges } from "./recruiter";
+import { db } from "../lib/postgres.js";
+import { generateAiJson, hasAiKey } from "../lib/ai.js";
+import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { deserializeDriveColleges } from "./recruiter.js";
 
 
 const router = Router();
@@ -44,7 +44,7 @@ type PassedAttempt = {
 };
 
 async function getPassedAttempts(candidateId: string, examId?: string) {
-  let query = supabase
+  let query = db
     .from("attempts")
     .select("id, exam_id, score, submitted_at, exams:exam_id(id, title, description, total_marks, pass_marks)")
     .eq("candidate_id", candidateId)
@@ -110,7 +110,7 @@ async function buildStageQuestions(candidateId: string, attempt: PassedAttempt, 
 
   if (hasAiKey()) {
     try {
-      const { data: profile } = await supabase
+      const { data: profile } = await db
         .from("candidate_profiles")
         .select("skills, domain_preference")
         .eq("user_id", candidateId)
@@ -411,7 +411,7 @@ router.get("/pending", async (req: AuthRequest, res) => {
       return;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("ai_interviews")
       .select("*, exam:exam_id(title, description), job:job_id(title, company_name, interview_pass_score)")
       .eq("candidate_id", req.user!.id)
@@ -444,8 +444,8 @@ router.get("/recruiter/pending", async (req: AuthRequest, res) => {
 
     // 1) Fetch exam IDs and job IDs created by this recruiter
     const [{ data: exams }, { data: jobs }] = await Promise.all([
-      supabase.from("exams").select("id").eq("created_by", req.user!.id),
-      supabase.from("jobs").select("id").eq("created_by", req.user!.id),
+      db.from("exams").select("id").eq("created_by", req.user!.id),
+      db.from("jobs").select("id").eq("created_by", req.user!.id),
     ]);
 
     const examIds = (exams || []).map((e: any) => e.id);
@@ -457,7 +457,7 @@ router.get("/recruiter/pending", async (req: AuthRequest, res) => {
     }
 
     // 2) Fetch pending/scheduled AI interviews for those exams/jobs
-    let query = supabase
+    let query = db
       .from("ai_interviews")
       .select(
         "*, candidate:candidate_id(id, name, email), job:job_id(id, title, company_name), exam:exam_id(id, title)"
@@ -471,7 +471,7 @@ router.get("/recruiter/pending", async (req: AuthRequest, res) => {
     query = query.or(conditions.join(","));
 
     if (collegeId) {
-      const { data: profiles } = await supabase
+      const { data: profiles } = await db
         .from("candidate_profiles")
         .select("user_id")
         .eq("college_id", collegeId);
@@ -512,7 +512,7 @@ router.post("/start", async (req: AuthRequest, res) => {
     // Resolve job_id if not explicitly provided
     let resolvedJobId = job_id || null;
     if (!resolvedJobId) {
-      const { data: jobData } = await supabase
+      const { data: jobData } = await db
         .from("jobs")
         .select("id")
         .eq("exam_id", eligibleAttempt.examId)
@@ -524,7 +524,7 @@ router.post("/start", async (req: AuthRequest, res) => {
     }
 
     // Interview record exists in status "pending"; candidate can start only inside the recruiter-scheduled window.
-    const { data: pendingInterview } = await supabase
+    const { data: pendingInterview } = await db
       .from("ai_interviews")
       .select("id, job_id, scheduled_start_at, scheduled_end_at")
       .eq("candidate_id", req.user!.id)
@@ -553,7 +553,7 @@ router.post("/start", async (req: AuthRequest, res) => {
     }
 
     // Activate the scheduled interview
-    const { data: interview, error } = await supabase
+    const { data: interview, error } = await db
       .from("ai_interviews")
       .update({ status: "in_progress", started_at: new Date().toISOString() })
       .eq("id", pendingInterview.id)
@@ -568,10 +568,10 @@ router.post("/start", async (req: AuthRequest, res) => {
     const interviewRecord = interview;
 
     // Fetch job data for technical question generation
-    let job = null;
+    let job: any = null;
     const jobId = interviewRecord.job_id || job_id;
     if (jobId) {
-      const { data: jobData } = await supabase
+      const { data: jobData } = await db
         .from("jobs")
         .select("id, title, company_name, company_description, required_skills, interview_pass_score, interview_duration")
         .eq("id", jobId)
@@ -618,7 +618,7 @@ router.post("/:interviewId/schedule", roleMiddleware(["recruiter"]), async (req:
       return;
     }
 
-    const { data: interview } = await supabase
+    const { data: interview } = await db
       .from("ai_interviews")
       .select("id, candidate_id, job_id, exam_id, status")
       .eq("id", interviewId)
@@ -637,10 +637,10 @@ router.post("/:interviewId/schedule", roleMiddleware(["recruiter"]), async (req:
     // Verify recruiter owns the job or exam behind this interview
     let recruiterId: string | null = null;
     if (interview.job_id) {
-      const { data: job } = await supabase.from("jobs").select("created_by").eq("id", interview.job_id).maybeSingle();
+      const { data: job } = await db.from("jobs").select("created_by").eq("id", interview.job_id).maybeSingle();
       recruiterId = job?.created_by ?? null;
     } else if (interview.exam_id) {
-      const { data: exam } = await supabase.from("exams").select("created_by").eq("id", interview.exam_id).maybeSingle();
+      const { data: exam } = await db.from("exams").select("created_by").eq("id", interview.exam_id).maybeSingle();
       recruiterId = exam?.created_by ?? null;
     }
 
@@ -649,7 +649,7 @@ router.post("/:interviewId/schedule", roleMiddleware(["recruiter"]), async (req:
       return;
     }
 
-    const { data: updated, error: updErr } = await supabase
+    const { data: updated, error: updErr } = await db
       .from("ai_interviews")
       .update({
         scheduled_start_at: startIso,
@@ -667,7 +667,7 @@ router.post("/:interviewId/schedule", roleMiddleware(["recruiter"]), async (req:
 
     // Notify the candidate about the scheduled window
     try {
-      await supabase.from("notifications").insert({
+      await db.from("notifications").insert({
         user_id: interview.candidate_id,
         title: "AI Interview Scheduled",
         body: `Your AI interview is scheduled between ${new Date(startIso).toLocaleString()} and ${new Date(endIso).toLocaleString()}.`,
@@ -687,7 +687,7 @@ router.get("/:interviewId/answers", async (req: AuthRequest, res) => {
   try {
     const { interviewId } = req.params;
 
-    const { data: interview, error: intErr } = await supabase
+    const { data: interview, error: intErr } = await db
       .from("ai_interviews")
       .select("candidate_id, job_id, exam_id, status, score, feedback, summary, started_at, submitted_at, intro_score, speaking_score, pronunciation_score, technical_score, relevance_score, communication_score, selected")
       .eq("id", interviewId)
@@ -699,15 +699,14 @@ router.get("/:interviewId/answers", async (req: AuthRequest, res) => {
     }
 
     const isCandidateOwner = req.user!.id === interview.candidate_id;
-    const isStaff = ["admin", "recruiter"].includes(req.user!.role);
 
     if (!isCandidateOwner && req.user!.role === "recruiter") {
       let recruiterId: string | null = null;
       if (interview.job_id) {
-        const { data: job } = await supabase.from("jobs").select("created_by").eq("id", interview.job_id).maybeSingle();
+        const { data: job } = await db.from("jobs").select("created_by").eq("id", interview.job_id).maybeSingle();
         recruiterId = job?.created_by ?? null;
       } else if (interview.exam_id) {
-        const { data: exam } = await supabase.from("exams").select("created_by").eq("id", interview.exam_id).maybeSingle();
+        const { data: exam } = await db.from("exams").select("created_by").eq("id", interview.exam_id).maybeSingle();
         recruiterId = exam?.created_by ?? null;
       }
       if (!recruiterId || recruiterId !== req.user!.id) {
@@ -719,7 +718,7 @@ router.get("/:interviewId/answers", async (req: AuthRequest, res) => {
       return;
     }
 
-    const { data: answers, error: ansErr } = await supabase
+    const { data: answers, error: ansErr } = await db
       .from("ai_interview_answers")
       .select("*")
       .eq("interview_id", interviewId)
@@ -749,7 +748,7 @@ router.post("/:interviewId/answer", async (req: AuthRequest, res) => {
       return;
     }
 
-    const { data: interview } = await supabase
+    const { data: interview } = await db
       .from("ai_interviews")
       .select("candidate_id, status, job_id")
       .eq("id", interviewId)
@@ -760,9 +759,9 @@ router.post("/:interviewId/answer", async (req: AuthRequest, res) => {
       return;
     }
 
-    let job = null;
+    let job: any = null;
     if (interview.job_id) {
-      const { data: jobData } = await supabase
+      const { data: jobData } = await db
         .from("jobs")
         .select("company_description")
         .eq("id", interview.job_id)
@@ -778,7 +777,7 @@ router.post("/:interviewId/answer", async (req: AuthRequest, res) => {
         const audioBuffer = Buffer.from(audio, "base64");
         const fileName = `${interviewId}_${Date.now()}.wav`;
 
-        const { error: uploadError } = await supabase.storage
+        const { error: uploadError } = await db.storage
           .from("intellihire")
           .upload(`audio/${fileName}`, audioBuffer, {
             contentType: "audio/wav",
@@ -786,9 +785,9 @@ router.post("/:interviewId/answer", async (req: AuthRequest, res) => {
           });
 
         if (uploadError) {
-          console.error("Supabase Storage audio upload error:", uploadError);
+          console.error("db Storage audio upload error:", uploadError);
         } else {
-          const { data: publicUrlData } = supabase.storage
+          const { data: publicUrlData } = db.storage
             .from("intellihire")
             .getPublicUrl(`audio/${fileName}`);
           audioUrl = publicUrlData.publicUrl;
@@ -830,7 +829,7 @@ router.post("/:interviewId/answer", async (req: AuthRequest, res) => {
       ? JSON.stringify({ feedback: evaluation.feedback, audio_url: audioUrl })
       : evaluation.feedback;
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("ai_interview_answers")
       .insert({
         interview_id: interviewId,
@@ -863,7 +862,7 @@ router.post("/:interviewId/submit", async (req: AuthRequest, res) => {
     const { interviewId } = req.params;
 
     // Fetch interview + job pass score
-    const { data: interview } = await supabase
+    const { data: interview } = await db
       .from("ai_interviews")
       .select("candidate_id, job_id, exam_id")
       .eq("id", interviewId)
@@ -875,9 +874,9 @@ router.post("/:interviewId/submit", async (req: AuthRequest, res) => {
     }
 
     let interviewPassScore = 60; // default
-    let job = null;
+    let job: any = null;
     if (interview.job_id) {
-      const { data: jobData } = await supabase
+      const { data: jobData } = await db
         .from("jobs")
         .select("interview_pass_score, company_description")
         .eq("id", interview.job_id)
@@ -886,7 +885,7 @@ router.post("/:interviewId/submit", async (req: AuthRequest, res) => {
       interviewPassScore = Number(job?.interview_pass_score ?? 60);
     }
 
-    const { data: rawAnswers } = await supabase
+    const { data: rawAnswers } = await db
       .from("ai_interview_answers")
       .select("score, question, answer")
       .eq("interview_id", interviewId)
@@ -902,7 +901,7 @@ router.post("/:interviewId/submit", async (req: AuthRequest, res) => {
 
     const result = await summarizeInterview(answers, interviewPassScore, job);
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("ai_interviews")
       .update({
         status: "completed",
@@ -932,7 +931,7 @@ router.post("/:interviewId/submit", async (req: AuthRequest, res) => {
     try {
       if (interview.job_id) {
         const newStatus = result.selected ? "offered" : "rejected";
-        await supabase
+        await db
           .from("candidate_status")
           .update({ status: newStatus })
           .eq("job_id", interview.job_id)
@@ -946,15 +945,15 @@ router.post("/:interviewId/submit", async (req: AuthRequest, res) => {
     try {
       let recruiterId: string | null = null;
       if (interview.job_id) {
-        const { data: job } = await supabase.from("jobs").select("created_by").eq("id", interview.job_id).maybeSingle();
+        const { data: job } = await db.from("jobs").select("created_by").eq("id", interview.job_id).maybeSingle();
         recruiterId = job?.created_by ?? null;
       } else if (interview.exam_id) {
-        const { data: exam } = await supabase.from("exams").select("created_by").eq("id", interview.exam_id).maybeSingle();
+        const { data: exam } = await db.from("exams").select("created_by").eq("id", interview.exam_id).maybeSingle();
         recruiterId = exam?.created_by ?? null;
       }
 
       if (recruiterId) {
-        await supabase.from("notifications").insert({
+        await db.from("notifications").insert({
           user_id: recruiterId,
           title: result.selected ? "AI Interview Result: Selected" : "AI Interview Result: Not Selected",
           body: `AI interview completed. Overall: ${result.score}/100.\nSummary: ${result.summary}\nFeedback: ${result.feedback}`,
@@ -972,7 +971,7 @@ router.post("/:interviewId/submit", async (req: AuthRequest, res) => {
 });
 
 router.get("/mine", async (req: AuthRequest, res) => {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("ai_interviews")
     .select("*")
     .eq("candidate_id", req.user!.id)
@@ -994,21 +993,21 @@ router.get("/summaries", async (req: AuthRequest, res) => {
 
     const collegeId = req.query.collegeId as string | undefined;
 
-    let query = supabase
+    let query = db
       .from("ai_interviews")
       .select("*, candidate:candidate_id(id, name, email), job:job_id(title, company_name), exam:exam_id(title)")
       .order("started_at", { ascending: false });
 
     if (req.user!.role === "recruiter") {
       // 1. Fetch exam IDs created by this recruiter
-      const { data: exams } = await supabase
+      const { data: exams } = await db
         .from("exams")
         .select("id")
         .eq("created_by", req.user!.id);
       const examIds = (exams || []).map((e) => e.id);
 
       // 2. Fetch job IDs created by this recruiter
-      const { data: jobs } = await supabase
+      const { data: jobs } = await db
         .from("jobs")
         .select("id")
         .eq("created_by", req.user!.id);
@@ -1019,7 +1018,7 @@ router.get("/summaries", async (req: AuthRequest, res) => {
         return;
       }
 
-      const conditions = [];
+      const conditions: string[] = [];
       if (examIds.length > 0) {
         conditions.push(`exam_id.in.(${examIds.join(",")})`);
       }
@@ -1031,7 +1030,7 @@ router.get("/summaries", async (req: AuthRequest, res) => {
     }
 
     if (collegeId) {
-      const { data: profiles } = await supabase
+      const { data: profiles } = await db
         .from("candidate_profiles")
         .select("user_id")
         .eq("college_id", collegeId);

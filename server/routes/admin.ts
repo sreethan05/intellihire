@@ -1,8 +1,8 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { supabase } from "../lib/supabase";
-import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth";
-import { getPasswordValidationError, isValidEmail } from "../lib/validation";
+import { db } from "../lib/postgres.js";
+import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { getPasswordValidationError, isValidEmail } from "../lib/validation.js";
 
 const router = Router();
 
@@ -40,7 +40,7 @@ router.post("/create-recruiter", async (req: AuthRequest, res) => {
     }
 
     const password_hash = await bcrypt.hash(password, 10);
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("users")
       .insert({
         name,
@@ -81,7 +81,7 @@ router.post("/create-tpo", async (req: AuthRequest, res) => {
       return;
     }
 
-    const { data: college, error: collegeError } = await supabase
+    const { data: college, error: collegeError } = await db
       .from("colleges")
       .upsert({
         name: college_name,
@@ -98,7 +98,7 @@ router.post("/create-tpo", async (req: AuthRequest, res) => {
     }
 
     const password_hash = await bcrypt.hash(password, 10);
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("users")
       .insert({
         name,
@@ -126,7 +126,7 @@ router.post("/create-tpo", async (req: AuthRequest, res) => {
 
 router.get("/recruiters", async (req: AuthRequest, res) => {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("users")
       .select("id, name, email, created_at")
       .eq("role", "recruiter")
@@ -146,7 +146,7 @@ router.get("/recruiters", async (req: AuthRequest, res) => {
 
 router.get("/tpos", async (req: AuthRequest, res) => {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("users")
       .select("id, name, email, created_at, college:college_id(id, name, code)")
       .eq("role", "tpo")
@@ -168,13 +168,13 @@ router.get("/dashboard", async (req: AuthRequest, res) => {
   try {
     const adminId = req.user!.id;
 
-    const { count: recruiterCount } = await supabase
+    const { count: recruiterCount } = await db
       .from("users")
       .select("*", { count: "exact", head: true })
       .eq("role", "recruiter")
       .eq("created_by", adminId);
 
-    const { count: candidateCount } = await supabase
+    const { count: candidateCount } = await db
       .from("users")
       .select("*", { count: "exact", head: true })
       .eq("role", "candidate");
@@ -189,32 +189,32 @@ router.get("/dashboard", async (req: AuthRequest, res) => {
       { data: exams },
       { data: attempts },
     ] = await Promise.all([
-      supabase
+      db
         .from("users")
         .select("id, name, email, created_at")
         .eq("role", "recruiter")
         .eq("created_by", adminId),
-      supabase
+      db
         .from("users")
         .select("id, name, email, college_id, created_at")
         .eq("role", "tpo"),
-      supabase
+      db
         .from("colleges")
         .select("id, name, code"),
-      supabase
+      db
         .from("users")
         .select("id, created_by")
         .eq("role", "candidate"),
-      supabase
+      db
         .from("candidate_profiles")
         .select("id, college_id, branch, cgpa, profile_complete, documents_verified, colleges:college_id(name, code)"),
-      supabase
+      db
         .from("jobs")
         .select("id, title, company_name, college_id, status, drive_date, exam_id"),
-      supabase
+      db
         .from("exams")
         .select("id, title, created_by, total_marks, pass_marks, created_at, available_from, available_until"),
-      supabase
+      db
         .from("attempts")
         .select("id, recruiter_id, candidate_id, exam_id, status, score, started_at, submitted_at, users:candidate_id(name, email), exams:exam_id(title, total_marks, pass_marks)")
         .order("started_at", { ascending: false }),

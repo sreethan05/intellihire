@@ -58,18 +58,17 @@ Sensitive keys are stored in `.env`, not hardcoded in frontend code.
 Important keys:
 
 ```text
-SUPABASE_SERVICE_ROLE_KEY
+DATABASE_URL
 JWT_SECRET
 GEMINI_API_KEY
 ```
 
 Security note:
 
-- `SUPABASE_SERVICE_ROLE_KEY` must remain backend-only.
+- PostgreSQL credentials must remain backend-only.
 - `JWT_SECRET` should be long, random, and changed before deployment.
 - Default admin password should be changed before real use.
 
 ## Security Summary
 
 IntelliHire protects the main workflow using password hashing, JWT-based login sessions, protected backend routes, and role-based access control. These controls make the platform safer for handling exams, users, answers, and results.
-

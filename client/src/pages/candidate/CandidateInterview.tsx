@@ -610,7 +610,7 @@ export default function CandidateInterview() {
     } finally {
       setLoading(false);
     }
-  }, [eligibility?.selectedAttempt, pendingInterview, requestDevices, speak, stopDevices, canStartInterview, scheduledStartMs, scheduledEndMs, user?.name]);
+  }, [eligibility?.selectedAttempt, pendingInterview, requestDevices, speak, stopDevices, canStartInterview, scheduledStartMs, scheduledEndMs, user]);
 
   useEffect(() => { void refreshInterviewState(); }, [refreshInterviewState]);
 

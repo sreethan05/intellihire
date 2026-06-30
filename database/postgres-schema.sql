@@ -1,5 +1,7 @@
--- Kimi Agent Exam-Based Hiring System
--- Supabase Schema
+-- IntelliHire Exam-Based Hiring System
+-- PostgreSQL schema
+
+create extension if not exists pgcrypto;
 
 -- Users table (admin, tpo, recruiter, candidate)
 create table if not exists users (
@@ -101,10 +103,14 @@ create table if not exists jobs (
   drive_date timestamptz,
   exam_id uuid references exams(id),
   status text default 'active' check (status in ('draft', 'active', 'closed')),
+  interview_pass_score integer default 60,
   interview_duration integer default 15,
   created_by uuid references users(id) not null,
   created_at timestamptz default now()
 );
+
+alter table jobs add column if not exists interview_pass_score integer default 60;
+alter table jobs add column if not exists interview_duration integer default 15;
 
 create table if not exists candidate_status (
   id uuid primary key default gen_random_uuid(),
@@ -299,6 +305,11 @@ create table if not exists ai_interviews (
   score integer default 0,
   relevance_score integer default 0,
   communication_score integer default 0,
+  intro_score integer default 0,
+  speaking_score integer default 0,
+  pronunciation_score integer default 0,
+  technical_score integer default 0,
+  selected boolean default false,
   summary text,
   feedback text,
   started_at timestamptz default now(),
@@ -309,6 +320,11 @@ create table if not exists ai_interviews (
 alter table ai_interviews add column if not exists scheduled_start_at timestamptz;
 alter table ai_interviews add column if not exists scheduled_end_at timestamptz;
 alter table ai_interviews add column if not exists scheduled_by uuid references users(id) on delete set null;
+alter table ai_interviews add column if not exists intro_score integer default 0;
+alter table ai_interviews add column if not exists speaking_score integer default 0;
+alter table ai_interviews add column if not exists pronunciation_score integer default 0;
+alter table ai_interviews add column if not exists technical_score integer default 0;
+alter table ai_interviews add column if not exists selected boolean default false;
 
 create table if not exists ai_interview_answers (
   id uuid primary key default gen_random_uuid(),

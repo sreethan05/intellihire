@@ -19,9 +19,17 @@ dist-ssr/
 *.tsbuildinfo
 **/*.tsbuildinfo
 
+# Playwright
+/playwright-report/
+/test-results/
+/blob-report/
+/playwright/.cache/
+
 # Local scratch and temp folders
 scratch/
 **/scratch/
+uploads/
+**/uploads/
 Thumbs.db
 
 # Environment variables - never commit secrets!

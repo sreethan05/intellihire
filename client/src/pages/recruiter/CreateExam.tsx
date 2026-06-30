@@ -614,6 +614,7 @@ export default function CreateExam() {
                     <Type className="w-5 h-5" />
                   </div>
                   <Input 
+                    name="title"
                     value={title} 
                     onChange={e => setTitle(e.target.value)} 
                     placeholder="Enter exam title"
@@ -630,6 +631,7 @@ export default function CreateExam() {
                     <FileText className="w-5 h-5" />
                   </div>
                   <Textarea 
+                    name="description"
                     value={description} 
                     onChange={e => setDescription(e.target.value)} 
                     placeholder="Enter exam description (optional)"
@@ -649,6 +651,7 @@ export default function CreateExam() {
                       <Clock className="w-5 h-5" />
                     </div>
                     <Input 
+                      name="duration"
                       type="number" 
                       value={duration} 
                       onChange={e => setDuration(Number(e.target.value))} 
@@ -666,6 +669,7 @@ export default function CreateExam() {
                       <Trophy className="w-5 h-5" />
                     </div>
                     <Input 
+                      name="totalMarks"
                       type="number" 
                       value={totalMarks} 
                       onChange={e => setTotalMarks(Number(e.target.value))} 
@@ -683,6 +687,7 @@ export default function CreateExam() {
                       <ShieldCheck className="w-5 h-5" />
                     </div>
                     <Input 
+                      name="passMarks"
                       type="number" 
                       value={passMarks} 
                       onChange={e => setPassMarks(Number(e.target.value))} 

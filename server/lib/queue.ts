@@ -1,6 +1,10 @@
-import { supabase } from "./supabase";
-import { runWithJudge0 } from "./judge0";
-import { runPlagiarismCheck } from "./plagiarism";
+import { db } from "./postgres.js";
+import { runWithJudge0 } from "./judge0.js";
+import { runPlagiarismCheck } from "./plagiarism.js";
+import { sendResultPublishedEmail } from "./email.js";
+import { logger } from "./logger.js";
+
+const APP_URL = process.env.VITE_API_URL?.replace("/api", "") || "http://localhost:3000";
 
 class BackgroundGradingQueue {
   private queue: string[] = [];
@@ -14,7 +18,7 @@ class BackgroundGradingQueue {
 
     if (!this.queue.includes(attemptId)) {
       this.queue.push(attemptId);
-      console.log(`[Queue] Added attempt ${attemptId} to background grading queue. Queue size: ${this.queue.length}`);
+      logger.info({ attemptId, queueSize: this.queue.length }, "Added attempt to grading queue");
     }
 
     if (!this.isProcessing) {
@@ -30,18 +34,18 @@ class BackgroundGradingQueue {
 
     while (this.queue.length > 0) {
       const currentAttemptId = this.queue.shift()!;
-      console.log(`[Queue] Starting grading for attempt: ${currentAttemptId}`);
+      logger.info({ attemptId: currentAttemptId }, "Starting grading");
 
       try {
         await this.gradeAttempt(currentAttemptId);
-        console.log(`[Queue] Finished grading successfully for attempt: ${currentAttemptId}`);
+        logger.info({ attemptId: currentAttemptId }, "Grading completed successfully");
       } catch (error) {
-        console.error(`[Queue] Failed to grade attempt ${currentAttemptId}:`, error);
+        logger.error({ error, attemptId: currentAttemptId }, "Grading failed");
       }
     }
 
     this.isProcessing = false;
-    console.log("[Queue] Worker idle. No more items in queue.");
+    logger.info("Worker idle — no more items in queue");
   }
 
   /**
@@ -50,7 +54,7 @@ class BackgroundGradingQueue {
    */
   private async gradeAttempt(attemptId: string) {
     // 1. Fetch the attempt details
-    const { data: attempt, error: attErr } = await supabase
+    const { data: attempt, error: attErr } = await db
       .from("attempts")
       .select("*")
       .eq("id", attemptId)
@@ -61,7 +65,7 @@ class BackgroundGradingQueue {
     }
 
     // 2. Fetch all coding submissions associated with this attempt
-    const { data: submissions, error: subErr } = await supabase
+    const { data: submissions, error: subErr } = await db
       .from("coding_submissions")
       .select("*, coding_questions(*)")
       .eq("attempt_id", attemptId);
@@ -75,12 +79,12 @@ class BackgroundGradingQueue {
       for (const submission of submissions) {
         // Skip grading if already tested to avoid duplicate network calls
         if (submission.status === "tested" && submission.score > 0) {
-          console.log(`[Queue] Submission ${submission.id} already graded. Score: ${submission.score}`);
+          logger.info({ submissionId: submission.id, score: submission.score }, "Submission already graded, skipping");
           continue;
         }
 
         if (!submission.code || !submission.code.trim()) {
-          console.log(`[Queue] Submission ${submission.id} has empty code. Skipping.`);
+          logger.info({ submissionId: submission.id }, "Submission has empty code, skipping");
           continue;
         }
 
@@ -93,13 +97,13 @@ class BackgroundGradingQueue {
           testCases = typeof question.test_cases === "string"
             ? JSON.parse(question.test_cases)
             : question.test_cases;
-        } catch (e) {
-          console.warn(`[Queue] Failed to parse test cases for question ${question.id}`);
+        } catch {
+          logger.warn({ questionId: question.id }, "Failed to parse test cases");
         }
 
         if (!Array.isArray(testCases) || testCases.length === 0) {
-          console.log(`[Queue] Question ${question.id} has no test cases. Assigning full marks.`);
-          await supabase
+          logger.info({ questionId: question.id }, "Question has no test cases, assigning full marks");
+          await db
             .from("coding_submissions")
             .update({ score: question.marks || 10, status: "tested" })
             .eq("id", submission.id);
@@ -108,7 +112,7 @@ class BackgroundGradingQueue {
 
         // Run Judge0 compiler against test cases sequentially to respect API rate limits
         let passedCount = 0;
-        console.log(`[Queue] Running ${testCases.length} test cases for question: "${question.title}" (language: ${submission.language})`);
+        logger.info({ testCaseCount: testCases.length, questionTitle: question.title, language: submission.language }, "Running test cases");
 
         for (const tc of testCases) {
           try {
@@ -120,7 +124,7 @@ class BackgroundGradingQueue {
               passedCount++;
             }
           } catch (execErr: any) {
-            console.error(`[Queue] Test case execution failed: ${execErr.message}`);
+            logger.error({ error: execErr.message }, "Test case execution failed");
           }
           // Subtle pause to avoid hitting public Judge0 API rate limits
           await new Promise((resolve) => setTimeout(resolve, 300));
@@ -129,10 +133,10 @@ class BackgroundGradingQueue {
         const scorePercentage = passedCount / testCases.length;
         const finalCodingScore = Math.round(scorePercentage * (question.marks || 10));
 
-        console.log(`[Queue] Submission ${submission.id} graded: ${passedCount}/${testCases.length} passed. Final Score: ${finalCodingScore}`);
+        logger.info({ submissionId: submission.id, passedCount, total: testCases.length, finalScore: finalCodingScore }, "Submission graded");
 
         // Update database submission score
-        await supabase
+        await db
           .from("coding_submissions")
           .update({
             score: finalCodingScore,
@@ -144,8 +148,8 @@ class BackgroundGradingQueue {
 
     // 4. Fetch final updated scores (MCQs + Coding Submissions)
     const [{ data: answers }, { data: updatedSubmissions }] = await Promise.all([
-      supabase.from("answers").select("marks_obtained").eq("attempt_id", attemptId),
-      supabase.from("coding_submissions").select("score").eq("attempt_id", attemptId)
+      db.from("answers").select("marks_obtained").eq("attempt_id", attemptId),
+      db.from("coding_submissions").select("score").eq("attempt_id", attemptId)
     ]);
 
     const mcqScore = answers?.reduce((sum: number, a: any) => sum + (a.marks_obtained || 0), 0) ?? 0;
@@ -153,7 +157,7 @@ class BackgroundGradingQueue {
     const totalScore = mcqScore + codingScore;
 
     // 5. Finalize the attempt overall score
-    const { data: updatedAttempt, error: updErr } = await supabase
+    const { data: updatedAttempt, error: updErr } = await db
       .from("attempts")
       .update({
         score: totalScore,
@@ -168,24 +172,45 @@ class BackgroundGradingQueue {
       throw new Error(`Failed to finalize attempt score in database: ${updErr?.message}`);
     }
 
-    console.log(`[Queue] Attempt ${attemptId} finalized. Total Score: ${totalScore} (MCQ: ${mcqScore}, Coding: ${codingScore})`);
+    logger.info({ attemptId, totalScore, mcqScore, codingScore }, "Attempt finalized");
 
-    // 6. Trigger auto-shortlisting and AI Interview scheduling logic
+    // 6. Fetch exam and candidate details for email notification
+    const { data: examData } = await db
+      .from("exams")
+      .select("pass_marks, title, total_marks")
+      .eq("id", updatedAttempt.exam_id)
+      .single();
+
+    const { data: candidate } = await db
+      .from("users")
+      .select("name, email")
+      .eq("id", updatedAttempt.candidate_id)
+      .single();
+
+    // Send result notification email (fire-and-forget)
+    if (candidate?.email && examData) {
+      const passed = totalScore >= (examData.pass_marks || 0);
+      sendResultPublishedEmail(
+        candidate.email,
+        candidate.name || "Candidate",
+        examData.title || "Exam",
+        totalScore,
+        examData.total_marks || 0,
+        passed,
+        APP_URL
+      ).catch((err: any) => logger.error({ err, candidateId: updatedAttempt.candidate_id }, "Failed to send result email"));
+    }
+
+    // 7. Trigger auto-shortlisting and AI Interview scheduling logic
     try {
-      const { data: examData } = await supabase
-        .from("exams")
-        .select("pass_marks, title")
-        .eq("id", updatedAttempt.exam_id)
-        .single();
-
       const passMarks = Number(examData?.pass_marks || 0);
       const passed = totalScore >= passMarks;
 
       if (passed) {
-        console.log(`[Queue] Attempt ${attemptId} qualified! Running auto-shortlisting workflow.`);
+        logger.info({ attemptId }, "Attempt qualified, running auto-shortlisting");
 
         // Find the job assignment
-        const { data: assignment } = await supabase
+        const { data: assignment } = await db
           .from("exam_assignments")
           .select("job_id, assigned_by")
           .eq("exam_id", updatedAttempt.exam_id)
@@ -194,7 +219,7 @@ class BackgroundGradingQueue {
 
         // Update candidate status
         if (assignment?.job_id) {
-          await supabase
+          await db
             .from("candidate_status")
             .upsert(
               { job_id: assignment.job_id, candidate_id: updatedAttempt.candidate_id, status: "shortlisted" },
@@ -203,7 +228,7 @@ class BackgroundGradingQueue {
         }
 
         // Create pending AI interview
-        const { data: existingInterview } = await supabase
+        const { data: existingInterview } = await db
           .from("ai_interviews")
           .select("id")
           .eq("candidate_id", updatedAttempt.candidate_id)
@@ -211,20 +236,20 @@ class BackgroundGradingQueue {
           .maybeSingle();
 
         if (!existingInterview) {
-          await supabase.from("ai_interviews").insert({
+          await db.from("ai_interviews").insert({
             candidate_id: updatedAttempt.candidate_id,
             job_id: assignment?.job_id || null,
             exam_id: updatedAttempt.exam_id,
             status: "pending",
             started_at: null,
           });
-          console.log(`[Queue] Successfully scheduled pending AI face-to-face interview.`);
+          logger.info({ attemptId, candidateId: updatedAttempt.candidate_id }, "Scheduled pending AI interview");
         }
 
         // Notify recruiter
         const recruiterId = assignment?.assigned_by;
         if (recruiterId) {
-          await supabase.from("notifications").insert({
+          await db.from("notifications").insert({
             user_id: recruiterId,
             title: "AI Interview Scheduling Required",
             body: `A candidate qualified "${examData?.title || "the exam"}". Please set the interview start and end time.`,
@@ -232,11 +257,11 @@ class BackgroundGradingQueue {
         }
       }
     } catch (shortlistErr) {
-      console.warn("[Queue] Auto-shortlist warning (non-fatal):", shortlistErr);
+      logger.warn({ error: shortlistErr }, "Auto-shortlist warning (non-fatal)");
     }
 
-    // 7. Trigger the plagiarism checker
-    console.log(`[Queue] Triggering plagiarism matching for attempt: ${attemptId}`);
+    // 8. Trigger the plagiarism checker
+    logger.info({ attemptId }, "Triggering plagiarism check");
     await runPlagiarismCheck(attemptId);
   }
 }

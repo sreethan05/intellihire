@@ -9,13 +9,16 @@
     "server": "npm --prefix server run start",
     "server:dev": "npm --prefix server run dev",
     "build": "npm --prefix client run build",
-    "check": "npm --prefix client run check",
-    "lint": "npm --prefix client run lint",
+    "check": "npm --prefix client run check && npm --prefix server run check",
+    "lint": "npm --prefix client run lint && npm --prefix server run lint",
     "preview": "npm --prefix client run preview",
     "start": "npm --prefix server run start",
-    "test": "npm --prefix server run test"
+    "test": "npm --prefix server run test",
+    "test:e2e": "npx playwright test"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "@playwright/test": "^1.61.1",
+    "concurrently": "^9.1.2",
+    "playwright": "^1.61.1"
   }
 }

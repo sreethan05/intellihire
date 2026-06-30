@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { authMiddleware } from "../middleware/auth";
-import { runWithJudge0 } from "../lib/judge0";
+import { authMiddleware } from "../middleware/auth.js";
+import { runWithJudge0 } from "../lib/judge0.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -33,7 +33,7 @@ router.post("/submit", async (req, res) => {
       return;
     }
 
-    const results = [];
+    const results: any[] = [];
     let passed = 0;
 
     for (const tc of test_cases) {

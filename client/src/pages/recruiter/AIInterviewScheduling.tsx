@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { toast } from "sonner";
 import type { AxiosError } from "axios";
 import { Button } from "@/components/ui/button";
@@ -48,7 +48,7 @@ export default function AIInterviewScheduling() {
 
   const [draftById, setDraftById] = useState<Record<string, { start: string; end: string }>>({});
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     setLoading(true);
     try {
       const [pendingRes, summariesRes] = await Promise.all([
@@ -67,11 +67,11 @@ export default function AIInterviewScheduling() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedCollegeId]);
 
   useEffect(() => {
     void refresh();
-  }, [selectedCollegeId]);
+  }, [refresh]);
 
   const scheduleCandidate = async (interview: Interview) => {
     const draft = draftById[interview.id];
