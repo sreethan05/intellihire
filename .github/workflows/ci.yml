@@ -113,7 +113,7 @@ jobs:
       JWT_SECRET: test-jwt-secret-must-be-32-chars-long-for-ci-only
       GROQ_API_KEY: test-groq-key
       GROQ_MODEL: llama-3.3-70b-versatile
-      DATABASE_URL: postgres://postgres:password@localhost:5433/intellihire_test
+      DATABASE_URL: postgres://postgres:password@127.0.0.1:5433/intellihire_test
     steps:
       - uses: actions/checkout@v4
 
