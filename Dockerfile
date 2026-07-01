@@ -27,8 +27,8 @@ WORKDIR /app
 # Set production environment
 ENV NODE_ENV=production
 
-# Copy built frontend
-COPY --from=builder /app/dist ./dist
+# Copy built frontend (vite outputs to server/dist)
+COPY --from=builder /app/server/dist ./dist
 
 # Copy server package files and install production deps
 COPY server/package*.json ./server/

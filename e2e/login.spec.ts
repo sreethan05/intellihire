@@ -13,7 +13,7 @@ test.describe("Login Flow", () => {
     await expect(page).toHaveURL(/admin\/overview/);
 
     // Dashboard should be visible
-    await expect(page.locator("text=Platform Overview")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Platform Control Overview" })).toBeVisible();
   });
 
   test("shows error for invalid credentials", async ({ page }) => {
