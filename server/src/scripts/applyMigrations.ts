@@ -60,6 +60,9 @@ async function applyMigrations() {
 
   } catch (err: unknown) {
     console.error("Migration/Seeding failed:", err);
+    if (process.env.CI) {
+      console.log(`::error::Migration/Seeding failed: ${err instanceof Error ? err.message + '\nStack: ' + err.stack : String(err)}`);
+    }
     process.exit(1);
   } finally {
     await pool.end();
