@@ -95,10 +95,25 @@ jobs:
   e2e:
     name: E2E Tests (Playwright)
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: intellihire_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       JWT_SECRET: test-jwt-secret-must-be-32-chars-long-for-ci-only
       GROQ_API_KEY: test-groq-key
       GROQ_MODEL: llama-3.3-70b-versatile
+      DATABASE_URL: postgres://postgres:password@localhost:5432/intellihire_test
     steps:
       - uses: actions/checkout@v4
 
@@ -119,6 +134,12 @@ jobs:
 
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
+
+      - name: Run Database Migrations
+        run: npm --prefix server run migrate
+
+      - name: Seed E2E Users
+        run: npx tsx server/src/seed_e2e_users.ts
 
       - name: Run E2E Tests
         run: npx playwright test
