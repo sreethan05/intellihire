@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "../lib/postgres.js";
-import { generateAiJson, hasAiKey } from "../lib/ai.js";
+import { generateExam, getBankStats } from "../lib/examPipeline.js";
 import { authMiddleware, type AuthRequest } from "../middleware/auth.js";
 
 const router = Router();
@@ -33,6 +33,38 @@ function normalizeWords(value: string) {
     .replace(/[^a-z0-9+#.\s-]/g, " ")
     .split(/\s+/)
     .filter(Boolean);
+}
+
+function normalizeDifficulty(raw: string): "easy" | "medium" | "hard" | "very_hard" {
+  const d = raw.toLowerCase().trim().replace(/\s+/g, "_");
+  if (d.includes("very") && (d.includes("hard") || d.includes("tough") || d.includes("difficult"))) return "very_hard";
+  if (d.includes("hard") || d.includes("tough") || d.includes("difficult")) return "hard";
+  if (d.includes("easy") || d.includes("simple") || d.includes("basic")) return "easy";
+  if (d.includes("medium") || d.includes("moderate") || d.includes("intermediate")) return "medium";
+  return "medium";
+}
+
+function mapPipelineToMcq(q: any): McqQuestion {
+  return {
+    question_text: q.question_text,
+    option_a: q.option_a,
+    option_b: q.option_b,
+    option_c: q.option_c,
+    option_d: q.option_d,
+    correct_option: (q.correct_option || "A").toUpperCase() as "A" | "B" | "C" | "D",
+    marks: q.marks || 1,
+  };
+}
+
+function mapPipelineToCoding(q: any): CodingDraft {
+  return {
+    title: q.title,
+    description: q.description,
+    difficulty: q.difficulty,
+    starter_code: q.starter_code || "",
+    test_cases: Array.isArray(q.test_cases) ? q.test_cases : [],
+    marks: q.marks || 10,
+  };
 }
 
 function pickSkills(text: string) {
@@ -257,19 +289,20 @@ const realFallbackCoding: Record<string, Record<string, CodingDraft[]>> = {
 
 function fallbackMcqs(topic: string, difficulty: string, count: number): McqQuestion[] {
   const topicKey = topic.toLowerCase().trim();
+  const lookupDifficulty = difficulty === "very_hard" ? "hard" : difficulty;
   const poolKeys = Object.keys(realFallbackMcqs);
   
   if (topicKey === "general dsa" || topicKey === "general" || topicKey === "technical" || !topicKey) {
     return Array.from({ length: count }).map((_, index) => {
       const key = poolKeys[index % poolKeys.length];
-      const diffPool = realFallbackMcqs[key][difficulty] || realFallbackMcqs[key]["easy"] || realFallbackMcqs[key]["medium"] || realFallbackMcqs[key]["hard"];
+      const diffPool = realFallbackMcqs[key][lookupDifficulty] || realFallbackMcqs[key]["easy"] || realFallbackMcqs[key]["medium"] || realFallbackMcqs[key]["hard"];
       const q = diffPool[Math.floor(index / poolKeys.length) % diffPool.length];
       return { ...q, question_text: `${q.question_text} (${key.toUpperCase()})` };
     });
   }
 
-  if (realFallbackMcqs[topicKey] && realFallbackMcqs[topicKey][difficulty]) {
-    const pool = realFallbackMcqs[topicKey][difficulty];
+  if (realFallbackMcqs[topicKey] && realFallbackMcqs[topicKey][lookupDifficulty]) {
+    const pool = realFallbackMcqs[topicKey][lookupDifficulty];
     return Array.from({ length: count }).map((_, index) => {
       const q = pool[index % pool.length];
       return { ...q };
@@ -316,7 +349,8 @@ function fallbackMcqs(topic: string, difficulty: string, count: number): McqQues
 }
 
 function fallbackCoding(topic: string, difficulty: string, index = 0): CodingDraft {
-  const marks = difficulty === "hard" ? 20 : difficulty === "easy" ? 10 : 15;
+  const lookupDifficulty = difficulty === "very_hard" ? "hard" : difficulty;
+  const marks = difficulty === "very_hard" ? 25 : difficulty === "hard" ? 20 : difficulty === "easy" ? 10 : 15;
   const topicKey = topic.toLowerCase().trim();
 
   if (topicKey === "general dsa" || topicKey === "general" || topicKey === "technical" || !topicKey) {
@@ -336,10 +370,10 @@ function fallbackCoding(topic: string, difficulty: string, index = 0): CodingDra
     };
   }
 
-  if (realFallbackCoding[topicKey] && realFallbackCoding[topicKey][difficulty]) {
-    const pool = realFallbackCoding[topicKey][difficulty];
+  if (realFallbackCoding[topicKey] && realFallbackCoding[topicKey][lookupDifficulty]) {
+    const pool = realFallbackCoding[topicKey][lookupDifficulty];
     const picked = pool[index % pool.length];
-    return { ...picked };
+    return { ...picked, difficulty, marks };
   }
 
   return {
@@ -355,7 +389,7 @@ function fallbackCoding(topic: string, difficulty: string, index = 0): CodingDra
   };
 }
 
-function cleanMcqs(value: unknown, topic: string, difficulty: string, count: number) {
+function _cleanMcqs(value: unknown, topic: string, difficulty: string, count: number) {
   const candidate = value as { questions?: McqQuestion[] };
   const questions = Array.isArray(candidate.questions) ? candidate.questions : [];
   const cleaned = questions.slice(0, count).map((question, index) => ({
@@ -393,7 +427,7 @@ function cleanCoding(value: unknown, topic: string, difficulty: string) {
   };
 }
 
-function cleanCodingList(value: unknown, topic: string, difficulty: string, count: number): CodingDraft[] {
+function _cleanCodingList(value: unknown, topic: string, difficulty: string, count: number): CodingDraft[] {
   const candidate = value as { questions?: Array<Partial<CodingDraft>> };
   const questions = Array.isArray(candidate.questions) ? candidate.questions : [];
   const cleaned = questions.slice(0, count).map((q) => cleanCoding({ question: q }, topic, difficulty));
@@ -426,90 +460,71 @@ router.post("/resume-parse", async (req: AuthRequest, res) => {
 
 router.post("/generate-mcq", async (req: AuthRequest, res) => {
   const topic = String(req.body.topic || "technical").toLowerCase();
-  const difficulty = String(req.body.difficulty || "medium").toLowerCase();
+  const difficulty = normalizeDifficulty(String(req.body.difficulty || "medium"));
   const count = Math.min(50, Math.max(1, Number(req.body.count || 5)));
 
-  if (!hasAiKey()) {
-    res.json({ questions: fallbackMcqs(topic, difficulty, count), source: "fallback" });
-    return;
+  // ─── IntelliHire Exam Pipeline ───
+  // Zero-API, zero-cost, local question bank with intelligent selection
+  // and deterministic variation. This replaces cloud LLM generation for exams.
+  try {
+    const bankStatus = await getBankStats();
+    if (bankStatus.healthy && bankStatus.totalMcq >= count) {
+      const result = await generateExam({
+        topic,
+        difficulty,
+        count,
+        questionType: "mcq",
+        balanceSubtopics: true,
+        variationDepth: 1,
+      });
+      const questions = result.questions.map(mapPipelineToMcq);
+      res.json({
+        questions,
+        source: "pipeline",
+        metadata: result.metadata,
+      });
+      return;
+    }
+  } catch (err: any) {
+    console.warn("[ExamPipeline] MCQ generation failed, falling back to static bank:", err.message);
   }
 
-  try {
-    const generated = await generateAiJson<{ questions: McqQuestion[] }>(`
-Return only valid JSON. Create ${count} ${difficulty} campus hiring MCQ questions about ${topic}.
-Schema:
-{
-  "questions": [
-    {
-      "question_text": "string",
-      "option_a": "string",
-      "option_b": "string",
-      "option_c": "string",
-      "option_d": "string",
-      "correct_option": "A",
-      "marks": 1
-    }
-  ]
-}
-Rules:
-- correct_option must be A, B, C, or D.
-- Keep explanations out of the JSON.
-- Questions should be usable in a college recruitment assessment.
-- Do NOT include metadata words like "easy level", "medium difficulty", "hard level" or "campus assessment concept" in the question text or options.
-`);
-    res.json({ questions: cleanMcqs(generated, topic, difficulty, count), source: "ai" });
-  } catch (err) {
-    console.error("AI MCQ generation error:", err);
-    res.json({ questions: fallbackMcqs(topic, difficulty, count), source: "fallback" });
-  }
+  // Fallback: static in-memory bank (no API call)
+  res.json({ questions: fallbackMcqs(topic, difficulty, count), source: "fallback" });
 });
 
 router.post("/generate-coding", async (req: AuthRequest, res) => {
   const topic = String(req.body.topic || "arrays").toLowerCase();
-  const difficulty = String(req.body.difficulty || "medium").toLowerCase();
+  const difficulty = normalizeDifficulty(String(req.body.difficulty || "medium"));
   const count = Math.min(5, Math.max(1, Number(req.body.count || 1)));
 
-  if (!hasAiKey()) {
-    const questions = Array.from({ length: count }).map((_, idx) => fallbackCoding(topic, difficulty, idx));
-    res.json({ questions, question: questions[0], source: "fallback" });
-    return;
+  // ─── IntelliHire Exam Pipeline ───
+  try {
+    const bankStatus = await getBankStats();
+    if (bankStatus.healthy && bankStatus.totalCoding >= count) {
+      const result = await generateExam({
+        topic,
+        difficulty,
+        count,
+        questionType: "coding",
+        variationDepth: 1,
+      });
+      const questions = result.codingQuestions.map(mapPipelineToCoding);
+      res.json({
+        questions,
+        question: questions[0] || fallbackCoding(topic, difficulty, 0),
+        source: "pipeline",
+        metadata: result.metadata,
+      });
+      return;
+    }
+  } catch (err: any) {
+    console.warn("[ExamPipeline] Coding generation failed, falling back to static bank:", err.message);
   }
 
-  try {
-    const generated = await generateAiJson<{ questions: CodingDraft[] }>(`
-Return only valid JSON. Create ${count} ${difficulty} coding problems for a campus hiring exam about ${topic}.
-Schema:
-{
-  "questions": [
-    {
-      "title": "string",
-      "description": "string",
-      "difficulty": "${difficulty}",
-      "starter_code": "Python starter code string",
-      "test_cases": [
-        { "input": "string", "expected_output": "string" }
-      ],
-      "marks": 10
-    }
-  ]
-}
-Rules:
-- Include at least 2 visible test cases per question.
-- The problems must use stdin/stdout.
-- Do not include markdown.
-- Do NOT include metadata words like "easy level", "medium difficulty", "hard level" or "campus assessment concept" in the title or description.
-`);
-    const cleanedQuestions = cleanCodingList(generated, topic, difficulty, count);
-    res.json({
-      questions: cleanedQuestions,
-      question: cleanedQuestions[0] || fallbackCoding(topic, difficulty, 0),
-      source: "ai"
-    });
-  } catch (err) {
-    console.error("AI coding generation error:", err);
-    const questions = Array.from({ length: count }).map((_, idx) => fallbackCoding(topic, difficulty, idx));
-    res.json({ questions, question: questions[0], source: "fallback" });
-  }
+  // Fallback: static in-memory bank (no API call)
+  const questions = Array.from({ length: count }).map((_, idx) => fallbackCoding(topic, difficulty, idx));
+  res.json({ questions, question: questions[0], source: "fallback" });
 });
 
 router.post("/improvement-report", async (req: AuthRequest, res) => {

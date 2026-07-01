@@ -1,6 +1,7 @@
 import { Server } from "socket.io";
 import type { Server as HTTPServer } from "http";
 import { logger } from "./lib/logger.js";
+import { db } from "./lib/postgres.js";
 
 export function setupWebSocket(httpServer: HTTPServer) {
   const io = new Server(httpServer, {
@@ -56,6 +57,12 @@ export function setupWebSocket(httpServer: HTTPServer) {
       logger.info({ socketId: socket.id, room }, "Joined monitoring room");
     });
 
+    // Admin joins the global admin monitoring room
+    socket.on("admin:join", () => {
+      socket.join("admin");
+      logger.info({ socketId: socket.id }, "Admin joined admin room");
+    });
+
     // Candidate sends a snapshot event (broadcast to monitoring room)
     socket.on("proctor:snapshot", (data: { attemptId: string; examId: string; snapshotData: string; timestamp: string }) => {
       const monitorRoom = `monitor:${data.examId}`;
@@ -67,7 +74,7 @@ export function setupWebSocket(httpServer: HTTPServer) {
     });
 
     // Candidate sends a violation event (broadcast to monitoring room with urgency)
-    socket.on("proctor:violation", (data: { attemptId: string; examId: string; violationCount: number; message: string; timestamp: string }) => {
+    socket.on("proctor:violation", async (data: { attemptId: string; examId: string; violationCount: number; message: string; timestamp: string }) => {
       const monitorRoom = `monitor:${data.examId}`;
       io.to(monitorRoom).emit("proctor:violation", {
         attemptId: data.attemptId,
@@ -75,6 +82,29 @@ export function setupWebSocket(httpServer: HTTPServer) {
         message: data.message,
         timestamp: data.timestamp,
       });
+
+      try {
+        const { data: attempt } = await db.from("attempts").select("candidate_id, exams:exam_id(title)").eq("id", data.attemptId).single() as any;
+        const candidateId = attempt?.candidate_id;
+        const examTitle = attempt?.exams?.title || "Exam";
+        let candidateName = "Candidate";
+        if (candidateId) {
+          const { data: candidate } = await db.from("users").select("name").eq("id", candidateId).single();
+          candidateName = candidate?.name || "Candidate";
+        }
+
+        io.to("admin").emit("admin:proctor_violation", {
+          attemptId: data.attemptId,
+          candidateName,
+          examTitle,
+          message: data.message,
+          violationCount: data.violationCount,
+          timestamp: data.timestamp,
+        });
+      } catch (err) {
+        logger.error(err, "Failed to resolve names for admin alert");
+      }
+
       logger.warn({ attemptId: data.attemptId, violationCount: data.violationCount }, "Proctoring violation broadcast");
     });
 

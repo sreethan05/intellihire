@@ -38,7 +38,7 @@ type SortSpec = {
   ascending: boolean;
 };
 
-type FilterOperator = "eq" | "neq" | "gt" | "gte" | "lt" | "lte" | "in" | "ilike" | "like";
+type FilterOperator = "eq" | "neq" | "gt" | "gte" | "lt" | "lte" | "in" | "ilike" | "like" | "overlaps";
 
 type SimpleFilter = {
   kind: "simple";
@@ -382,6 +382,13 @@ function conditionSql(filter: SimpleFilter, values: unknown[]) {
     return `${column} IN (${list.map((item) => parameter(values, normalizeValue(item))).join(", ")})`;
   }
 
+  if (filter.operator === "overlaps") {
+    const list = Array.isArray(value) ? value : [];
+    if (list.length === 0) return "false";
+    const placeholder = parameter(values, list);
+    return `${column} ?| ${placeholder}::text[]`;
+  }
+
   const placeholder = parameter(values, value);
   switch (filter.operator) {
     case "eq":
@@ -552,6 +559,10 @@ class PostgresQueryBuilder implements PromiseLike<QueryResponse> {
 
   in(column: string, values: unknown[]) {
     return this.addFilter(column, "in", values);
+  }
+
+  overlaps(column: string, values: unknown[]) {
+    return this.addFilter(column, "overlaps", values);
   }
 
   or(source: string) {

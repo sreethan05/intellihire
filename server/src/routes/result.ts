@@ -248,6 +248,24 @@ router.post("/submit-exam", async (req: AuthRequest, res) => {
     // This allows the route to return immediately (< 100ms) preventing timeouts!
     gradingQueue.push(attempt_id);
 
+    const io = req.app.get("io");
+    if (io) {
+      Promise.all([
+        Promise.resolve(db.from("users").select("name").eq("id", req.user!.id).single()),
+        Promise.resolve(db.from("exams").select("title").eq("id", data.exam_id).single())
+      ])
+        .then(([userRes, examRes]) => {
+          io.to("admin").emit("admin:exam_submission", {
+            attemptId: attempt_id,
+            candidateName: userRes.data?.name || req.user!.email,
+            examTitle: examRes.data?.title || "Exam",
+            submittedAt: data.submitted_at,
+            score: data.score || 0,
+          });
+        })
+        .catch((err) => console.error("Socket emit submit-exam error:", err));
+    }
+
     res.json({ 
       message: "Exam submitted successfully. Grading is processing in the background.", 
       attempt: data 

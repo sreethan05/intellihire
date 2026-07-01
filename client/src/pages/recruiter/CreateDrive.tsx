@@ -387,7 +387,7 @@ export default function CreateDrive() {
                                             </span>
                                             {candProfile.resume_url && (
                                               <a
-                                                href={candProfile.resume_url}
+                                                href={candProfile.resume_url ? (import.meta.env.VITE_API_URL || "").replace(/\/api$/, "") + candProfile.resume_url : ""}
                                                 target="_blank"
                                                 rel="noreferrer"
                                                 className="flex items-center text-[10px] font-bold text-blue-600 hover:underline"

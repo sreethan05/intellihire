@@ -13,6 +13,7 @@ import path from "path";
 
 import { initSentry } from "./lib/sentry.js";
 import { isPostgresConfigured, storageRoot } from "./lib/postgres.js";
+import { getBankStats } from "./lib/examPipeline.js";
 initSentry();
 import { errorHandler } from "./middleware/errorHandler.js";
 import { requestLogger } from "./middleware/logger.js";
@@ -29,6 +30,10 @@ import proctoringRoutes from "./routes/proctoring.js";
 import aiRoutes from "./routes/ai.js";
 import interviewRoutes from "./routes/interview.js";
 import candidateAssetsRoutes from "./routes/candidateAssets.js";
+import candidateAnalyticsRoutes from "./routes/candidateAnalytics.js";
+import recruiterAnalyticsRoutes from "./routes/recruiterAnalytics.js";
+import tpoAnalyticsRoutes from "./routes/tpoAnalytics.js";
+import adminAnalyticsRoutes from "./routes/adminAnalytics.js";
 
 import docsRoutes from "./routes/docs.js";
 
@@ -97,9 +102,13 @@ export function createApp() {
   // ─── API Routes ───
   app.use("/api/auth", authRoutes);
   app.use("/api/admin", adminRoutes);
+  app.use("/api/admin", adminAnalyticsRoutes);
   app.use("/api/recruiter", recruiterRoutes);
+  app.use("/api/recruiter", recruiterAnalyticsRoutes);
   app.use("/api/tpo", tpoRoutes);
+  app.use("/api/tpo", tpoAnalyticsRoutes);
   app.use("/api/candidate", candidateRoutes);
+  app.use("/api/candidate", candidateAnalyticsRoutes);
   app.use("/api/exam", examRoutes);
   app.use("/api/result", resultRoutes);
   app.use("/api/compiler", compilerRoutes);
@@ -144,6 +153,13 @@ export function createApp() {
     );
     const isGroqConfigured = Boolean(process.env.GROQ_API_KEY);
 
+    let pipelineStatus = { healthy: false, totalMcq: 0, totalCoding: 0 };
+    try {
+      pipelineStatus = await getBankStats();
+    } catch {
+      // Pipeline status unavailable
+    }
+
     const judge0Status = {
       endpoint: process.env.JUDGE0_API_URL || "https://ce.judge0.com",
       isPrivate: Boolean(process.env.JUDGE0_API_URL && !process.env.JUDGE0_API_URL.includes("ce.judge0.com")),
@@ -162,6 +178,7 @@ export function createApp() {
         judge0: judge0Status,
         email: Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS),
         sentry: Boolean(process.env.SENTRY_DSN),
+        pipeline: pipelineStatus,
       },
     });
   });

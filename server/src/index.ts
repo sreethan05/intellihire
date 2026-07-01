@@ -8,6 +8,7 @@ const NODE_ENV = process.env.NODE_ENV || "development";
 
 const httpServer = createServer(app);
 const io = setupWebSocket(httpServer);
+app.set("io", io);
 
 httpServer.listen(PORT, () => {
   logger.info(

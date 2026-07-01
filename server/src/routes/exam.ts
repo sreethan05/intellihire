@@ -295,10 +295,23 @@ router.post("/start", async (req: AuthRequest, res) => {
     if (existingAttempt) { res.json({ attempt: existingAttempt }); return; }
     const { data: completedAttempt } = await db.from("attempts").select("*").eq("exam_id", exam_id).eq("candidate_id", req.user!.id).eq("status", "completed").maybeSingle();
     if (completedAttempt) { res.status(400).json({ error: "Exam already completed" }); return; }
-    const { data: exam, error: examErr } = await db.from("exams").select("created_by").eq("id", exam_id).single();
+    const { data: exam, error: examErr } = await db.from("exams").select("created_by, title").eq("id", exam_id).single();
     if (examErr || !exam) { res.status(404).json({ error: "Exam not found" }); return; }
+    const { data: userProfile } = await db.from("users").select("name").eq("id", req.user!.id).single();
+    const candidateName = userProfile?.name || req.user!.email;
     const { data, error } = await db.from("attempts").insert({ exam_id, candidate_id: req.user!.id, recruiter_id: exam.created_by, status: "in_progress", score: 0, started_at: new Date().toISOString() }).select().single();
     if (error) { res.status(400).json({ error: error.message }); return; }
+    
+    const io = req.app.get("io");
+    if (io) {
+      io.to("admin").emit("admin:exam_start", {
+        attemptId: data.id,
+        candidateName,
+        examTitle: exam.title || "Exam",
+        startedAt: data.started_at,
+      });
+    }
+    
     res.json({ attempt: data });
   } catch (err) { console.error("Start exam error:", err); res.status(500).json({ error: "Server error" }); }
 });

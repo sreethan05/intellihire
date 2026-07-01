@@ -1,4 +1,10 @@
 import { scanMarksheetOCR } from "./ocr.js";
+import {
+  ollamaGeneratePromptJson,
+  ollamaGenerateText,
+  isOllamaAvailable,
+  checkOllamaStatus,
+} from "./ollama.js";
 
 type MarksheetFile = {
   name: string;
@@ -31,6 +37,7 @@ function getKeys() {
     GEMINI_MODEL: process.env.GEMINI_MODEL || "gemini-2.0-flash",
     GROQ_API_KEY: process.env.GROQ_API_KEY,
     GROQ_MODEL: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
+    OLLAMA_MODEL: process.env.OLLAMA_MODEL || "llama3.2:3b",
   };
 }
 
@@ -67,6 +74,21 @@ export function hasAiKey() {
 // Keep hasGeminiKey as deprecated alias for safety
 export function hasGeminiKey() {
   return hasAiKey();
+}
+
+/**
+ * Check if local Ollama is available for exam generation.
+ * This is the preferred provider for exams to avoid API costs.
+ */
+export async function hasLocalModel(): Promise<boolean> {
+  return isOllamaAvailable();
+}
+
+/**
+ * Get the active Ollama status for health checks and diagnostics.
+ */
+export async function getOllamaStatus() {
+  return checkOllamaStatus();
 }
 
 export async function generateGroqText(prompt: string | { systemPrompt?: string; userPrompt: string }): Promise<string> {
@@ -153,13 +175,25 @@ export async function generateGroqJson<T>(prompt: string | { systemPrompt?: stri
 }
 
 export async function generateAiText(prompt: string | { systemPrompt?: string; userPrompt: string }): Promise<string> {
-  const { GEMINI_API_KEY, GEMINI_MODEL, GROQ_API_KEY } = getKeys();
+  // Try local Ollama first for zero-cost, zero-latency generation
+  const { OLLAMA_MODEL } = getKeys();
+  if (await isOllamaAvailable()) {
+    try {
+      const systemPrompt = typeof prompt === "object" ? prompt.systemPrompt : undefined;
+      const userPrompt = typeof prompt === "object" ? prompt.userPrompt : prompt;
+      return await ollamaGenerateText(userPrompt, { model: OLLAMA_MODEL, system: systemPrompt, temperature: 0.35 });
+    } catch (err: any) {
+      console.warn("[AI] Ollama text generation failed, falling back to cloud...", err.message);
+    }
+  }
+
+  const { GEMINI_API_KEY, GROQ_API_KEY } = getKeys();
   if (GROQ_API_KEY && !GEMINI_API_KEY) {
     return generateGroqText(prompt);
   }
 
   if (!GEMINI_API_KEY) {
-    throw new Error("Neither GEMINI_API_KEY nor GROQ_API_KEY is configured");
+    throw new Error("Neither GEMINI_API_KEY, GROQ_API_KEY, nor Ollama is available");
   }
 
   const systemPrompt = typeof prompt === "object" ? prompt.systemPrompt : undefined;
@@ -184,7 +218,7 @@ export async function generateAiText(prompt: string | { systemPrompt?: string; u
       };
     }
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${getKeys().GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(bodyPayload),
@@ -216,13 +250,27 @@ export function generateGeminiText(prompt: string | { systemPrompt?: string; use
 }
 
 export async function generateAiJson<T>(prompt: string | { systemPrompt?: string; userPrompt: string }): Promise<T> {
-  const { GEMINI_API_KEY, GEMINI_MODEL, GROQ_API_KEY } = getKeys();
+  // Try local Ollama FIRST for exam generation — zero API cost, zero latency, fully private
+  const { OLLAMA_MODEL } = getKeys();
+  if (await isOllamaAvailable()) {
+    try {
+      const systemPrompt = typeof prompt === "object" ? prompt.systemPrompt : undefined;
+      const userPrompt = typeof prompt === "object" ? prompt.userPrompt : prompt;
+      const result = await ollamaGeneratePromptJson<T>(userPrompt, systemPrompt, { model: OLLAMA_MODEL, temperature: 0.2 });
+      console.log("[AI] Ollama JSON generation succeeded — no cloud API used.");
+      return result;
+    } catch (err: any) {
+      console.warn("[AI] Ollama JSON generation failed, falling back to cloud...", err.message);
+    }
+  }
+
+  const { GEMINI_API_KEY, GROQ_API_KEY } = getKeys();
   if (GROQ_API_KEY && !GEMINI_API_KEY) {
     return generateGroqJson<T>(prompt);
   }
 
   if (!GEMINI_API_KEY) {
-    throw new Error("Neither GEMINI_API_KEY nor GROQ_API_KEY is configured");
+    throw new Error("Neither GEMINI_API_KEY, GROQ_API_KEY, nor Ollama is available");
   }
 
   const systemPrompt = typeof prompt === "object" ? prompt.systemPrompt : undefined;
@@ -248,7 +296,7 @@ export async function generateAiJson<T>(prompt: string | { systemPrompt?: string
       };
     }
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${getKeys().GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(bodyPayload),

@@ -152,6 +152,14 @@ export const candidateApi = {
     marksheet_url?: string;
     resume_url?: string;
   }) => api.post("/candidate/onboarding", data),
+  uploadResume: (file: File) => {
+    const formData = new FormData();
+    formData.append("resume", file);
+    return api.post("/candidate/resume/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" }
+    });
+  },
+  deleteResume: () => api.delete("/candidate/resume")
 };
 
 export const resultApi = {
@@ -240,4 +248,47 @@ export const interviewApi = {
 export const assetApi = {
   getCertificates: () => api.get("/assets/certificates"),
   getBadges: () => api.get("/assets/badges"),
+};
+
+export const candidateAnalyticsApi = {
+  getTopicMastery: () => api.get("/candidate/topic-mastery"),
+  getCodingAnalytics: () => api.get("/candidate/coding-analytics"),
+  getInterviewAnalytics: () => api.get("/candidate/interview-analytics"),
+  getJobPipeline: () => api.get("/candidate/job-pipeline"),
+  getStreak: () => api.get("/candidate/streak"),
+  getReadinessScore: () => api.get("/candidate/readiness-score"),
+  getProctoringSummary: () => api.get("/candidate/proctoring-summary"),
+  getPeerComparison: () => api.get("/candidate/peer-comparison"),
+};
+
+export const recruiterAnalyticsApi = {
+  getCandidateAnalytics: (candidateId: string) => api.get(`/recruiter/candidates/${candidateId}/analytics`),
+  getExamTopicPerformance: (examId: string) => api.get(`/recruiter/exams/${examId}/topic-performance`),
+  getProctoringAnalytics: (collegeId?: string | null) =>
+    api.get("/recruiter/proctoring-analytics", { params: collegeId ? { collegeId } : undefined }),
+  getPlagiarismAnalytics: (collegeId?: string | null) =>
+    api.get("/recruiter/plagiarism-analytics", { params: collegeId ? { collegeId } : undefined }),
+  getInterviewFunnel: (collegeId?: string | null) =>
+    api.get("/recruiter/interview-funnel", { params: collegeId ? { collegeId } : undefined }),
+  getTimeToComplete: (collegeId?: string | null) =>
+    api.get("/recruiter/time-to-complete", { params: collegeId ? { collegeId } : undefined }),
+  getCodingLanguages: (collegeId?: string | null) =>
+    api.get("/recruiter/coding-languages", { params: collegeId ? { collegeId } : undefined }),
+  getPredictiveShortlist: (collegeId?: string | null, jobId?: string | null) =>
+    api.get("/recruiter/predictive-shortlist", {
+      params: { ...(collegeId ? { collegeId } : {}), ...(jobId ? { jobId } : {}) },
+    }),
+};
+
+export const tpoAnalyticsApi = {
+  getPlacementStats: () => api.get("/tpo/placement-stats"),
+  getReadinessHeatmap: () => api.get("/tpo/readiness-heatmap"),
+  getCompanyPerformance: () => api.get("/tpo/company-performance"),
+  getUploadTracking: () => api.get("/tpo/upload-tracking"),
+};
+
+export const adminAnalyticsApi = {
+  getPlatformGrowth: () => api.get("/admin/platform-growth"),
+  getSystemHealth: () => api.get("/admin/system-health"),
+  getRealTimeActivity: () => api.get("/admin/real-time-activity"),
 };
