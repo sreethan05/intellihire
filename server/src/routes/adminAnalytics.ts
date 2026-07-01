@@ -189,7 +189,6 @@ router.get("/system-health", async (req: AuthRequest, res) => {
     }).length;
 
     const judge0Key = process.env.JUDGE0_API_KEY;
-    const geminiKey = process.env.GEMINI_API_KEY;
     const groqKey = process.env.GROQ_API_KEY;
 
     const apis = {
@@ -197,13 +196,9 @@ router.get("/system-health", async (req: AuthRequest, res) => {
         status: judge0Key ? "healthy" : "unknown",
         responseTimeMs: judge0Key ? 800 : 0,
       },
-      gemini: {
-        status: geminiKey ? "healthy" : "unknown",
-        responseTimeMs: geminiKey ? 1200 : 0,
-      },
       groq: {
-        status: groqKey ? "degraded" : "unknown",
-        responseTimeMs: groqKey ? 3500 : 0,
+        status: groqKey ? "healthy" : "unknown",
+        responseTimeMs: groqKey ? 1200 : 0,
       },
     };
 

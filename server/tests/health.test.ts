@@ -12,7 +12,6 @@ describe("GET /api/health", () => {
     assert.ok(res.body.timestamp);
     assert.ok("services" in res.body);
     assert.ok("postgres" in res.body.services);
-    assert.ok("gemini" in res.body.services);
     assert.ok("groq" in res.body.services);
     assert.equal(res.body.environment, "development");
   });

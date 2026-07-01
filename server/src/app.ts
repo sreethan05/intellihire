@@ -148,9 +148,6 @@ export function createApp() {
    */
   app.get("/api/health", async (_req, res) => {
     const isPostgresHealthy = isPostgresConfigured();
-    const isGeminiConfigured = Boolean(
-      process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
-    );
     const isGroqConfigured = Boolean(process.env.GROQ_API_KEY);
 
     let pipelineStatus = { healthy: false, totalMcq: 0, totalCoding: 0 };
@@ -173,7 +170,6 @@ export function createApp() {
       environment: NODE_ENV,
       services: {
         postgres: isPostgresHealthy,
-        gemini: isGeminiConfigured,
         groq: isGroqConfigured,
         judge0: judge0Status,
         email: Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS),

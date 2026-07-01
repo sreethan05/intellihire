@@ -328,8 +328,7 @@ export default function AdminDashboard() {
                 <tbody className="divide-y divide-slate-100 font-semibold text-slate-600">
                   {[
                     { name: "Judge0 Compiler API", scope: "Coding Compile", key: "judge0" },
-                    { name: "Google Gemini API", scope: "Interview evaluation", key: "gemini" },
-                    { name: "Groq Voice Whisper API", scope: "Whisper speech-to-text", key: "groq" },
+                    { name: "Groq Llama & Whisper API", scope: "Text & speech-to-text", key: "groq" },
                   ].map((service) => {
                     const health = healthData.apis?.[service.key] || { status: "unknown", responseTimeMs: 0 };
                     const statusConfig = apiStatusTone(health.status);

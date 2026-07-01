@@ -187,61 +187,12 @@ export async function generateAiText(prompt: string | { systemPrompt?: string; u
     }
   }
 
-  const { GEMINI_API_KEY, GROQ_API_KEY } = getKeys();
-  if (GROQ_API_KEY && !GEMINI_API_KEY) {
-    return generateGroqText(prompt);
+  const { GROQ_API_KEY } = getKeys();
+  if (!GROQ_API_KEY) {
+    throw new Error("GROQ_API_KEY is not configured and Ollama is unavailable");
   }
 
-  if (!GEMINI_API_KEY) {
-    throw new Error("Neither GEMINI_API_KEY, GROQ_API_KEY, nor Ollama is available");
-  }
-
-  const systemPrompt = typeof prompt === "object" ? prompt.systemPrompt : undefined;
-  const userPrompt = typeof prompt === "object" ? prompt.userPrompt : prompt;
-
-  try {
-    const bodyPayload: any = {
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: userPrompt }],
-        },
-      ],
-      generationConfig: {
-        temperature: 0.35,
-      },
-    };
-
-    if (systemPrompt) {
-      bodyPayload.systemInstruction = {
-        parts: [{ text: systemPrompt }],
-      };
-    }
-
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${getKeys().GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(bodyPayload),
-    });
-
-    const body = await response.json();
-    if (!response.ok) {
-      throw new Error(body?.error?.message || "Gemini request failed");
-    }
-
-    const text = body?.candidates?.[0]?.content?.parts?.find((part: { text?: string }) => part.text)?.text;
-    if (!text) {
-      throw new Error("Gemini returned an empty response");
-    }
-
-    return text;
-  } catch (err) {
-    if (GROQ_API_KEY) {
-      console.warn("Gemini generation failed, trying Groq fallback...", err);
-      return generateGroqText(prompt);
-    }
-    throw err;
-  }
+  return generateGroqText(prompt);
 }
 
 // Keep generateGeminiText as alias
@@ -264,62 +215,12 @@ export async function generateAiJson<T>(prompt: string | { systemPrompt?: string
     }
   }
 
-  const { GEMINI_API_KEY, GROQ_API_KEY } = getKeys();
-  if (GROQ_API_KEY && !GEMINI_API_KEY) {
-    return generateGroqJson<T>(prompt);
+  const { GROQ_API_KEY } = getKeys();
+  if (!GROQ_API_KEY) {
+    throw new Error("GROQ_API_KEY is not configured and Ollama is unavailable");
   }
 
-  if (!GEMINI_API_KEY) {
-    throw new Error("Neither GEMINI_API_KEY, GROQ_API_KEY, nor Ollama is available");
-  }
-
-  const systemPrompt = typeof prompt === "object" ? prompt.systemPrompt : undefined;
-  const userPrompt = typeof prompt === "object" ? prompt.userPrompt : prompt;
-
-  try {
-    const bodyPayload: any = {
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: userPrompt }],
-        },
-      ],
-      generationConfig: {
-        temperature: 0.2,
-        responseMimeType: "application/json",
-      },
-    };
-
-    if (systemPrompt) {
-      bodyPayload.systemInstruction = {
-        parts: [{ text: systemPrompt }],
-      };
-    }
-
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${getKeys().GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(bodyPayload),
-    });
-
-    const body = await response.json();
-    if (!response.ok) {
-      throw new Error(body?.error?.message || "Gemini request failed");
-    }
-
-    const text = body?.candidates?.[0]?.content?.parts?.find((part: { text?: string }) => part.text)?.text;
-    if (!text) {
-      throw new Error("Gemini returned an empty response");
-    }
-
-    return parseJson(text) as T;
-  } catch (err) {
-    if (GROQ_API_KEY) {
-      console.warn("Gemini generation failed, trying Groq fallback...", err);
-      return generateGroqJson<T>(prompt);
-    }
-    throw err;
-  }
+  return generateGroqJson<T>(prompt);
 }
 
 // Keep generateGeminiJson as alias
@@ -328,111 +229,52 @@ export function generateGeminiJson<T>(prompt: string | { systemPrompt?: string; 
 }
 
 export async function scanMarksheet(file: MarksheetFile): Promise<ScannedStudent> {
-  const { GEMINI_API_KEY, GEMINI_MODEL, GROQ_API_KEY } = getKeys();
-  if (!GEMINI_API_KEY && !GROQ_API_KEY) {
-    throw new Error("Either GEMINI_API_KEY or GROQ_API_KEY is required for marksheet scanning");
+  const { GROQ_API_KEY } = getKeys();
+  if (!GROQ_API_KEY) {
+    throw new Error("GROQ_API_KEY is required for marksheet scanning");
   }
 
-  if (GROQ_API_KEY && !GEMINI_API_KEY) {
-    try {
-      const ocrResult = await scanMarksheetOCR(file);
-      if (ocrResult.confidence >= 0.95) {
-        return ocrResult;
-      }
-
-      const prompt = `
-        ${extractionPrompt}
-        
-        Below is the raw text extracted via OCR from the marksheet file "${file.name}":
-        ---
-        ${ocrResult.roll_number ? `Detected Roll Number: ${ocrResult.roll_number}\n` : ""}
-        ${ocrResult.name ? `Detected Name: ${ocrResult.name}\n` : ""}
-        ${ocrResult.branch ? `Detected Branch: ${ocrResult.branch}\n` : ""}
-        ${!isNaN(ocrResult.cgpa) ? `Detected CGPA: ${ocrResult.cgpa}\n` : ""}
-        ${ocrResult.graduation_year ? `Detected Graduation Year: ${ocrResult.graduation_year}\n` : ""}
-        ---
-        Please verify the fields, correct any typographical OCR errors, and output the clean JSON object matching the schema.
-      `;
-
-      const parsed = await generateGroqJson<any>(prompt);
-      const roll_number = String(parsed.roll_number || ocrResult.roll_number || "").trim().toUpperCase();
-      const name = String(parsed.name || ocrResult.name || "").trim();
-      const branch = String(parsed.branch || ocrResult.branch || "").trim().toUpperCase();
-      const cgpa = Number(parsed.cgpa ?? ocrResult.cgpa);
-      const graduation_year = Number(parsed.graduation_year ?? ocrResult.graduation_year);
-
-      return {
-        roll_number,
-        name,
-        branch,
-        cgpa,
-        graduation_year,
-        confidence: Number(parsed.confidence || 0.85),
-        source_file: file.name,
-        warnings: Array.isArray(parsed.warnings) ? parsed.warnings.map(String) : ocrResult.warnings,
-      };
-    } catch (err) {
-      console.warn("Groq marksheet correction failed, returning raw OCR:", err);
-      return scanMarksheetOCR(file);
+  try {
+    const ocrResult = await scanMarksheetOCR(file);
+    if (ocrResult.confidence >= 0.95) {
+      return ocrResult;
     }
+
+    const prompt = `
+      ${extractionPrompt}
+      
+      Below is the raw text extracted via OCR from the marksheet file "${file.name}":
+      ---
+      ${ocrResult.roll_number ? `Detected Roll Number: ${ocrResult.roll_number}\n` : ""}
+      ${ocrResult.name ? `Detected Name: ${ocrResult.name}\n` : ""}
+      ${ocrResult.branch ? `Detected Branch: ${ocrResult.branch}\n` : ""}
+      ${!isNaN(ocrResult.cgpa) ? `Detected CGPA: ${ocrResult.cgpa}\n` : ""}
+      ${ocrResult.graduation_year ? `Detected Graduation Year: ${ocrResult.graduation_year}\n` : ""}
+      ---
+      Please verify the fields, correct any typographical OCR errors, and output the clean JSON object matching the schema.
+    `;
+
+    const parsed = await generateGroqJson<any>(prompt);
+    const roll_number = String(parsed.roll_number || ocrResult.roll_number || "").trim().toUpperCase();
+    const name = String(parsed.name || ocrResult.name || "").trim();
+    const branch = String(parsed.branch || ocrResult.branch || "").trim().toUpperCase();
+    const cgpa = Number(parsed.cgpa ?? ocrResult.cgpa);
+    const graduation_year = Number(parsed.graduation_year ?? ocrResult.graduation_year);
+
+    return {
+      roll_number,
+      name,
+      branch,
+      cgpa,
+      graduation_year,
+      confidence: Number(parsed.confidence || 0.85),
+      source_file: file.name,
+      warnings: Array.isArray(parsed.warnings) ? parsed.warnings.map(String) : ocrResult.warnings,
+    };
+  } catch (err) {
+    console.warn("Groq marksheet correction failed, returning raw OCR:", err);
+    return scanMarksheetOCR(file);
   }
-
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { text: extractionPrompt },
-            {
-              inline_data: {
-                mime_type: file.mimeType,
-                data: file.data,
-              },
-            },
-          ],
-        },
-      ],
-      generationConfig: {
-        temperature: 0,
-        responseMimeType: "application/json",
-      },
-    }),
-  });
-
-  const body = await response.json();
-  if (!response.ok) {
-    throw new Error(body?.error?.message || `Gemini scan failed for ${file.name}`);
-  }
-
-  const text = body?.candidates?.[0]?.content?.parts?.find((part: { text?: string }) => part.text)?.text;
-  if (!text) {
-    throw new Error(`No extraction result for ${file.name}`);
-  }
-
-  const parsed = parseJson(text);
-  const roll_number = String(parsed.roll_number || "").trim().toUpperCase();
-  const name = String(parsed.name || "").trim();
-  const branch = String(parsed.branch || "").trim().toUpperCase();
-  const cgpa = Number(parsed.cgpa);
-  const graduation_year = Number(parsed.graduation_year);
-
-  if (!roll_number || !name || !branch || Number.isNaN(cgpa) || Number.isNaN(graduation_year)) {
-    throw new Error(`Could not extract required fields from ${file.name}`);
-  }
-
-  return {
-    roll_number,
-    name,
-    branch,
-    cgpa,
-    graduation_year,
-    confidence: Number(parsed.confidence || 0),
-    source_file: file.name,
-    warnings: Array.isArray(parsed.warnings) ? parsed.warnings.map(String) : [],
-  };
 }
 
 export type SnapshotAnalysis = {
@@ -517,93 +359,11 @@ Return ONLY valid JSON matching this schema:
 }
 
 export async function verifyWebcamSnapshot(base64DataUrl: string): Promise<SnapshotAnalysis> {
-  const { GEMINI_API_KEY, GEMINI_MODEL, GROQ_API_KEY } = getKeys();
-
-  // If only Groq key is present, use Groq directly
-  if (GROQ_API_KEY && !GEMINI_API_KEY) {
-    return verifyWebcamSnapshotGroq(base64DataUrl);
+  const { GROQ_API_KEY } = getKeys();
+  if (!GROQ_API_KEY) {
+    throw new Error("GROQ_API_KEY is not configured for webcam snapshot analysis.");
   }
-
-  if (!GEMINI_API_KEY && !GROQ_API_KEY) {
-    throw new Error("Neither GEMINI_API_KEY nor GROQ_API_KEY is configured for webcam snapshot analysis.");
-  }
-
-  try {
-    // Extract raw base64 and mime type from standard data URL
-    const match = base64DataUrl.match(/^data:([^;]+);base64,(.+)$/);
-    const mimeType = match ? match[1] : "image/jpeg";
-    const data = match ? match[2] : base64DataUrl;
-
-    const prompt = `
-You are an expert remote proctoring AI auditing agent.
-Analyze the webcam snapshot taken during a high-stakes exam and check for security violations.
-Provide your evaluation on the following fields:
-1. single_person: Is there EXACTLY ONE candidate visible in the frame? If the frame is empty, dark, or no candidate face is visible, set to false.
-2. multiple_people: Are there multiple faces or people visible in the frame? (Potential cheating/collusion/external help).
-3. looking_away: Is the candidate looking completely away from the screen, down at their lap, or sideways to talk to someone?
-4. phone_detected: Is there a smartphone, secondary screen, tablet, or cheat-sheet book/notes visible?
-
-Return ONLY valid JSON matching this schema:
-{
-  "single_person": true,
-  "multiple_people": false,
-  "looking_away": false,
-  "phone_detected": false,
-  "summary": "Brief 1-sentence observation, e.g., 'Candidate is focused on screen.'"
-}
-`;
-
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [
-              { text: prompt },
-              {
-                inline_data: {
-                  mime_type: mimeType,
-                  data: data,
-                },
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.1,
-          responseMimeType: "application/json",
-        },
-      }),
-    });
-
-    const body = await response.json();
-    if (!response.ok) {
-      if (GROQ_API_KEY) {
-        console.warn("[AI Proctoring] Gemini vision failed (key likely expired/invalid). Failing over to Groq Vision...");
-        return verifyWebcamSnapshotGroq(base64DataUrl);
-      }
-      throw new Error(body?.error?.message || "Gemini vision analysis failed");
-    }
-
-    const text = body?.candidates?.[0]?.content?.parts?.find((part: { text?: string }) => part.text)?.text;
-    if (!text) {
-      if (GROQ_API_KEY) {
-        console.warn("[AI Proctoring] Gemini returned empty response. Failing over to Groq Vision...");
-        return verifyWebcamSnapshotGroq(base64DataUrl);
-      }
-      throw new Error("Gemini returned empty webcam analysis");
-    }
-
-    return parseJson(text) as SnapshotAnalysis;
-  } catch (err: any) {
-    if (GROQ_API_KEY) {
-      console.warn("[AI Proctoring] Gemini threw an error. Failing over to Groq Vision...", err.message);
-      return verifyWebcamSnapshotGroq(base64DataUrl);
-    }
-    throw err;
-  }
+  return verifyWebcamSnapshotGroq(base64DataUrl);
 }
 
 function parseJson(text: string) {
