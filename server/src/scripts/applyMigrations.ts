@@ -16,6 +16,15 @@ async function applyMigrations() {
 
   try {
     console.log("Connecting to PostgreSQL...");
+
+    // 0. Read postgres-schema.sql
+    const baseSchemaPath = resolve(__dirname, "../../../database/postgres-schema.sql");
+    console.log(`Reading base schema from: ${baseSchemaPath}`);
+    const baseSchemaSql = await fs.readFile(baseSchemaPath, "utf-8");
+
+    console.log("Applying base schema...");
+    await pool.query(baseSchemaSql);
+    console.log("Base schema applied successfully.");
     
     // 1. Read schema-question-bank.sql
     const schemaPath = resolve(__dirname, "../../../database/schema-question-bank.sql");
