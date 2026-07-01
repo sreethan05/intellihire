@@ -135,24 +135,6 @@ jobs:
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
 
-      - name: Debug DB Connection
-        run: |
-          node -e "
-            import('pg').then(({ default: pg }) => {
-              const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
-              client.connect()
-                .then(() => {
-                  console.log('DB Connection OK');
-                  process.exit(0);
-                })
-                .catch(e => {
-                  console.error('::error::DB Connection Failed: ' + e.message + ' (code: ' + e.code + ', stack: ' + e.stack + ')');
-                  process.exit(1);
-                });
-            });
-          "
-        working-directory: server
-
       - name: Run Database Migrations
         run: npm --prefix server run migrate
 
