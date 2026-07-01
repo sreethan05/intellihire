@@ -191,29 +191,9 @@ npm run build
 npm run start
 ```
 
----
-
 ## Manual Testing & Account Verification
 
-Once local development servers are running, you can authenticate and test each portal user path using these pre-seeded accounts:
-
-### 1. Super Admin Panel
-* **Purpose**: Manage platforms, system parameters, college registrations, and global databases.
-* **Credentials**:
-  - **Email**: `admin@intellihire.com`
-  - **Password**: `admin123`
-
-### 2. Recruiter Portal
-* **Purpose**: Create exams, manage question variants, configure custom test cases, review proctoring logs, and inspect performance analytics.
-* **Credentials**:
-  - **Email**: `recruiter@example.com`
-  - **Password**: `recruiter123`
-
-### 3. Candidate Assessment Area
-* **Purpose**: Take exams, write code in the live sandbox editor, and complete audio recording portions.
-* **Credentials**:
-  - **Email**: `candidate@example.com`
-  - **Password**: `candidate123`
+Once local development servers are running, you can authenticate and test each portal user path using pre-seeded test accounts. For security, please refer directly to the database seeding script at [seed_e2e_users.ts](file:///server/src/seed_e2e_users.ts) and base schema at [postgres-schema.sql](file:///database/postgres-schema.sql) to inspect or configure the pre-seeded credentials and roles.
 
 ---
 
