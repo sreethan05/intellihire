@@ -9,8 +9,8 @@ flowchart LR
   User["User Browser"] --> Frontend["React + Vite Frontend"]
   Frontend --> API["Express Backend API"]
   API --> Auth["JWT + bcrypt Auth"]
-  API --> DB["Supabase PostgreSQL"]
-  API --> AI["Gemini AI Service"]
+  API --> DB["PostgreSQL"]
+  API --> AI["Groq / Ollama AI"]
   API --> Judge["Judge0 Code Runner"]
   API --> Proctor["Proctoring Event Logger"]
 ```

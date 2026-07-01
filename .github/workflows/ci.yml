@@ -45,10 +45,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       JWT_SECRET: test-jwt-secret-must-be-32-chars-long-for-ci-only
-      SUPABASE_URL: https://test-project.supabase.co
-      SUPABASE_SERVICE_ROLE_KEY: test-service-role-key
-      GEMINI_API_KEY: test-gemini-key
-      GEMINI_MODEL: gemini-2.0-flash
       GROQ_API_KEY: test-groq-key
       GROQ_MODEL: llama-3.3-70b-versatile
     steps:
@@ -101,10 +97,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       JWT_SECRET: test-jwt-secret-must-be-32-chars-long-for-ci-only
-      SUPABASE_URL: https://test-project.supabase.co
-      SUPABASE_SERVICE_ROLE_KEY: test-service-role-key
-      GEMINI_API_KEY: test-gemini-key
-      GEMINI_MODEL: gemini-2.0-flash
       GROQ_API_KEY: test-groq-key
       GROQ_MODEL: llama-3.3-70b-versatile
     steps:

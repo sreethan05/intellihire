@@ -750,7 +750,6 @@ export interface AdminSystemHealth {
   };
   apis: {
     judge0: ApiHealthStatus;
-    gemini: ApiHealthStatus;
     groq: ApiHealthStatus;
   };
   errorRate: {

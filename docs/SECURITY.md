@@ -60,7 +60,7 @@ Important keys:
 ```text
 DATABASE_URL
 JWT_SECRET
-GEMINI_API_KEY
+GROQ_API_KEY
 ```
 
 Security note:

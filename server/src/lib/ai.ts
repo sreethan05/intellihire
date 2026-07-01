@@ -33,8 +33,6 @@ dotenv.config({ path: resolve(__dirname, "../../../.env") });
 
 function getKeys() {
   return {
-    GEMINI_API_KEY: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY,
-    GEMINI_MODEL: process.env.GEMINI_MODEL || "gemini-2.0-flash",
     GROQ_API_KEY: process.env.GROQ_API_KEY,
     GROQ_MODEL: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
     OLLAMA_MODEL: process.env.OLLAMA_MODEL || "llama3.2:3b",
@@ -67,13 +65,8 @@ Schema:
 `;
 
 export function hasAiKey() {
-  const { GEMINI_API_KEY, GROQ_API_KEY } = getKeys();
-  return Boolean(GEMINI_API_KEY || GROQ_API_KEY);
-}
-
-// Keep hasGeminiKey as deprecated alias for safety
-export function hasGeminiKey() {
-  return hasAiKey();
+  const { GROQ_API_KEY } = getKeys();
+  return Boolean(GROQ_API_KEY);
 }
 
 /**
@@ -195,10 +188,6 @@ export async function generateAiText(prompt: string | { systemPrompt?: string; u
   return generateGroqText(prompt);
 }
 
-// Keep generateGeminiText as alias
-export function generateGeminiText(prompt: string | { systemPrompt?: string; userPrompt: string }): Promise<string> {
-  return generateAiText(prompt);
-}
 
 export async function generateAiJson<T>(prompt: string | { systemPrompt?: string; userPrompt: string }): Promise<T> {
   // Try local Ollama FIRST for exam generation — zero API cost, zero latency, fully private
@@ -223,10 +212,6 @@ export async function generateAiJson<T>(prompt: string | { systemPrompt?: string
   return generateGroqJson<T>(prompt);
 }
 
-// Keep generateGeminiJson as alias
-export function generateGeminiJson<T>(prompt: string | { systemPrompt?: string; userPrompt: string }): Promise<T> {
-  return generateAiJson<T>(prompt);
-}
 
 export async function scanMarksheet(file: MarksheetFile): Promise<ScannedStudent> {
   const { GROQ_API_KEY } = getKeys();

@@ -13,10 +13,6 @@ services:
         generateValue: true
       - key: DATABASE_URL
         sync: false
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: GEMINI_MODEL
-        value: gemini-2.0-flash
       - key: GROQ_API_KEY
         sync: false
       - key: GROQ_MODEL

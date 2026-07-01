@@ -200,7 +200,7 @@ export default function CandidateOnboarding() {
                   <Loader2 className="h-8 w-8 text-violet-600 animate-spin" />
                   <div className="text-center">
                     <div className="font-extrabold text-violet-700">Analyzing Resume...</div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">Gemini is extracting skills and calculating your ATS Score.</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">AI is extracting skills and calculating your ATS Score.</div>
                   </div>
                 </div>
               ) : form.resume_url ? (

@@ -11,7 +11,6 @@ test.describe("Health & API Checks", () => {
     expect(body).toHaveProperty("environment");
     expect(body).toHaveProperty("services");
     expect(body.services).toHaveProperty("postgres");
-    expect(body.services).toHaveProperty("gemini");
     expect(body.services).toHaveProperty("groq");
     expect(body.services).toHaveProperty("judge0");
     expect(body.services).toHaveProperty("email");
