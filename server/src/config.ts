@@ -6,6 +6,14 @@ import { resolve } from "path";
 const __dirname = import.meta.dirname;
 dotenv.config({ path: resolve(__dirname, "../../.env") });
 
+const isTestEnv = process.env.NODE_ENV === "test" || 
+  (process.env.npm_lifecycle_event && process.env.npm_lifecycle_event.includes("test")) || 
+  process.argv.some(arg => arg.includes("test"));
+
+if (isTestEnv && !process.env.NODE_ENV) {
+  process.env.NODE_ENV = "test";
+}
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   PORT: z.string().default("5000"),
