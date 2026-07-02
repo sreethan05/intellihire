@@ -63,7 +63,7 @@ export function createApp() {
   );
 
   // ─── Rate Limiting ───
-  const isRateLimitDisabled = config.DISABLE_RATE_LIMITS === "true" || NODE_ENV !== "production";
+  const isRateLimitDisabled = config.DISABLE_RATE_LIMITS === "true";
 
   const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,

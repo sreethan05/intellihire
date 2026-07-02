@@ -9,7 +9,7 @@ dotenv.config({ path: resolve(__dirname, "../../.env") });
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   PORT: z.string().default("5000"),
-  DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
+  DATABASE_URL: z.string().optional(),
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
   GROQ_API_KEY: z.string().min(1, "GROQ_API_KEY is required").optional(),
   VITE_API_URL: z.string().url().optional().default("http://localhost:5000/api"),
@@ -33,7 +33,13 @@ function parseEnv() {
     console.error("\n❌ Invalid environment variables:\n" + errors + "\n");
     process.exit(1);
   }
-  return result.data;
+  const data = result.data;
+  // DATABASE_URL is only required in development & production
+  if (data.NODE_ENV !== "test" && !data.DATABASE_URL) {
+    console.error("\n❌ Invalid environment variables:\n  - DATABASE_URL: DATABASE_URL is required\n");
+    process.exit(1);
+  }
+  return data;
 }
 
 export const config = parseEnv();
