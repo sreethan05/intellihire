@@ -731,6 +731,39 @@ export default function CandidateDashboard() {
                     ))}
                   </div>
                 </div>
+
+                {/* Pipeline logs timeline dropdown */}
+                {track.pipelineLogs && track.pipelineLogs.length > 0 && (
+                  <div className="mt-4 border-t border-slate-100 pt-3">
+                    <details className="group">
+                      <summary className="text-[10px] font-black text-slate-400 uppercase tracking-wider cursor-pointer list-none flex items-center gap-1.5 hover:text-slate-600 transition">
+                        <span className="transition-transform group-open:rotate-90 text-[8px]">▶</span> View Detailed Journey Audit Trail
+                      </summary>
+                      <div className="mt-3 pl-3 border-l border-slate-200 space-y-3">
+                        {track.pipelineLogs.map((log: any, lidx: number) => (
+                          <div key={lidx} className="relative pl-4 text-xs text-slate-600">
+                            <span className="absolute -left-1.5 top-1 h-2.5 w-2.5 rounded-full border border-white bg-slate-400"></span>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="font-bold text-slate-900 uppercase text-[9px] bg-slate-100 px-1.5 py-0.5 rounded">
+                                {log.stage}
+                              </span>
+                              <span className="text-[9px] text-slate-400">
+                                {new Date(log.entered_at).toLocaleString("en-IN", {
+                                  month: "short",
+                                  day: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit"
+                                })}
+                              </span>
+                            </div>
+                            {log.notes && <p className="text-slate-500 mt-0.5 italic">"{log.notes}"</p>}
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  </div>
+                )}
+
               </div>
             ))}
           </div>

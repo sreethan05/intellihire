@@ -1,6 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { db, storageRoot } from "../lib/postgres.js";
+import { db, storageRoot, recordPipelineStage } from "../lib/postgres.js";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
 import { getPasswordValidationError } from "../lib/validation.js";
 import {
@@ -1701,12 +1701,20 @@ router.get("/journey-tracker", async (req: AuthRequest, res) => {
           stages[5].date = app.updated_at;
         }
         
+        // Fetch detailed pipeline audit logs
+        const { data: pipelineLogs } = await db.from("candidate_pipeline")
+          .select("*")
+          .eq("candidate_id", userId)
+          .eq("job_id", job.id)
+          .order("entered_at", { ascending: true });
+        
         trackers.push({
           jobId: job.id,
           jobTitle: job.title,
           companyName: job.company_name,
           currentStage: app.status,
-          stages
+          stages,
+          pipelineLogs: pipelineLogs || []
         });
       }
     }
@@ -1835,6 +1843,11 @@ router.post("/offers/:jobId/respond", async (req: AuthRequest, res) => {
       return;
     }
     
+    // Record stage transition in pipeline logs
+    const stageName = response === "accept" ? "offered" : response === "decline" ? "rejected" : "on_hold";
+    const notesText = response === "accept" ? "Offer accepted by candidate" : response === "decline" ? "Offer declined by candidate" : "Negotiation requested by candidate";
+    await recordPipelineStage(userId, jobId as string, stageName, notesText, userId);
+
     // Log in activity feed
     await db.from("activity_feed").insert({
       actor_id: userId,

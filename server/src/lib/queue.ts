@@ -1,4 +1,4 @@
-import { db, storageRoot } from "./postgres.js";
+import { db, storageRoot, recordPipelineStage } from "./postgres.js";
 import { runWithJudge0 } from "./judge0.js";
 import { runPlagiarismCheck } from "./plagiarism.js";
 import { sendResultPublishedEmail } from "./email.js";
@@ -260,6 +260,15 @@ class BackgroundGradingQueue {
               { job_id: assignment.job_id, candidate_id: updatedAttempt.candidate_id, status: "shortlisted" },
               { onConflict: "job_id,candidate_id" }
             );
+
+          // Record stage transition in pipeline logs
+          await recordPipelineStage(
+            updatedAttempt.candidate_id,
+            assignment.job_id,
+            "shortlisted",
+            "Auto-shortlisted after passing exam cutoff score",
+            assignment.assigned_by
+          );
         }
 
         // Create pending AI interview

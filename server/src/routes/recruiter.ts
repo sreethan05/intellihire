@@ -1,6 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { db } from "../lib/postgres.js";
+import { db, recordPipelineStage } from "../lib/postgres.js";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
 import { generateAiJson, hasAiKey } from "../lib/ai.js";
 import { getPasswordValidationError, isValidEmail } from "../lib/validation.js";
@@ -369,6 +369,17 @@ router.post("/drives", async (req: AuthRequest, res) => {
         })),
         { onConflict: "job_id,candidate_id", ignoreDuplicates: true }
       );
+
+      // Record stage transitions in pipeline logs
+      for (const candidate of eligible) {
+        await recordPipelineStage(
+          candidate.user_id,
+          drive.id,
+          "registered",
+          "Auto-registered for drive by eligibility criteria",
+          req.user!.id
+        );
+      }
 
       if (drive.exam_id) {
         await db.from("exam_assignments").upsert(
@@ -1120,6 +1131,15 @@ router.post("/offers/:candidateId/:jobId", uploadOffer.single("offerLetter"), as
       res.status(400).json({ error: error.message });
       return;
     }
+
+    // Record stage transition in pipeline logs
+    await recordPipelineStage(
+      candidateId as string,
+      jobId as string,
+      "offered",
+      "Offer Letter extended by recruiter",
+      recruiterId
+    );
 
     // Log in activity feed
     await db.from("activity_feed").insert({

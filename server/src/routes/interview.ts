@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db } from "../lib/postgres.js";
+import { db, recordPipelineStage } from "../lib/postgres.js";
 import { generateAiJson, hasAiKey } from "../lib/ai.js";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
 import { deserializeDriveColleges } from "./recruiter.js";
@@ -936,6 +936,16 @@ router.post("/:interviewId/submit", async (req: AuthRequest, res) => {
           .update({ status: newStatus })
           .eq("job_id", interview.job_id)
           .eq("candidate_id", req.user!.id);
+
+        // Record stage transition in pipeline logs
+        await recordPipelineStage(
+          req.user!.id,
+          interview.job_id,
+          newStatus,
+          result.selected 
+            ? `Selected after AI Interview assessment. Summary: ${result.summary || ""}`
+            : `Rejected after AI Interview assessment. Feedback: ${result.feedback || ""}`
+        );
       }
     } catch (statusErr) {
       console.warn("Status update warning (non-fatal):", statusErr);

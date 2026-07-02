@@ -47,3 +47,17 @@ describe("POST /api/candidate/offers/:jobId/respond", () => {
     assert.equal(res.status, 401);
   });
 });
+
+describe("GET /api/candidate/journey-tracker", () => {
+  it("returns 401 when no auth token is provided", async () => {
+    const res = await request(app).get("/api/candidate/journey-tracker");
+    assert.equal(res.status, 401);
+  });
+
+  it("returns 401 when an invalid auth token is provided", async () => {
+    const res = await request(app)
+      .get("/api/candidate/journey-tracker")
+      .set("Authorization", "Bearer invalid-token-12345");
+    assert.equal(res.status, 401);
+  });
+});

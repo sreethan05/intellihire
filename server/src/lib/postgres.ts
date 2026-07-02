@@ -912,4 +912,42 @@ export async function transaction<T>(callback: (client: pg.PoolClient) => Promis
   }
 }
 
+/**
+ * Automatically records candidate pipeline stage transitions.
+ * When a candidate transitions to a new stage:
+ * 1. Mark any active prior stage for that candidate/job as exited (set exited_at = now()).
+ * 2. Insert the new stage transition entry.
+ */
+export async function recordPipelineStage(
+  candidateId: string,
+  jobId: string,
+  stage: string,
+  notes?: string | null,
+  updatedBy?: string | null
+): Promise<void> {
+  try {
+    const nowStr = new Date().toISOString();
+    
+    // First, exit any existing stage for this candidate and job
+    await pool.query(
+      `UPDATE candidate_pipeline 
+       SET exited_at = $1 
+       WHERE candidate_id = $2 AND job_id = $3 AND exited_at IS NULL`,
+      [nowStr, candidateId, jobId]
+    );
+
+    // Insert the new stage transition log
+    // We use ON CONFLICT (candidate_id, job_id, stage) DO UPDATE to handle the UNIQUE constraint cleanly
+    await pool.query(
+      `INSERT INTO candidate_pipeline (candidate_id, job_id, stage, entered_at, exited_at, notes, updated_by)
+       VALUES ($1, $2, $3, $4, NULL, $5, $6)
+       ON CONFLICT (candidate_id, job_id, stage) 
+       DO UPDATE SET entered_at = $4, exited_at = NULL, notes = $5, updated_by = $6`,
+      [candidateId, jobId, stage, nowStr, notes || null, updatedBy || null]
+    );
+  } catch (err: any) {
+    console.error(`Failed to record pipeline stage transition to "${stage}":`, err.message);
+  }
+}
+
 export { EMPTY_UUID, storageRoot };
