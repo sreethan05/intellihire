@@ -163,6 +163,7 @@ export const candidateApi = {
     marksheet_url?: string;
     resume_url?: string;
   }) => api.post("/candidate/onboarding", data),
+  updateProfile: (data: any) => api.put("/candidate/profile", data),
   uploadResume: (file: File) => {
     const formData = new FormData();
     formData.append("resume", file);

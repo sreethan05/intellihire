@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import { QRCodeSVG } from "qrcode.react";
-import { Briefcase, FileText, CheckCircle, MapPin, QrCode } from "lucide-react";
+import { Briefcase, FileText, CheckCircle, MapPin, QrCode, Github, Linkedin, Globe } from "lucide-react";
 
 export default function PublicPortfolio() {
   const { slug } = useParams<{ slug: string }>();
@@ -60,7 +60,7 @@ export default function PublicPortfolio() {
             <div className="flex flex-col sm:flex-row gap-5 items-start justify-between">
               
               {/* Profile Image & Meta */}
-              <div className="flex gap-4 items-center">
+              <div className="flex gap-4 items-start">
                 <div className="h-20 w-20 rounded-full bg-slate-200 border-2 border-slate-300 overflow-hidden shrink-0 flex items-center justify-center text-slate-400 font-bold text-2xl">
                   {profile.photo_url ? (
                     <img src={profile.photo_url} alt={profile.user?.name} className="h-full w-full object-cover" />
@@ -69,7 +69,7 @@ export default function PublicPortfolio() {
                   )}
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h1 className="text-xl font-extrabold text-slate-900">{profile.user?.name}</h1>
                     {profile.documents_verified && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-bold text-green-700 border border-green-200">
@@ -81,17 +81,45 @@ export default function PublicPortfolio() {
                   <p className="mt-1 text-xs text-slate-400 flex items-center gap-1">
                     <MapPin className="h-3 w-3" /> {profile.college?.name} ({profile.college?.code})
                   </p>
+                  
+                  {/* Social Links */}
+                  {(profile.github_url || profile.linkedin_url || profile.portfolio_url) && (
+                    <div className="flex items-center gap-2 mt-2">
+                      {profile.github_url && (
+                        <a href={profile.github_url} target="_blank" rel="noreferrer" className="rounded-full bg-slate-50 p-1.5 text-slate-600 hover:bg-slate-100 transition" title="GitHub">
+                          <Github className="h-4 w-4" />
+                        </a>
+                      )}
+                      {profile.linkedin_url && (
+                        <a href={profile.linkedin_url} target="_blank" rel="noreferrer" className="rounded-full bg-slate-50 p-1.5 text-slate-600 hover:bg-slate-100 transition" title="LinkedIn">
+                          <Linkedin className="h-4 w-4" />
+                        </a>
+                      )}
+                      {profile.portfolio_url && (
+                        <a href={profile.portfolio_url} target="_blank" rel="noreferrer" className="rounded-full bg-slate-50 p-1.5 text-slate-600 hover:bg-slate-100 transition" title="Portfolio Website">
+                          <Globe className="h-4 w-4" />
+                        </a>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* QR Code Container */}
               <div className="flex flex-col items-center border border-slate-100 bg-slate-50/50 p-2 rounded-lg shrink-0 self-center sm:self-auto">
-                <QRCodeSVG value={typeof window !== "undefined" ? window.location.href : ""} size={96} />
+                <QRCodeSVG value={typeof window !== "undefined" ? window.location.href : ""} size={80} />
                 <span className="mt-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-0.5">
                   <QrCode className="h-2.5 w-2.5" /> Scan Profile
                 </span>
               </div>
             </div>
+
+            {/* Bio Display */}
+            {profile.bio && (
+              <div className="rounded-lg bg-slate-50 border border-slate-100 p-3.5 text-xs text-slate-600 italic">
+                "{profile.bio}"
+              </div>
+            )}
 
             {/* Academic Matrix Grid */}
             <div className="grid grid-cols-3 gap-4 border-y border-slate-100 py-4">
@@ -112,7 +140,7 @@ export default function PublicPortfolio() {
             </div>
 
             {/* Skills & Preferences */}
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div>
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5">Core Competencies</h3>
                 <div className="flex flex-wrap gap-1.5">
@@ -127,6 +155,39 @@ export default function PublicPortfolio() {
                   )}
                 </div>
               </div>
+
+              {/* Showcase Projects */}
+              {profile.projects && Array.isArray(profile.projects) && profile.projects.length > 0 && (
+                <div className="pt-4 border-t border-slate-100 space-y-3">
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5">Showcase Projects</h3>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {profile.projects.map((proj: any, pidx: number) => (
+                      <div key={pidx} className="rounded-xl border border-slate-100 bg-slate-50/30 p-3 flex flex-col justify-between">
+                        <div>
+                          <div className="flex justify-between items-start gap-1.5">
+                            <h4 className="font-bold text-xs text-slate-900 line-clamp-1">{proj.title}</h4>
+                            {proj.url && (
+                              <a href={proj.url} target="_blank" rel="noreferrer" className="text-[10px] text-blue-600 hover:underline font-bold shrink-0 flex items-center gap-0.5">
+                                <Globe className="h-2.5 w-2.5" /> Link
+                              </a>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-slate-500 mt-1 line-clamp-2">{proj.description}</p>
+                        </div>
+                        {proj.tech_stack && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {(typeof proj.tech_stack === "string" ? proj.tech_stack.split(",") : proj.tech_stack).map((tag: string, tidx: number) => (
+                              <span key={tidx} className="inline-block rounded bg-blue-50 px-1 py-0.5 text-[8px] font-bold text-blue-600">
+                                {tag.trim()}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

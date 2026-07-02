@@ -1,9 +1,16 @@
 import { useEffect, useState } from "react";
 import { 
-  BarChart3, Bell, Briefcase, CheckCircle, Loader2, MapPin, QrCode, Trophy, User, AlertCircle
+  BarChart3, Bell, Briefcase, CheckCircle, Loader2, MapPin, QrCode, Trophy, User, AlertCircle,
+  Github, Linkedin, Globe, Plus, Trash2, Edit, X
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { candidateApi, interviewApi } from "@/lib/api";
+import { QRCodeSVG } from "qrcode.react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, 
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid 
@@ -19,6 +26,18 @@ export default function CandidateDashboard() {
   const [pendingInterview, setPendingInterview] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  // Profile Edit Modal States
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [skillsInput, setSkillsInput] = useState("");
+  const [domainPreference, setDomainPreference] = useState("");
+  const [bio, setBio] = useState("");
+  const [githubUrl, setGithubUrl] = useState("");
+  const [linkedinUrl, setLinkedinUrl] = useState("");
+  const [portfolioUrl, setPortfolioUrl] = useState("");
+  const [projectsList, setProjectsList] = useState<any[]>([]);
+
   useEffect(() => {
     Promise.all([
       candidateApi.getProfile(),
@@ -28,7 +47,18 @@ export default function CandidateDashboard() {
       interviewApi.pending()
     ])
       .then(([profileRes, actionRes, trackerRes, radarRes, interviewRes]) => {
-        setProfile(profileRes.data.profile || null);
+        const p = profileRes.data.profile || null;
+        setProfile(p);
+        if (p) {
+          setPhone(p.phone || "");
+          setSkillsInput(Array.isArray(p.skills) ? p.skills.join(", ") : "");
+          setDomainPreference(p.domain_preference || "");
+          setBio(p.bio || "");
+          setGithubUrl(p.github_url || "");
+          setLinkedinUrl(p.linkedin_url || "");
+          setPortfolioUrl(p.portfolio_url || "");
+          setProjectsList(Array.isArray(p.projects) ? p.projects : []);
+        }
         setActionItems(actionRes.data.actionItems || []);
         setTrackers(trackerRes.data.trackers || []);
         setRadarData(radarRes.data.radarData || []);
@@ -54,7 +84,6 @@ export default function CandidateDashboard() {
   // Derive public URL for portfolio
   const publicSlug = profile?.public_portfolio_slug || profile?.user_id || "";
   const publicPortfolioUrl = `${window.location.origin}/portfolio/${publicSlug}`;
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(publicPortfolioUrl)}`;
 
   // Helper to resolve stages matching Kanban columns
   const getKanbanStageName = (currentStage: string) => {
@@ -71,12 +100,64 @@ export default function CandidateDashboard() {
     }
   };
 
+  const handleAddProject = () => {
+    setProjectsList([...projectsList, { title: "", description: "", tech_stack: "", url: "" }]);
+  };
+
+  const handleRemoveProject = (index: number) => {
+    setProjectsList(projectsList.filter((_, idx) => idx !== index));
+  };
+
+  const handleProjectChange = (index: number, key: string, value: string) => {
+    const updated = [...projectsList];
+    updated[index] = { ...updated[index], [key]: value };
+    setProjectsList(updated);
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const skillsArray = skillsInput
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      const response = await candidateApi.updateProfile({
+        phone,
+        skills: skillsArray,
+        domain_preference: domainPreference,
+        bio,
+        github_url: githubUrl,
+        linkedin_url: linkedinUrl,
+        portfolio_url: portfolioUrl,
+        projects: projectsList,
+      });
+
+      setProfile(response.data.profile);
+      toast.success("Placement Passport updated successfully!");
+      setShowEditModal(false);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Failed to update profile");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-6 pb-12">
       {/* Title Header */}
-      <div>
-        <h1 className="text-2xl font-black text-slate-900">Placement Command Center</h1>
-        <p className="text-sm text-slate-500">Track your verified profile, pipeline stage eligibility, and proctored exam performance.</p>
+      <div className="flex justify-between items-center flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-slate-900">Placement Command Center</h1>
+          <p className="text-sm text-slate-500">Track your verified profile, pipeline stage eligibility, and proctored exam performance.</p>
+        </div>
+        <Button 
+          onClick={() => setShowEditModal(true)} 
+          className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg px-4 h-9 flex items-center gap-1.5 shadow-sm transition"
+        >
+          <Edit className="h-3.5 w-3.5" /> Edit Placement Passport
+        </Button>
       </div>
 
       {/* Pending Interview Banner */}
@@ -113,7 +194,7 @@ export default function CandidateDashboard() {
             <div className="flex flex-col sm:flex-row gap-5 items-start justify-between">
               
               {/* Profile Details */}
-              <div className="flex gap-4 items-center">
+              <div className="flex gap-4 items-start">
                 <div className="h-16 w-16 rounded-full bg-slate-200 border-2 border-slate-300 overflow-hidden shrink-0 flex items-center justify-center text-slate-400 font-bold text-xl">
                   {profile?.photo_url ? (
                     <img src={profile.photo_url} alt="Profile" className="h-full w-full object-cover" />
@@ -122,7 +203,7 @@ export default function CandidateDashboard() {
                   )}
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h2 className="text-lg font-bold text-slate-900">{profile?.roll_number ? `Student ID: ${profile.roll_number}` : "Complete Onboarding"}</h2>
                     {profile?.documents_verified && (
                       <span className="inline-flex items-center gap-0.5 rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-bold text-green-700 border border-green-200">
@@ -134,17 +215,45 @@ export default function CandidateDashboard() {
                   <p className="mt-0.5 text-xs text-slate-400 flex items-center gap-1">
                     <MapPin className="h-3.5 w-3.5" /> IIT Campus Placement
                   </p>
+                  
+                  {/* Social Links */}
+                  {(profile?.github_url || profile?.linkedin_url || profile?.portfolio_url) && (
+                    <div className="flex items-center gap-2 mt-2">
+                      {profile?.github_url && (
+                        <a href={profile.github_url} target="_blank" rel="noreferrer" className="rounded-full bg-slate-50 p-1.5 text-slate-600 hover:bg-slate-100 transition" title="GitHub">
+                          <Github className="h-3.5 w-3.5" />
+                        </a>
+                      )}
+                      {profile?.linkedin_url && (
+                        <a href={profile.linkedin_url} target="_blank" rel="noreferrer" className="rounded-full bg-slate-50 p-1.5 text-slate-600 hover:bg-slate-100 transition" title="LinkedIn">
+                          <Linkedin className="h-3.5 w-3.5" />
+                        </a>
+                      )}
+                      {profile?.portfolio_url && (
+                        <a href={profile.portfolio_url} target="_blank" rel="noreferrer" className="rounded-full bg-slate-50 p-1.5 text-slate-600 hover:bg-slate-100 transition" title="Portfolio Website">
+                          <Globe className="h-3.5 w-3.5" />
+                        </a>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* QR Code */}
+              {/* QR Code Container */}
               <div className="flex flex-col items-center border border-slate-100 bg-slate-50 p-2 rounded-lg self-center sm:self-auto shrink-0">
-                <img src={qrCodeUrl} alt="Passport QR" className="h-20 w-20 object-contain" />
-                <span className="mt-1 text-[9px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-0.5">
+                <QRCodeSVG value={publicPortfolioUrl} size={80} />
+                <span className="mt-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-0.5">
                   <QrCode className="h-2.5 w-2.5" /> Share Profile
                 </span>
               </div>
             </div>
+
+            {/* Bio Display */}
+            {profile?.bio && (
+              <div className="rounded-lg bg-slate-50/50 border border-slate-100 p-3 text-xs text-slate-600 italic">
+                "{profile.bio}"
+              </div>
+            )}
 
             {/* Academic stats */}
             <div className="grid grid-cols-3 gap-4 border-y border-slate-100 py-3 text-center">
@@ -345,6 +454,55 @@ export default function CandidateDashboard() {
         </div>
       )}
 
+      {/* Projects Showcase Section */}
+      <div className="space-y-4">
+        <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+          <h2 className="text-sm font-extrabold text-slate-950 flex items-center gap-2">
+            <Briefcase className="h-4 w-4 text-blue-600" /> Featured Projects
+          </h2>
+          <Button 
+            onClick={() => setShowEditModal(true)} 
+            variant="outline" 
+            className="h-7 text-[10px] font-bold border-slate-200 text-slate-600 hover:bg-slate-50 flex items-center gap-1 rounded-md"
+          >
+            <Plus className="h-3 w-3" /> Manage Projects
+          </Button>
+        </div>
+
+        {projectsList.length > 0 ? (
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+            {projectsList.map((proj, pidx) => (
+              <div key={pidx} className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs hover:shadow-sm transition flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-start gap-2">
+                    <h4 className="font-extrabold text-sm text-slate-900 line-clamp-1">{proj.title}</h4>
+                    {proj.url && (
+                      <a href={proj.url} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline font-bold shrink-0 flex items-center gap-0.5">
+                        <Globe className="h-3 w-3" /> Link
+                      </a>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2 line-clamp-3">{proj.description}</p>
+                </div>
+                {proj.tech_stack && (
+                  <div className="flex flex-wrap gap-1 mt-3.5 pt-2 border-t border-slate-50">
+                    {(typeof proj.tech_stack === "string" ? proj.tech_stack.split(",") : proj.tech_stack).map((tag: string, tidx: number) => (
+                      <span key={tidx} className="inline-block rounded bg-blue-50 px-1.5 py-0.5 text-[9px] font-bold text-blue-600">
+                        {tag.trim()}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 border border-dashed border-slate-200 rounded-xl bg-slate-50/50 text-xs text-slate-400">
+            No projects added yet. Click "Manage Projects" to showcase your developer projects to recruiters.
+          </div>
+        )}
+      </div>
+
       {/* Drive Application Kanban Board */}
       <div className="space-y-3">
         <h2 className="text-sm font-extrabold text-slate-950 flex items-center gap-2 border-b border-slate-100 pb-2">
@@ -391,6 +549,218 @@ export default function CandidateDashboard() {
           })}
         </div>
       </div>
+      {/* Edit Placement Passport Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-xs overflow-y-auto">
+          <div className="relative w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl border border-slate-100 my-8">
+            {/* Close Button */}
+            <button
+              onClick={() => setShowEditModal(false)}
+              className="absolute right-4 top-4 rounded-lg p-1 text-slate-400 hover:bg-slate-100 transition"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <div className="mb-5 pb-3 border-b border-slate-100">
+              <h2 className="text-base font-extrabold text-slate-900 tracking-tight">Edit Placement Passport</h2>
+              <p className="text-[11px] text-slate-400 font-semibold">Update your professional details and showcase projects for recruiter matching.</p>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <Label className="text-xs font-bold text-slate-700">Contact Number</Label>
+                  <Input 
+                    type="text" 
+                    value={phone} 
+                    onChange={(e) => setPhone(e.target.value)} 
+                    placeholder="Enter phone number" 
+                    className="mt-1 h-9 text-xs font-semibold"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs font-bold text-slate-700">Domain Preference</Label>
+                  <Input 
+                    type="text" 
+                    value={domainPreference} 
+                    onChange={(e) => setDomainPreference(e.target.value)} 
+                    placeholder="e.g. Frontend Developer, Data Engineer" 
+                    className="mt-1 h-9 text-xs font-semibold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-xs font-bold text-slate-700">Professional Bio</Label>
+                <Textarea 
+                  value={bio} 
+                  onChange={(e) => setBio(e.target.value)} 
+                  placeholder="Tell recruiters about yourself, your career goals, or technical interests..." 
+                  className="mt-1 text-xs font-semibold min-h-[60px]"
+                />
+              </div>
+
+              <div>
+                <Label className="text-xs font-bold text-slate-700">Technical Skills (comma-separated)</Label>
+                <Input 
+                  type="text" 
+                  value={skillsInput} 
+                  onChange={(e) => setSkillsInput(e.target.value)} 
+                  placeholder="e.g. React, Node.js, Python, PostgreSQL" 
+                  className="mt-1 h-9 text-xs font-semibold"
+                />
+              </div>
+
+              <div className="h-px bg-slate-100" />
+
+              <div className="space-y-3">
+                <Label className="text-xs font-extrabold text-slate-900 tracking-tight">Social Profiles</Label>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div>
+                    <Label className="text-[10px] font-bold text-slate-500">GitHub Profile URL</Label>
+                    <div className="relative mt-1">
+                      <Github size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <Input 
+                        type="url" 
+                        value={githubUrl} 
+                        onChange={(e) => setGithubUrl(e.target.value)} 
+                        placeholder="https://github.com/..." 
+                        className="h-9 pl-8 text-xs font-semibold"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-[10px] font-bold text-slate-500">LinkedIn Profile URL</Label>
+                    <div className="relative mt-1">
+                      <Linkedin size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <Input 
+                        type="url" 
+                        value={linkedinUrl} 
+                        onChange={(e) => setLinkedinUrl(e.target.value)} 
+                        placeholder="https://linkedin.com/in/..." 
+                        className="h-9 pl-8 text-xs font-semibold"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-[10px] font-bold text-slate-500">Personal Website URL</Label>
+                    <div className="relative mt-1">
+                      <Globe size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <Input 
+                        type="url" 
+                        value={portfolioUrl} 
+                        onChange={(e) => setPortfolioUrl(e.target.value)} 
+                        placeholder="https://yourwebsite.com" 
+                        className="h-9 pl-8 text-xs font-semibold"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="h-px bg-slate-100" />
+
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <Label className="text-xs font-extrabold text-slate-900 tracking-tight">Showcase Projects</Label>
+                  <Button 
+                    type="button" 
+                    onClick={handleAddProject} 
+                    variant="outline" 
+                    className="h-7 text-[10px] font-bold border-slate-200 text-slate-600 hover:bg-slate-50 flex items-center gap-1 rounded-md"
+                  >
+                    <Plus className="h-3 w-3" /> Add Project
+                  </Button>
+                </div>
+
+                {projectsList.length > 0 ? (
+                  <div className="space-y-4">
+                    {projectsList.map((proj, index) => (
+                      <div key={index} className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 space-y-3 relative animate-in fade-in zoom-in-95 duration-150">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveProject(index)}
+                          className="absolute right-3 top-3 text-slate-400 hover:text-red-500 transition"
+                          title="Remove Project"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div>
+                            <Label className="text-[10px] font-bold text-slate-500">Project Title</Label>
+                            <Input 
+                              type="text" 
+                              required
+                              value={proj.title} 
+                              onChange={(e) => handleProjectChange(index, "title", e.target.value)} 
+                              placeholder="e.g. Portfolio Website, Chat App" 
+                              className="mt-1 h-8 text-xs font-semibold bg-white"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-[10px] font-bold text-slate-500">Project URL / GitHub Link</Label>
+                            <Input 
+                              type="url" 
+                              value={proj.url || ""} 
+                              onChange={(e) => handleProjectChange(index, "url", e.target.value)} 
+                              placeholder="https://..." 
+                              className="mt-1 h-8 text-xs font-semibold bg-white"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label className="text-[10px] font-bold text-slate-500">Project Description</Label>
+                          <Textarea 
+                            required
+                            value={proj.description} 
+                            onChange={(e) => handleProjectChange(index, "description", e.target.value)} 
+                            placeholder="Briefly describe the purpose of the project, features, and key architecture..." 
+                            className="mt-1 text-xs font-semibold min-h-[50px] bg-white"
+                          />
+                        </div>
+
+                        <div>
+                          <Label className="text-[10px] font-bold text-slate-500">Technologies Used (comma-separated)</Label>
+                          <Input 
+                            type="text" 
+                            value={proj.tech_stack || ""} 
+                            onChange={(e) => handleProjectChange(index, "tech_stack", e.target.value)} 
+                            placeholder="e.g. React, Express, MongoDB" 
+                            className="mt-1 h-8 text-xs font-semibold bg-white"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 italic">No projects added. Click "Add Project" to display your work.</p>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-3.5 pt-4 border-t border-slate-100">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowEditModal(false)}
+                  className="h-9 text-xs font-bold border-slate-200 text-slate-600 rounded-lg"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={saving}
+                  className="h-9 text-xs font-extrabold bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 shadow-sm"
+                >
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Changes"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

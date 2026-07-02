@@ -58,3 +58,11 @@ ALTER TABLE proctoring_snapshots ADD COLUMN IF NOT EXISTS typing_speed_wpm integ
 ALTER TABLE candidate_status ADD COLUMN IF NOT EXISTS offer_letter_url text;
 ALTER TABLE candidate_status ADD COLUMN IF NOT EXISTS offer_accepted_at timestamptz;
 ALTER TABLE candidate_status ADD COLUMN IF NOT EXISTS offer_declined_at timestamptz;
+
+-- Alter candidate_profiles to add professional links, bio, and projects
+ALTER TABLE candidate_profiles ADD COLUMN IF NOT EXISTS github_url text;
+ALTER TABLE candidate_profiles ADD COLUMN IF NOT EXISTS linkedin_url text;
+ALTER TABLE candidate_profiles ADD COLUMN IF NOT EXISTS portfolio_url text;
+ALTER TABLE candidate_profiles ADD COLUMN IF NOT EXISTS bio text;
+ALTER TABLE candidate_profiles ADD COLUMN IF NOT EXISTS projects jsonb DEFAULT '[]';
+

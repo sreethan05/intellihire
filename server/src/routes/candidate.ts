@@ -49,7 +49,7 @@ router.get("/portfolio/:slug", async (req, res) => {
 
     // Only expose public-safe fields (no email, phone, marksheet_url, etc.)
     let query = db.from("candidate_profiles")
-      .select("id, user_id, photo_url, branch, cgpa, graduation_year, skills, resume_url, documents_verified, public_portfolio_slug, user:user_id(name), college:college_id(name, code)");
+      .select("id, user_id, photo_url, branch, cgpa, graduation_year, skills, resume_url, documents_verified, public_portfolio_slug, github_url, linkedin_url, portfolio_url, bio, projects, user:user_id(name), college:college_id(name, code)");
 
     if (isUuid) {
       query = query.eq("user_id", slug);
@@ -109,6 +109,50 @@ router.get("/profile", async (req: AuthRequest, res) => {
     res.json({ user, profile });
   } catch (err) {
     console.error("Candidate profile error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.put("/profile", async (req: AuthRequest, res) => {
+  try {
+    const {
+      phone,
+      skills,
+      domain_preference,
+      github_url,
+      linkedin_url,
+      portfolio_url,
+      bio,
+      photo_url,
+      projects,
+    } = req.body;
+
+    const { data: profile, error } = await db
+      .from("candidate_profiles")
+      .update({
+        phone: phone || null,
+        skills: Array.isArray(skills) ? skills : [],
+        domain_preference: domain_preference || null,
+        github_url: github_url || null,
+        linkedin_url: linkedin_url || null,
+        portfolio_url: portfolio_url || null,
+        bio: bio || null,
+        photo_url: photo_url || null,
+        projects: Array.isArray(projects) ? projects : [],
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", req.user!.id)
+      .select()
+      .single();
+
+    if (error) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+
+    res.json({ message: "Profile updated successfully", profile });
+  } catch (err) {
+    console.error("Update candidate profile error:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
