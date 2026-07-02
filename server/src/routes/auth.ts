@@ -4,6 +4,7 @@ import { db } from "../lib/postgres.js";
 import { generateToken, authMiddleware, refreshToken, type AuthRequest } from "../middleware/auth.js";
 import { isValidEmail } from "../lib/validation.js";
 import { loginSchema } from "../lib/schemas.js";
+import { logger } from "../lib/logger.js";
 
 /**
  * @openapi
@@ -121,7 +122,7 @@ router.post("/login", async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("Login error:", err);
+    logger.error({ err }, "Login error");
     res.status(500).json({ error: "Server error" });
   }
 });

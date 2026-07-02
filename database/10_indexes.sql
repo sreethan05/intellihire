@@ -1,0 +1,18 @@
+CREATE INDEX IF NOT EXISTS idx_answers_attempt_id ON answers(attempt_id);
+CREATE INDEX IF NOT EXISTS idx_attempts_candidate_id ON attempts(candidate_id);
+CREATE INDEX IF NOT EXISTS idx_attempts_exam_id ON attempts(exam_id);
+CREATE INDEX IF NOT EXISTS idx_attempts_status ON attempts(status);
+CREATE INDEX IF NOT EXISTS idx_proctoring_exam_candidate ON proctoring_snapshots(exam_id, candidate_id);
+CREATE INDEX IF NOT EXISTS idx_proctoring_snapshots_attempt_id ON proctoring_snapshots(attempt_id);
+CREATE INDEX IF NOT EXISTS idx_coding_submissions_attempt_id ON coding_submissions(attempt_id);
+CREATE INDEX IF NOT EXISTS idx_exam_assignments_exam_id ON exam_assignments(exam_id);
+CREATE INDEX IF NOT EXISTS idx_exam_assignments_candidate_id ON exam_assignments(candidate_id);
+CREATE INDEX IF NOT EXISTS idx_exam_questions_exam_id ON exam_questions(exam_id);
+CREATE INDEX IF NOT EXISTS idx_exam_coding_questions_exam_id ON exam_coding_questions(exam_id);
+CREATE INDEX IF NOT EXISTS idx_jobs_created_by ON jobs(created_by);
+CREATE INDEX IF NOT EXISTS idx_jobs_college_id ON jobs(college_id);
+CREATE INDEX IF NOT EXISTS idx_candidate_status_job_id ON candidate_status(job_id);
+CREATE INDEX IF NOT EXISTS idx_candidate_status_candidate_id ON candidate_status(candidate_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_interviews_candidate_id ON ai_interviews(candidate_id);
+CREATE INDEX IF NOT EXISTS idx_ai_interviews_exam_id ON ai_interviews(exam_id);

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "../lib/postgres.js";
 import { authMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -37,7 +38,7 @@ router.get("/certificates", async (req: AuthRequest, res) => {
 
     res.json({ certificates: certificates || [] });
   } catch (err) {
-    console.error("Certificates error:", err);
+    logger.error({ err }, "Certificates error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -86,7 +87,7 @@ router.get("/badges", async (req: AuthRequest, res) => {
 
     res.json({ badges: data || [] });
   } catch (err) {
-    console.error("Badges error:", err);
+    logger.error({ err }, "Badges error");
     res.status(500).json({ error: "Server error" });
   }
 });

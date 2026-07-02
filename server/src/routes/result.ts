@@ -3,6 +3,7 @@ import { db } from "../lib/postgres.js";
 import { authMiddleware, type AuthRequest } from "../middleware/auth.js";
 import { gradingQueue } from "../lib/queue.js";
 import { runPlagiarismCheck } from "../lib/plagiarism.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 
@@ -76,7 +77,7 @@ router.post("/submit-mcq", async (req: AuthRequest, res) => {
 
     res.json({ message: "Answer submitted", answer: data });
   } catch (err) {
-    console.error("Submit MCQ error:", err);
+    logger.error({ err }, "Submit MCQ error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -134,7 +135,7 @@ router.post("/submit-code", async (req: AuthRequest, res) => {
 
     res.json({ message: "Code submitted", submission: data });
   } catch (err) {
-    console.error("Submit code error:", err);
+    logger.error({ err }, "Submit code error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -192,7 +193,7 @@ router.post("/update-code-score", async (req: AuthRequest, res) => {
 
     res.json({ message: "Code score updated", submission: data });
   } catch (err) {
-    console.error("Update code score error:", err);
+    logger.error({ err }, "Update code score error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -263,7 +264,7 @@ router.post("/submit-exam", async (req: AuthRequest, res) => {
             score: data.score || 0,
           });
         })
-        .catch((err) => console.error("Socket emit submit-exam error:", err));
+        .catch((err) => logger.error({ err }, "Socket emit submit-exam error"));
     }
 
     res.json({ 
@@ -271,7 +272,7 @@ router.post("/submit-exam", async (req: AuthRequest, res) => {
       attempt: data 
     });
   } catch (err) {
-    console.error("Submit exam error:", err);
+    logger.error({ err }, "Submit exam error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -309,7 +310,7 @@ router.get("/attempt/:attemptId", async (req: AuthRequest, res) => {
       codingSubmissions: submissions || [],
     });
   } catch (err) {
-    console.error("Get attempt error:", err);
+    logger.error({ err }, "Get attempt error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -349,7 +350,7 @@ router.get("/all", async (req: AuthRequest, res) => {
     }
     res.json({ results: data || [] });
   } catch (err) {
-    console.error("Get all results error:", err);
+    logger.error({ err }, "Get all results error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -392,7 +393,7 @@ router.get("/:examId", async (req: AuthRequest, res) => {
 
     res.json({ results: data || [] });
   } catch (err) {
-    console.error("Get results error:", err);
+    logger.error({ err }, "Get results error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -412,7 +413,7 @@ router.post("/plagiarism/run/:attemptId", async (req: AuthRequest, res) => {
 
     res.json({ message: "Plagiarism check completed successfully" });
   } catch (err) {
-    console.error("Run plagiarism error:", err);
+    logger.error({ err }, "Run plagiarism error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -474,7 +475,7 @@ router.get("/plagiarism/exam/:examId", async (req: AuthRequest, res) => {
 
     res.json({ flags: flags || [] });
   } catch (err) {
-    console.error("Get exam plagiarism error:", err);
+    logger.error({ err }, "Get exam plagiarism error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -519,7 +520,7 @@ router.get("/plagiarism/attempt/:attemptId", async (req: AuthRequest, res) => {
 
     res.json({ flags: flags || [] });
   } catch (err) {
-    console.error("Get attempt plagiarism error:", err);
+    logger.error({ err }, "Get attempt plagiarism error");
     res.status(500).json({ error: "Server error" });
   }
 });

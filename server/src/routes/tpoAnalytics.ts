@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "../lib/postgres.js";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -145,7 +146,7 @@ router.get("/placement-stats", async (req: AuthRequest, res) => {
 
     res.json({ byBranch, byYear, topCompanies });
   } catch (err) {
-    console.error("Placement stats error:", err);
+    logger.error({ err }, "Placement stats error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -277,7 +278,7 @@ router.get("/readiness-heatmap", async (req: AuthRequest, res) => {
 
     res.json({ students: studentScores, zoneCounts });
   } catch (err) {
-    console.error("Readiness heatmap error:", err);
+    logger.error({ err }, "Readiness heatmap error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -360,7 +361,7 @@ router.get("/company-performance", async (req: AuthRequest, res) => {
 
     res.json({ companies });
   } catch (err) {
-    console.error("Company performance error:", err);
+    logger.error({ err }, "Company performance error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -419,7 +420,7 @@ router.get("/upload-tracking", async (req: AuthRequest, res) => {
 
     res.json({ uploads: formattedUploads, trend });
   } catch (err) {
-    console.error("Upload tracking error:", err);
+    logger.error({ err }, "Upload tracking error");
     res.status(500).json({ error: "Server error" });
   }
 });

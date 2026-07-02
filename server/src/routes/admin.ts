@@ -3,6 +3,9 @@ import bcrypt from "bcryptjs";
 import { db, transaction } from "../lib/postgres.js";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
 import { getPasswordValidationError, isValidEmail } from "../lib/validation.js";
+import { logger } from "../lib/logger.js";
+
+import { createRecruiterSchema, createTpoSchema } from "../lib/schemas.js";
 
 const router = Router();
 
@@ -24,15 +27,13 @@ const monthsBack = (count: number) => {
 
 router.post("/create-recruiter", async (req: AuthRequest, res) => {
   try {
-    const { name, email, password } = req.body;
-    if (!name || !email || !password) {
-      res.status(400).json({ error: "Name, email, and password required" });
+    const parsed = createRecruiterSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
-    if (!isValidEmail(email)) {
-      res.status(400).json({ error: "Enter a valid recruiter email address" });
-      return;
-    }
+    const { name, email, password } = parsed.data;
+
     const passwordError = getPasswordValidationError(password);
     if (passwordError) {
       res.status(400).json({ error: passwordError });
@@ -59,22 +60,20 @@ router.post("/create-recruiter", async (req: AuthRequest, res) => {
 
     res.json({ message: "Recruiter created", recruiter: data });
   } catch (err) {
-    console.error("Create recruiter error:", err);
+    logger.error({ err }, "Create recruiter error");
     res.status(500).json({ error: "Server error" });
   }
 });
 
 router.post("/create-tpo", async (req: AuthRequest, res) => {
   try {
-    const { name, email, password, college_name, college_code, location } = req.body;
-    if (!name || !email || !password || !college_name || !college_code) {
-      res.status(400).json({ error: "Name, email, password, college name, and college code required" });
+    const parsed = createTpoSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
-    if (!isValidEmail(email)) {
-      res.status(400).json({ error: "Enter a valid TPO email address" });
-      return;
-    }
+    const { name, email, password, college_name, college_code, location } = parsed.data;
+
     const passwordError = getPasswordValidationError(password);
     if (passwordError) {
       res.status(400).json({ error: passwordError });
@@ -110,47 +109,59 @@ router.post("/create-tpo", async (req: AuthRequest, res) => {
 
     res.json({ message: "TPO and college created", tpo, college });
   } catch (err) {
-    console.error("Create TPO error:", err);
+    logger.error({ err }, "Create TPO error");
     res.status(500).json({ error: "Server error" });
   }
 });
 
 router.get("/recruiters", async (req: AuthRequest, res) => {
   try {
-    const { data, error } = await db
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 50));
+    const offset = (page - 1) * limit;
+
+    const { data, error, count } = await db
       .from("users")
-      .select("id, name, email, created_at")
+      .select("id, name, email, created_at", { count: "exact" })
       .eq("role", "recruiter")
-      .eq("created_by", req.user!.id);
+      .eq("created_by", req.user!.id)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       res.status(400).json({ error: error.message });
       return;
     }
 
-    res.json({ recruiters: data || [] });
+    res.json({ recruiters: data || [], total: count ?? 0, page, limit });
   } catch (err) {
-    console.error("Fetch recruiters error:", err);
+    logger.error({ err }, "Fetch recruiters error");
     res.status(500).json({ error: "Server error" });
   }
 });
 
 router.get("/tpos", async (req: AuthRequest, res) => {
   try {
-    const { data, error } = await db
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 50));
+    const offset = (page - 1) * limit;
+
+    const { data, error, count } = await db
       .from("users")
-      .select("id, name, email, created_at, college:college_id(id, name, code)")
+      .select("id, name, email, created_at, college:college_id(id, name, code)", { count: "exact" })
       .eq("role", "tpo")
-      .eq("created_by", req.user!.id);
+      .eq("created_by", req.user!.id)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       res.status(400).json({ error: error.message });
       return;
     }
 
-    res.json({ tpos: data || [] });
+    res.json({ tpos: data || [], total: count ?? 0, page, limit });
   } catch (err) {
-    console.error("Fetch TPOs error:", err);
+    logger.error({ err }, "Fetch TPOs error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -385,7 +396,7 @@ router.get("/dashboard", async (req: AuthRequest, res) => {
       resultSummary,
     });
   } catch (err) {
-    console.error("Admin dashboard error:", err);
+    logger.error({ err }, "Admin dashboard error");
     res.status(500).json({ error: "Server error" });
   }
 });

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "../lib/postgres.js";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -155,7 +156,7 @@ router.get("/platform-growth", async (req: AuthRequest, res) => {
       totals,
     });
   } catch (err) {
-    console.error("Platform growth error:", err);
+    logger.error({ err }, "Platform growth error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -225,7 +226,7 @@ router.get("/system-health", async (req: AuthRequest, res) => {
       dbConnections,
     });
   } catch (err) {
-    console.error("System health error:", err);
+    logger.error({ err }, "System health error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -334,7 +335,7 @@ router.get("/real-time-activity", async (req: AuthRequest, res) => {
       },
     });
   } catch (err) {
-    console.error("Real-time activity error:", err);
+    logger.error({ err }, "Real-time activity error");
     res.status(500).json({ error: "Server error" });
   }
 });

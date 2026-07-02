@@ -1,12 +1,8 @@
+import { config } from "../config.js";
 import jwt from "jsonwebtoken";
 import type { Request, Response, NextFunction } from "express";
 
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET || JWT_SECRET.length < 32) {
-  throw new Error(
-    "JWT_SECRET must be set in .env and be at least 32 characters long."
-  );
-}
+const JWT_SECRET = config.JWT_SECRET;
 
 export interface AuthRequest extends Request {
   user?: {

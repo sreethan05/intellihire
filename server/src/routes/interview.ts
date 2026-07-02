@@ -3,6 +3,7 @@ import { db, recordPipelineStage } from "../lib/postgres.js";
 import { generateAiJson, hasAiKey } from "../lib/ai.js";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
 import { deserializeDriveColleges } from "./recruiter.js";
+import { logger } from "../lib/logger.js";
 
 
 const router = Router();
@@ -162,7 +163,7 @@ Schema:
 
       if (generated.length >= 2) technicalQuestions = generated;
     } catch (err) {
-      console.warn("AI technical question generation failed, using defaults:", err);
+      logger.warn({ err }, "AI technical question generation failed, using defaults");
     }
   }
 
@@ -272,7 +273,7 @@ Schema:
       feedback: String(result.feedback || fallbackFeedback(score)).trim(),
     };
   } catch (err) {
-    console.warn("AI answer scoring failed, using fallback:", err);
+    logger.warn({ err }, "AI answer scoring failed, using fallback");
     return {
       score: fallbackScore,
       feedback: fallbackFeedback(fallbackScore),
@@ -368,7 +369,7 @@ Schema:
       feedback: String(result.feedback || fallback.feedback).trim(),
     };
   } catch (err) {
-    console.warn("AI interview summary failed, using fallback:", err);
+    logger.warn({ err }, "AI interview summary failed, using fallback");
     return fallback;
   }
 }
@@ -398,7 +399,7 @@ router.get("/eligibility", async (req: AuthRequest, res) => {
         : "Pass an assigned exam to unlock the AI interview.",
     });
   } catch (err) {
-    console.error("Interview eligibility error:", err);
+    logger.error({ err }, "Interview eligibility error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -427,7 +428,7 @@ router.get("/pending", async (req: AuthRequest, res) => {
 
     res.json({ interview: data || null });
   } catch (err) {
-    console.error("Pending interview error:", err);
+    logger.error({ err }, "Pending interview error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -488,7 +489,7 @@ router.get("/recruiter/pending", async (req: AuthRequest, res) => {
 
     res.json({ interviews: data || [] });
   } catch (err) {
-    console.error("Recruiter pending interviews error:", err);
+    logger.error({ err }, "Recruiter pending interviews error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -594,7 +595,7 @@ router.post("/start", async (req: AuthRequest, res) => {
       job,
     });
   } catch (err) {
-    console.error("Start interview error:", err);
+    logger.error({ err }, "Start interview error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -673,12 +674,12 @@ router.post("/:interviewId/schedule", roleMiddleware(["recruiter"]), async (req:
         body: `Your AI interview is scheduled between ${new Date(startIso).toLocaleString()} and ${new Date(endIso).toLocaleString()}.`,
       });
     } catch (notifErr) {
-      console.warn("Candidate schedule notification warning (non-fatal):", notifErr);
+      logger.warn({ notifErr }, "Candidate schedule notification warning (non-fatal)");
     }
 
     res.json({ interview: updated });
   } catch (err) {
-    console.error("Schedule interview error:", err);
+    logger.error({ err }, "Schedule interview error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -734,7 +735,7 @@ router.get("/:interviewId/answers", async (req: AuthRequest, res) => {
       answers: answers || [],
     });
   } catch (err) {
-    console.error("Fetch interview answers error:", err);
+    logger.error({ err }, "Fetch interview answers error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -785,7 +786,7 @@ router.post("/:interviewId/answer", async (req: AuthRequest, res) => {
           });
 
         if (uploadError) {
-          console.error("db Storage audio upload error:", uploadError);
+          logger.error({ err: uploadError }, "db Storage audio upload error");
         } else {
           const { data: publicUrlData } = db.storage
             .from("intellihire")
@@ -808,7 +809,7 @@ router.post("/:interviewId/answer", async (req: AuthRequest, res) => {
 
             if (!response.ok) {
               const body = await response.json();
-              console.error("Groq Whisper API transcription error:", body?.error?.message);
+              logger.error({ message: body?.error?.message }, "Groq Whisper API transcription error");
             } else {
               const body: any = await response.json();
               if (body?.text) {
@@ -818,7 +819,7 @@ router.post("/:interviewId/answer", async (req: AuthRequest, res) => {
           }
         }
       } catch (audioErr) {
-        console.error("Audio processing failed, falling back to text:", audioErr);
+        logger.error({ err: audioErr }, "Audio processing failed, falling back to text");
       }
     }
 
@@ -852,7 +853,7 @@ router.post("/:interviewId/answer", async (req: AuthRequest, res) => {
       clarity_score: evaluation.clarity_score,
     });
   } catch (err) {
-    console.error("Interview answer error:", err);
+    logger.error({ err }, "Interview answer error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -948,7 +949,7 @@ router.post("/:interviewId/submit", async (req: AuthRequest, res) => {
         );
       }
     } catch (statusErr) {
-      console.warn("Status update warning (non-fatal):", statusErr);
+      logger.warn({ statusErr }, "Status update warning (non-fatal)");
     }
 
     // Notify the recruiter with selection + analysis
@@ -970,12 +971,12 @@ router.post("/:interviewId/submit", async (req: AuthRequest, res) => {
         });
       }
     } catch (notifErr) {
-      console.warn("Recruiter completion notification warning (non-fatal):", notifErr);
+      logger.warn({ notifErr }, "Recruiter completion notification warning (non-fatal)");
     }
 
     res.json({ interview: data, selected: result.selected });
   } catch (err) {
-    console.error("Submit interview error:", err);
+    logger.error({ err }, "Submit interview error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -1059,7 +1060,7 @@ router.get("/summaries", async (req: AuthRequest, res) => {
     }
     res.json({ interviews: data || [] });
   } catch (err) {
-    console.error("Summaries error:", err);
+    logger.error({ err }, "Summaries error");
     res.status(500).json({ error: "Server error" });
   }
 });

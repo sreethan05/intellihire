@@ -18,8 +18,8 @@ const swaggerSpec = swaggerJsdoc({
     },
     servers: [
       {
-        url: "http://localhost:5000/api",
-        description: "Local development server",
+        url: "http://localhost:5000/api/v1",
+        description: "Local development server (v1)",
       },
     ],
     components: {

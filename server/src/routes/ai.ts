@@ -1,7 +1,22 @@
+import { dirname, resolve } from "path";
+import { fileURLToPath } from "url";
+import fs from "fs/promises";
 import { Router } from "express";
 import { db } from "../lib/postgres.js";
 import { generateExam, getBankStats } from "../lib/examPipeline.js";
 import { authMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { logger } from "../lib/logger.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const realFallbackMcqs: Record<string, Record<string, McqQuestion[]>> = JSON.parse(
+  await fs.readFile(resolve(__dirname, "../../data/fallbackMcqs.json"), "utf-8")
+);
+
+const realFallbackCoding: Record<string, Record<string, CodingDraft[]>> = JSON.parse(
+  await fs.readFile(resolve(__dirname, "../../data/fallbackCoding.json"), "utf-8")
+);
 
 const router = Router();
 router.use(authMiddleware);
@@ -72,220 +87,6 @@ function pickSkills(text: string) {
   const words = normalizeWords(text).join(" ");
   return known.filter((skill) => words.includes(skill));
 }
-
-const realFallbackMcqs: Record<string, Record<string, McqQuestion[]>> = {
-  python: {
-    easy: [
-      {
-        question_text: "What is the output of print(type(5)) in Python?",
-        option_a: "<class 'int'>",
-        option_b: "<class 'float'>",
-        option_c: "<class 'str'>",
-        option_d: "<class 'number'>",
-        correct_option: "A",
-        marks: 1
-      },
-      {
-        question_text: "Which of the following is a mutable data type in Python?",
-        option_a: "tuple",
-        option_b: "list",
-        option_c: "string",
-        option_d: "int",
-        correct_option: "B",
-        marks: 1
-      },
-      {
-        question_text: "How do you insert an element at the end of a list in Python?",
-        option_a: "list.add(element)",
-        option_b: "list.insert(element)",
-        option_c: "list.append(element)",
-        option_d: "list.push(element)",
-        correct_option: "C",
-        marks: 1
-      },
-      {
-        question_text: "Which keyword is used to define a function in Python?",
-        option_a: "function",
-        option_b: "def",
-        option_c: "func",
-        option_d: "define",
-        correct_option: "B",
-        marks: 1
-      },
-      {
-        question_text: "What is the correct syntax to output 'Hello World' in Python?",
-        option_a: "echo('Hello World')",
-        option_b: "printf('Hello World')",
-        option_c: "print('Hello World')",
-        option_d: "console.log('Hello World')",
-        correct_option: "C",
-        marks: 1
-      }
-    ],
-    medium: [
-      {
-        question_text: "What is the output of print([x for x in range(5) if x % 2 == 0])?",
-        option_a: "[0, 2, 4]",
-        option_b: "[1, 3]",
-        option_c: "[0, 1, 2, 3, 4]",
-        option_d: "[2, 4]",
-        correct_option: "A",
-        marks: 1
-      },
-      {
-        question_text: "How do you handle exceptions in Python?",
-        option_a: "try/catch",
-        option_b: "try/except",
-        option_c: "throw/catch",
-        option_d: "raise/except",
-        correct_option: "B",
-        marks: 1
-      }
-    ],
-    hard: [
-      {
-        question_text: "What is the purpose of '__slots__' in Python classes?",
-        option_a: "To define private methods",
-        option_b: "To optimize memory by preventing dynamic dictionary creation for instances",
-        option_c: "To enable multiple inheritance",
-        option_d: "To declare abstract properties",
-        correct_option: "B",
-        marks: 1
-      }
-    ]
-  },
-  javascript: {
-    easy: [
-      {
-        question_text: "Which of the following is correct to declare a constant in JavaScript?",
-        option_a: "const",
-        option_b: "let",
-        option_c: "var",
-        option_d: "constant",
-        correct_option: "A",
-        marks: 1
-      },
-      {
-        question_text: "What is the output of console.log(typeof NaN)?",
-        option_a: "'number'",
-        option_b: "'NaN'",
-        option_c: "'undefined'",
-        option_d: "'object'",
-        correct_option: "A",
-        marks: 1
-      }
-    ],
-    medium: [
-      {
-        question_text: "What is the output of console.log(0.1 + 0.2 === 0.3)?",
-        option_a: "true",
-        option_b: "false",
-        option_c: "undefined",
-        option_d: "TypeError",
-        correct_option: "B",
-        marks: 1
-      }
-    ],
-    hard: [
-      {
-        question_text: "What is a closure in JavaScript?",
-        option_a: "A callback function",
-        option_b: "A function that has access to its outer scope even after the outer function has returned",
-        option_c: "A method to close browser tabs",
-        option_d: "A way of declaring private modules",
-        correct_option: "B",
-        marks: 1
-      }
-    ]
-  },
-  sql: {
-    easy: [
-      {
-        question_text: "Which SQL clause is used to filter records?",
-        option_a: "WHERE",
-        option_b: "FILTER",
-        option_c: "HAVING",
-        option_d: "GROUP BY",
-        correct_option: "A",
-        marks: 1
-      },
-      {
-        question_text: "Which statement is used to retrieve data from a table?",
-        option_a: "GET",
-        option_b: "SELECT",
-        option_c: "FETCH",
-        option_d: "EXTRACT",
-        correct_option: "B",
-        marks: 1
-      }
-    ],
-    medium: [
-      {
-        question_text: "What is the difference between WHERE and HAVING clauses?",
-        option_a: "WHERE is used before grouping; HAVING is used after grouping to filter groups",
-        option_b: "There is no difference",
-        option_c: "HAVING is for rows; WHERE is for columns",
-        option_d: "WHERE is only for SELECT statements",
-        correct_option: "A",
-        marks: 1
-      }
-    ],
-    hard: [
-      {
-        question_text: "Which type of index is used to physically order the data in a SQL table?",
-        option_a: "Clustered Index",
-        option_b: "Non-clustered Index",
-        option_c: "Unique Index",
-        option_d: "Composite Index",
-        correct_option: "A",
-        marks: 1
-      }
-    ]
-  }
-};
-
-const realFallbackCoding: Record<string, Record<string, CodingDraft[]>> = {
-  python: {
-    easy: [
-      {
-        title: "Even Numbers Sum",
-        description: "Given a number N, read N space-separated integers. Compute and print the sum of all even numbers in the list.",
-        difficulty: "easy",
-        starter_code: "n = int(input())\narr = list(map(int, input().split()))\n# Write your code here",
-        test_cases: [
-          { input: "5\n1 2 3 4 5", expected_output: "6" },
-          { input: "3\n11 13 15", expected_output: "0" }
-        ],
-        marks: 10
-      }
-    ],
-    medium: [
-      {
-        title: "Find Duplicate Elements",
-        description: "Given N elements, print all duplicate elements in sorted ascending order. If there are no duplicates, print -1.",
-        difficulty: "medium",
-        starter_code: "n = int(input())\narr = list(map(int, input().split()))\n# Write your code here",
-        test_cases: [
-          { input: "6\n4 3 2 7 8 2", expected_output: "2" },
-          { input: "4\n1 2 3 4", expected_output: "-1" }
-        ],
-        marks: 15
-      }
-    ],
-    hard: [
-      {
-        title: "Maximum Path Sum",
-        description: "Given an array representation of a binary tree, find the maximum path sum from any node to any node.",
-        difficulty: "hard",
-        starter_code: "# Write your code here",
-        test_cases: [
-          { input: "1\n2\n3", expected_output: "6" }
-        ],
-        marks: 20
-      }
-    ]
-  }
-};
 
 function fallbackMcqs(topic: string, difficulty: string, count: number): McqQuestion[] {
   const topicKey = topic.toLowerCase().trim();
@@ -486,7 +287,7 @@ router.post("/generate-mcq", async (req: AuthRequest, res) => {
       return;
     }
   } catch (err: any) {
-    console.warn("[ExamPipeline] MCQ generation failed, falling back to static bank:", err.message);
+    logger.warn({ err: err.message }, "[ExamPipeline] MCQ generation failed, falling back to static bank");
   }
 
   // Fallback: static in-memory bank (no API call)
@@ -519,7 +320,7 @@ router.post("/generate-coding", async (req: AuthRequest, res) => {
       return;
     }
   } catch (err: any) {
-    console.warn("[ExamPipeline] Coding generation failed, falling back to static bank:", err.message);
+    logger.warn({ err: err.message }, "[ExamPipeline] Coding generation failed, falling back to static bank");
   }
 
   // Fallback: static in-memory bank (no API call)
@@ -568,7 +369,7 @@ router.post("/improvement-report", async (req: AuthRequest, res) => {
 
     res.json({ report: data, percentage });
   } catch (err) {
-    console.error("Improvement report error:", err);
+    logger.error({ err }, "Improvement report error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -708,7 +509,7 @@ router.get("/profile-stats", async (req: AuthRequest, res) => {
 
     res.json({ title: "SYSTEM DASHBOARD", stats: [] });
   } catch (err) {
-    console.error("Profile stats error:", err);
+    logger.error({ err }, "Profile stats error");
     res.status(500).json({ error: "Server error" });
   }
 });

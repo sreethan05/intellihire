@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "../lib/postgres.js";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -94,7 +95,7 @@ router.get("/candidates/:candidateId/analytics", async (req: AuthRequest, res) =
       })),
     });
   } catch (err) {
-    console.error("Candidate drill-down error:", err);
+    logger.error({ err }, "Candidate drill-down error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -153,7 +154,7 @@ router.get("/exams/:examId/topic-performance", async (req: AuthRequest, res) => 
 
     res.json({ topics, weakest, totalCandidates: attemptIds.length });
   } catch (err) {
-    console.error("Topic performance error:", err);
+    logger.error({ err }, "Topic performance error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -205,7 +206,7 @@ router.get("/proctoring-analytics", async (req: AuthRequest, res) => {
 
     res.json({ totalViolations: violations.length, byType, byCandidate });
   } catch (err) {
-    console.error("Proctoring analytics error:", err);
+    logger.error({ err }, "Proctoring analytics error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -249,7 +250,7 @@ router.get("/plagiarism-analytics", async (req: AuthRequest, res) => {
 
     res.json({ totalFlags, avgSimilarity, highFlags });
   } catch (err) {
-    console.error("Plagiarism analytics error:", err);
+    logger.error({ err }, "Plagiarism analytics error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -307,7 +308,7 @@ router.get("/interview-funnel", async (req: AuthRequest, res) => {
 
     res.json({ funnel, scoreDistribution, avgScores, total: list.length });
   } catch (err) {
-    console.error("Interview funnel error:", err);
+    logger.error({ err }, "Interview funnel error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -349,7 +350,7 @@ router.get("/time-to-complete", async (req: AuthRequest, res) => {
 
     res.json({ data, avgTime, avgPercentageUsed, count: data.length });
   } catch (err) {
-    console.error("Time-to-complete error:", err);
+    logger.error({ err }, "Time-to-complete error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -391,7 +392,7 @@ router.get("/coding-languages", async (req: AuthRequest, res) => {
 
     res.json({ languages, totalSubmissions: (submissions || []).length });
   } catch (err) {
-    console.error("Coding languages error:", err);
+    logger.error({ err }, "Coding languages error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -489,7 +490,7 @@ router.get("/predictive-shortlist", async (req: AuthRequest, res) => {
 
     res.json({ candidates: ranked, total });
   } catch (err) {
-    console.error("Predictive shortlist error:", err);
+    logger.error({ err }, "Predictive shortlist error");
     res.status(500).json({ error: "Server error" });
   }
 });

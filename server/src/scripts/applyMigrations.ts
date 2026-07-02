@@ -3,19 +3,37 @@ import fs from "fs/promises";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { isPostgresConfigured, pool } from "../lib/postgres.js";
+import { logger } from "../lib/logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 dotenv.config({ path: resolve(__dirname, "../../../.env") });
 
+async function ensureMigrationsTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS migrations (
+      id SERIAL PRIMARY KEY,
+      filename TEXT UNIQUE NOT NULL,
+      checksum TEXT NOT NULL,
+      applied_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+  `);
+}
+
+async function computeChecksum(content: string): Promise<string> {
+  const { createHash } = await import("crypto");
+  return createHash("sha256").update(content).digest("hex").slice(0, 16);
+}
+
 async function applyMigrations() {
   if (!isPostgresConfigured()) {
-    console.error("Missing PostgreSQL configuration. Set DATABASE_URL in .env file.");
+    logger.error("Missing PostgreSQL configuration. Set DATABASE_URL in .env file.");
     process.exit(1);
   }
 
   try {
-    console.log("Connecting to PostgreSQL...");
+    await ensureMigrationsTable();
+    logger.info("Connecting to PostgreSQL...");
 
     const filesToApply = [
       "01_users_colleges.sql",
@@ -27,24 +45,45 @@ async function applyMigrations() {
       "07_interviews_feedback.sql",
       "08_platform_system.sql",
       "09_seed_data.sql",
+      "10_indexes.sql",
+      "11_audit_logs.sql",
     ];
 
     for (const file of filesToApply) {
       const filePath = resolve(__dirname, `../../../database/${file}`);
-      console.log(`Reading and applying: ${filePath}`);
       const sql = await fs.readFile(filePath, "utf-8");
-      
-      console.log(`Applying database file: ${file}...`);
+      const checksum = await computeChecksum(sql);
+
+      const existing = await pool.query(
+        "SELECT checksum FROM migrations WHERE filename = $1",
+        [file]
+      );
+
+      if (existing.rows.length > 0) {
+        if (existing.rows[0].checksum === checksum) {
+          logger.info(`Skipping already applied migration: ${file}`);
+          continue;
+        } else {
+          logger.warn(`Migration ${file} has changed! Re-applying (checksum mismatch).`);
+          // Remove old record to allow re-application
+          await pool.query("DELETE FROM migrations WHERE filename = $1", [file]);
+        }
+      }
+
+      logger.info(`Applying database file: ${file}...`);
       await pool.query(sql);
-      console.log(`Successfully applied: ${file}`);
+      await pool.query(
+        "INSERT INTO migrations (filename, checksum) VALUES ($1, $2)",
+        [file, checksum]
+      );
+      logger.info(`Successfully applied: ${file}`);
     }
 
-    // Verify
     const countRes = await pool.query("SELECT COUNT(*)::int as count FROM questions");
-    console.log(`Verification: Total questions currently in database: ${countRes.rows[0].count}`);
+    logger.info(`Verification: Total questions currently in database: ${countRes.rows[0].count}`);
 
   } catch (err: unknown) {
-    console.error("Migration/Seeding failed:", err);
+    logger.error({ err }, "Migration/Seeding failed");
     if (process.env.CI) {
       console.log(`::error::Migration/Seeding failed: ${err instanceof Error ? err.message + '\nStack: ' + err.stack : String(err)}`);
     }

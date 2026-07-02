@@ -4,6 +4,7 @@ import path from "path";
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 import pg from "pg";
+import { config } from "../config.js";
 
 const { Pool } = pg;
 
@@ -200,7 +201,7 @@ const TABLE_ALIASES: Record<string, string> = {
 };
 
 function databaseUrl() {
-  return process.env.DATABASE_URL || process.env.POSTGRES_URL;
+  return config.DATABASE_URL || process.env.POSTGRES_URL;
 }
 
 export const isPostgresConfigured = () =>

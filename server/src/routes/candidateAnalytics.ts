@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "../lib/postgres.js";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -90,7 +91,7 @@ router.get("/topic-mastery", async (req: AuthRequest, res) => {
       peerAverage,
     });
   } catch (err) {
-    console.error("Topic mastery error:", err);
+    logger.error({ err }, "Topic mastery error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -175,7 +176,7 @@ router.get("/coding-analytics", async (req: AuthRequest, res) => {
 
     res.json({ languages, difficulty, problemTypes });
   } catch (err) {
-    console.error("Coding analytics error:", err);
+    logger.error({ err }, "Coding analytics error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -226,7 +227,7 @@ router.get("/interview-analytics", async (req: AuthRequest, res) => {
 
     res.json({ interviews: breakdown, averages, count: breakdown.length });
   } catch (err) {
-    console.error("Interview analytics error:", err);
+    logger.error({ err }, "Interview analytics error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -258,7 +259,7 @@ router.get("/job-pipeline", async (req: AuthRequest, res) => {
 
     res.json({ pipeline, stages });
   } catch (err) {
-    console.error("Job pipeline error:", err);
+    logger.error({ err }, "Job pipeline error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -351,7 +352,7 @@ router.get("/streak", async (req: AuthRequest, res) => {
 
     res.json({ currentStreak, longestStreak, heatmap, dayNames });
   } catch (err) {
-    console.error("Streak error:", err);
+    logger.error({ err }, "Streak error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -435,7 +436,7 @@ router.get("/readiness-score", async (req: AuthRequest, res) => {
       },
     });
   } catch (err) {
-    console.error("Readiness score error:", err);
+    logger.error({ err }, "Readiness score error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -488,7 +489,7 @@ router.get("/proctoring-summary", async (req: AuthRequest, res) => {
 
     res.json({ totalViolations: violations.length, byType, recentExams });
   } catch (err) {
-    console.error("Proctoring summary error:", err);
+    logger.error({ err }, "Proctoring summary error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -571,7 +572,7 @@ router.get("/peer-comparison", async (req: AuthRequest, res) => {
       },
     });
   } catch (err) {
-    console.error("Peer comparison error:", err);
+    logger.error({ err }, "Peer comparison error");
     res.status(500).json({ error: "Server error" });
   }
 });

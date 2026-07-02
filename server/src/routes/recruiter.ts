@@ -4,6 +4,7 @@ import { db, recordPipelineStage } from "../lib/postgres.js";
 import { sendRealtimeNotification } from "../websocket.js";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
 import { generateAiJson, hasAiKey } from "../lib/ai.js";
+import { createCandidateSchema } from "../lib/schemas.js";
 import { getPasswordValidationError, isValidEmail } from "../lib/validation.js";
 import { sendDriveRegisteredEmail } from "../lib/email.js";
 import { logger } from "../lib/logger.js";
@@ -22,7 +23,7 @@ const APP_URL = process.env.VITE_API_URL?.replace("/api", "") || "http://localho
 // Offer letter upload storage
 const offersDir = path.resolve(storageRoot, "offers");
 fs.mkdir(offersDir, { recursive: true }).catch((err) =>
-  console.error("Failed to create offers storage folder:", err)
+  logger.error({ err }, "Failed to create offers storage folder")
 );
 
 const offerStorage = multer.diskStorage({
@@ -60,15 +61,13 @@ const monthsBack = (count: number) => {
 
 router.post("/create-candidate", async (req: AuthRequest, res) => {
   try {
-    const { name, email, password } = req.body;
-    if (!name || !email || !password) {
-      res.status(400).json({ error: "Name, email, and password required" });
+    const parsed = createCandidateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
-    if (!isValidEmail(email)) {
-      res.status(400).json({ error: "Enter a valid candidate email address" });
-      return;
-    }
+    const { name, email, password } = parsed.data;
+
     const passwordError = getPasswordValidationError(password);
     if (passwordError) {
       res.status(400).json({ error: passwordError });
@@ -95,26 +94,32 @@ router.post("/create-candidate", async (req: AuthRequest, res) => {
 
     res.json({ message: "Candidate created", candidate: data });
   } catch (err) {
-    console.error("Create candidate error:", err);
+    logger.error({ err }, "Create candidate error");
     res.status(500).json({ error: "Server error" });
   }
 });
 
 router.get("/candidates", async (req: AuthRequest, res) => {
   try {
-    const { data, error } = await db
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 50));
+    const offset = (page - 1) * limit;
+
+    const { data, error, count } = await db
       .from("users")
-      .select("id, name, email, created_at")
-      .eq("role", "candidate");
+      .select("id, name, email, created_at", { count: "exact" })
+      .eq("role", "candidate")
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       res.status(400).json({ error: error.message });
       return;
     }
 
-    res.json({ candidates: data || [] });
+    res.json({ candidates: data || [], total: count ?? 0, page, limit });
   } catch (err) {
-    console.error("Fetch candidates error:", err);
+    logger.error({ err }, "Fetch candidates error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -133,7 +138,7 @@ router.get("/colleges", async (_req: AuthRequest, res) => {
 
     res.json({ colleges: data || [] });
   } catch (err) {
-    console.error("Fetch colleges error:", err);
+    logger.error({ err }, "Fetch colleges error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -251,7 +256,7 @@ router.get("/colleges-summary", async (req: AuthRequest, res) => {
 
     res.json({ colleges: summary });
   } catch (err) {
-    console.error("Colleges summary error:", err);
+    logger.error({ err }, "Colleges summary error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -420,7 +425,7 @@ router.post("/drives", async (req: AuthRequest, res) => {
 
     res.json({ message: "Drive created", drive: enrichedDrive, eligibleCount: eligible.length });
   } catch (err) {
-    console.error("Create drive error:", err);
+    logger.error({ err }, "Create drive error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -472,7 +477,7 @@ router.get("/drives", async (req: AuthRequest, res) => {
 
     res.json({ drives: enrichedDrives });
   } catch (err) {
-    console.error("Fetch drives error:", err);
+    logger.error({ err }, "Fetch drives error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -494,7 +499,7 @@ router.get("/drives/:driveId/eligible-candidates", async (req: AuthRequest, res)
     const eligible = await findEligibleCandidates(drive);
     res.json({ candidates: eligible, count: eligible.length });
   } catch (err) {
-    console.error("Eligible candidates error:", err);
+    logger.error({ err }, "Eligible candidates error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -534,7 +539,7 @@ router.post("/drives/:driveId/assign-exam", async (req: AuthRequest, res) => {
 
     res.json({ message: `${data?.length || 0} eligible candidate(s) assigned`, assignments: data || [] });
   } catch (err) {
-    console.error("Assign drive exam error:", err);
+    logger.error({ err }, "Assign drive exam error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -830,7 +835,7 @@ router.get("/dashboard", async (req: AuthRequest, res) => {
       resultSummary,
     });
   } catch (err) {
-    console.error("Recruiter dashboard error:", err);
+    logger.error({ err }, "Recruiter dashboard error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -853,7 +858,7 @@ router.get("/drives/:driveId/ai-config", async (req: AuthRequest, res) => {
     const { aiConfig } = deserializeDriveColleges(drive.company_description);
     res.json({ aiConfig });
   } catch (err) {
-    console.error("Fetch AI config error:", err);
+    logger.error({ err }, "Fetch AI config error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -898,7 +903,7 @@ router.post("/drives/:driveId/ai-config", async (req: AuthRequest, res) => {
 
     res.json({ message: "AI Config saved successfully", drive: data });
   } catch (err) {
-    console.error("Save AI config error:", err);
+    logger.error({ err }, "Save AI config error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -960,7 +965,7 @@ Schema:
 
     res.json({ score, feedback });
   } catch (err: any) {
-    console.error("Test evaluation error:", err);
+    logger.error({ err }, "Test evaluation error");
     res.status(500).json({ error: err.message || "Server error during test evaluation" });
   }
 });
@@ -1023,7 +1028,7 @@ router.get("/candidates/compare", async (req: AuthRequest, res) => {
     
     res.json({ comparison: results });
   } catch (err) {
-    console.error("Compare candidates error:", err);
+    logger.error({ err }, "Compare candidates error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -1098,7 +1103,7 @@ Return a JSON object in this format:
     const result = await generateAiJson<{ shortlist: any[] }>({ systemPrompt, userPrompt });
     res.json({ shortlist: result.shortlist || [] });
   } catch (err) {
-    console.error("AI shortlist generator error:", err);
+    logger.error({ err }, "AI shortlist generator error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -1163,7 +1168,7 @@ router.post("/offers/:candidateId/:jobId", uploadOffer.single("offerLetter"), as
 
     res.json({ message: "Offer letter uploaded and candidate notified", status: data });
   } catch (err) {
-    console.error("Offer upload error:", err);
+    logger.error({ err }, "Offer upload error");
     res.status(500).json({ error: "Server error" });
   }
 });

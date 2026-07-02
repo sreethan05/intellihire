@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "../lib/postgres.js";
 import { authMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { logger } from "../lib/logger.js";
 import {
   createTopicScores,
   feedMcqAnswer,
@@ -111,7 +112,7 @@ router.get("/overview", async (req: AuthRequest, res) => {
       res.status(400).json({ error: "Invalid user role" });
     }
   } catch (err) {
-    console.error("Hub overview error:", err);
+    logger.error({ err }, "Hub overview error");
     res.status(500).json({ error: "Server error compiling hub overview" });
   }
 });

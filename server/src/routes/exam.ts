@@ -60,7 +60,7 @@ router.post("/create", recruiterOrAdmin, async (req: AuthRequest, res) => {
     const { data, error } = await db.from("exams").insert(sanitizedPayload).select().single();
     if (error) { res.status(400).json({ error: error.message }); return; }
     res.json({ message: "Exam created", exam: data });
-  } catch (err) { console.error("Create exam error:", err); res.status(500).json({ error: "Server error" }); }
+  } catch (err) { logger.error({ err }, "Create exam error"); res.status(500).json({ error: "Server error" }); }
 });
  
 // ── Question Bank routes ──────────────────────────────────────────────────────
@@ -143,7 +143,7 @@ router.post("/bank/add-mcqs", recruiterOrAdmin, async (req: AuthRequest, res) =>
     }
     res.json({ message: `${inserted.length} question(s) saved to bank`, questions: inserted });
   } catch (err) {
-    console.error("Save mcqs error:", err);
+    logger.error({ err }, "Save mcqs error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -174,7 +174,7 @@ router.post("/bank/add-coding", recruiterOrAdmin, async (req: AuthRequest, res) 
     }
     res.json({ message: "Coding question saved to bank", question: data });
   } catch (err) {
-    console.error("Save coding error:", err);
+    logger.error({ err }, "Save coding error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -195,7 +195,7 @@ router.post("/add-questions", recruiterOrAdmin, async (req: AuthRequest, res) =>
       if (!linkErr) insertedQuestions.push(linkData);
     }
     res.json({ message: "Questions added", questions: insertedQuestions });
-  } catch (err) { console.error("Add questions error:", err); res.status(500).json({ error: "Server error" }); }
+  } catch (err) { logger.error({ err }, "Add questions error"); res.status(500).json({ error: "Server error" }); }
 });
  
 router.post("/add-coding-questions", recruiterOrAdmin, async (req: AuthRequest, res) => {
@@ -212,7 +212,7 @@ router.post("/add-coding-questions", recruiterOrAdmin, async (req: AuthRequest, 
       if (!linkErr) insertedQuestions.push(linkData);
     }
     res.json({ message: "Coding questions added", questions: insertedQuestions });
-  } catch (err) { console.error("Add coding questions error:", err); res.status(500).json({ error: "Server error" }); }
+  } catch (err) { logger.error({ err }, "Add coding questions error"); res.status(500).json({ error: "Server error" }); }
 });
  
 router.post("/assign", recruiterOrAdmin, async (req: AuthRequest, res) => {
@@ -248,7 +248,7 @@ router.post("/assign", recruiterOrAdmin, async (req: AuthRequest, res) => {
     }
 
     res.json({ message, assignments: data });
-  } catch (err) { console.error("Assign exam error:", err); res.status(500).json({ error: "Server error" }); }
+  } catch (err) { logger.error({ err }, "Assign exam error"); res.status(500).json({ error: "Server error" }); }
 });
  
 router.get("/list", async (req: AuthRequest, res) => {
@@ -263,7 +263,7 @@ router.get("/list", async (req: AuthRequest, res) => {
     const { data, error } = await query;
     if (error) { res.status(400).json({ error: error.message }); return; }
     res.json({ exams: data || [] });
-  } catch (err) { console.error("List exams error:", err); res.status(500).json({ error: "Server error" }); }
+  } catch (err) { logger.error({ err }, "List exams error"); res.status(500).json({ error: "Server error" }); }
 });
  
 router.post("/start", async (req: AuthRequest, res) => {
@@ -306,7 +306,7 @@ router.post("/start", async (req: AuthRequest, res) => {
     }
     
     res.json({ attempt: data });
-  } catch (err) { console.error("Start exam error:", err); res.status(500).json({ error: "Server error" }); }
+  } catch (err) { logger.error({ err }, "Start exam error"); res.status(500).json({ error: "Server error" }); }
 });
  
 router.get("/:examId", recruiterOrAdmin, async (req: AuthRequest, res) => {
@@ -317,7 +317,7 @@ router.get("/:examId", recruiterOrAdmin, async (req: AuthRequest, res) => {
     const { data: mcqQuestions } = await db.from("exam_questions").select("*, questions:question_id(*)").eq("exam_id", examId);
     const { data: codingQuestions } = await db.from("exam_coding_questions").select("*, coding_questions:coding_question_id(*)").eq("exam_id", examId);
     res.json({ exam: data, mcqQuestions: mcqQuestions || [], codingQuestions: codingQuestions || [] });
-  } catch (err) { console.error("Get exam error:", err); res.status(500).json({ error: "Server error" }); }
+  } catch (err) { logger.error({ err }, "Get exam error"); res.status(500).json({ error: "Server error" }); }
 });
  
 export default router;

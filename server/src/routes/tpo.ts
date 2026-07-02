@@ -4,6 +4,7 @@ import { db, transaction } from "../lib/postgres.js";
 import { scanMarksheetOCR } from "../lib/ocr.js";
 import { scanMarksheet, hasAiKey } from "../lib/ai.js";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 
@@ -185,7 +186,7 @@ router.get("/dashboard", async (req: AuthRequest, res) => {
       recentDrives: drives || [],
     });
   } catch (err) {
-    console.error("TPO dashboard error:", err);
+    logger.error({ err }, "TPO dashboard error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -203,7 +204,7 @@ router.post("/upload-students", async (req: AuthRequest, res) => {
 
     res.json({ message: `${created.length} student account(s) processed`, created, failed });
   } catch (err) {
-    console.error("Upload students error:", err);
+    logger.error({ err }, "Upload students error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -233,9 +234,9 @@ router.post("/scan-marksheets", async (req: AuthRequest, res) => {
         if (student.confidence < 0.6 && hasAiKey()) {
           try {
             student = await scanMarksheet(file);
-            console.log(`[scan] AI fallback used for ${file.name}`);
+            logger.info({ fileName: file.name }, `[scan] AI fallback used`);
           } catch {
-            console.warn(`[scan] AI fallback failed for ${file.name}, using OCR result`);
+            logger.warn({ fileName: file.name }, `[scan] AI fallback failed, using OCR result`);
           }
         }
 
@@ -255,7 +256,7 @@ router.post("/scan-marksheets", async (req: AuthRequest, res) => {
       failed: [...failed, ...provisioned.failed],
     });
   } catch (err) {
-    console.error("Scan marksheets error:", err);
+    logger.error({ err }, "Scan marksheets error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -281,7 +282,7 @@ router.get("/students", async (req: AuthRequest, res) => {
 
     res.json({ students: data || [] });
   } catch (err) {
-    console.error("TPO students error:", err);
+    logger.error({ err }, "TPO students error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -306,7 +307,7 @@ router.patch("/students/:profileId/verification", async (req: AuthRequest, res) 
 
     res.json({ student: data });
   } catch (err) {
-    console.error("Verify documents error:", err);
+    logger.error({ err }, "Verify documents error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -378,7 +379,7 @@ router.get("/dashboard/summary", async (req: AuthRequest, res) => {
       }
     });
   } catch (err) {
-    console.error("Fetch TPO dashboard summary error:", err);
+    logger.error({ err }, "Fetch TPO dashboard summary error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -412,7 +413,7 @@ router.post("/verify/batch", async (req: AuthRequest, res) => {
     
     res.json({ message: `Batch updated ${updated.length} profile(s).`, updated });
   } catch (err) {
-    console.error("Batch verification error:", err);
+    logger.error({ err }, "Batch verification error");
     res.status(500).json({ error: "Server error" });
   }
 });

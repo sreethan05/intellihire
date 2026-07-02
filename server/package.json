@@ -7,6 +7,7 @@
     "dev": "nodemon --watch src --ext ts,json --exec tsx src/index.ts",
     "start": "tsx src/index.ts",
     "test": "tsx --test \"tests/**/*.test.ts\" \"src/lib/**/*.test.ts\"",
+    "test:coverage": "c8 --reporter=html --reporter=text tsx --test \"tests/**/*.test.ts\" \"src/lib/**/*.test.ts\"",
     "lint": "eslint .",
     "check": "tsc --noEmit",
     "migrate": "tsx src/scripts/applyMigrations.ts",
@@ -54,6 +55,7 @@
     "supertest": "^7.1.0",
     "tsx": "^4.21.0",
     "typescript": "~5.9.3",
-    "typescript-eslint": "^8.46.4"
+    "typescript-eslint": "^8.46.4",
+    "c8": "^10.1.3"
   }
 }

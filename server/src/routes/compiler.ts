@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { authMiddleware } from "../middleware/auth.js";
 import { runWithJudge0 } from "../lib/judge0.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -20,7 +21,7 @@ router.post("/run", async (req, res) => {
       status: result.status,
     });
   } catch (err: any) {
-    console.error("Run code error:", err?.response?.data || err?.message);
+    logger.error({ error: err?.response?.data || err?.message }, "Run code error");
     res.status(500).json({ error: "Code execution failed" });
   }
 });
@@ -56,7 +57,7 @@ router.post("/submit", async (req, res) => {
 
     res.json({ results, passed, total: test_cases.length, score });
   } catch (err: any) {
-    console.error("Submit code error:", err?.response?.data || err?.message);
+    logger.error({ error: err?.response?.data || err?.message }, "Submit code error");
     res.status(500).json({ error: "Code submission failed" });
   }
 });

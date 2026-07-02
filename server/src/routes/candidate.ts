@@ -14,6 +14,7 @@ import path from "path";
 import multer from "multer";
 import fs from "fs/promises";
 import { createRequire } from "module";
+import { logger } from "../lib/logger.js";
 
 const require = createRequire(import.meta.url);
 const pdfParse = require("pdf-parse");
@@ -21,7 +22,7 @@ const pdfParse = require("pdf-parse");
 // Ensure resumes folder exists
 const resumesDir = path.resolve(storageRoot, "resumes");
 fs.mkdir(resumesDir, { recursive: true }).catch((err) => 
-  console.error("Failed to create resumes storage folder:", err)
+  logger.error({ err }, "Failed to create resumes storage folder")
 );
 
 const storage = multer.diskStorage({
@@ -123,7 +124,7 @@ router.get("/portfolio/:slug", async (req, res) => {
       weaknesses
     });
   } catch (err) {
-    console.error("Public portfolio error:", err);
+    logger.error({ err }, "Public portfolio error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -161,7 +162,7 @@ router.get("/profile", async (req: AuthRequest, res) => {
 
     res.json({ user, profile });
   } catch (err) {
-    console.error("Candidate profile error:", err);
+    logger.error({ err }, "Candidate profile error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -207,7 +208,7 @@ router.put("/profile", async (req: AuthRequest, res) => {
 
     res.json({ message: "Profile updated successfully", profile });
   } catch (err) {
-    console.error("Update candidate profile error:", err);
+    logger.error({ err }, "Update candidate profile error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -253,7 +254,7 @@ router.post("/onboarding", async (req: AuthRequest, res) => {
 
     res.json({ message: "Onboarding complete", profile });
   } catch (err) {
-    console.error("Candidate onboarding error:", err);
+    logger.error({ err }, "Candidate onboarding error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -500,7 +501,7 @@ router.get("/dashboard", async (req: AuthRequest, res) => {
       leaderboard: leaderboard.slice(0, 10),
     });
   } catch (err) {
-    console.error("Candidate dashboard error:", err);
+    logger.error({ err }, "Candidate dashboard error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -519,7 +520,7 @@ router.get("/exams", async (req: AuthRequest, res) => {
  
     res.json({ exams: data || [] });
   } catch (err) {
-    console.error("Candidate exams error:", err);
+    logger.error({ err }, "Candidate exams error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -578,7 +579,7 @@ router.get("/exam/:examId", async (req: AuthRequest, res) => {
       })) || [],
     });
   } catch (err) {
-    console.error("Fetch exam error:", err);
+    logger.error({ err }, "Fetch exam error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -1495,7 +1496,7 @@ router.post("/resume/upload", upload.single("resume"), async (req: AuthRequest, 
 
     res.json({ message: "Resume parsed successfully", profile });
   } catch (err: any) {
-    console.error("Resume upload error:", err);
+    logger.error({ err }, "Resume upload error");
     res.status(500).json({ error: err.message || "Server error during upload" });
   }
 });
@@ -1533,7 +1534,7 @@ router.delete("/resume", async (req: AuthRequest, res) => {
 
     res.json({ message: "Resume deleted successfully", profile });
   } catch (err: any) {
-    console.error("Resume delete error:", err);
+    logger.error({ err }, "Resume delete error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -1625,7 +1626,7 @@ router.get("/action-items", async (req: AuthRequest, res) => {
     
     res.json({ actionItems: items });
   } catch (err) {
-    console.error("Fetch action items error:", err);
+    logger.error({ err }, "Fetch action items error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -1721,7 +1722,7 @@ router.get("/journey-tracker", async (req: AuthRequest, res) => {
     
     res.json({ trackers });
   } catch (err) {
-    console.error("Fetch journey tracker error:", err);
+    logger.error({ err }, "Fetch journey tracker error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -1803,7 +1804,7 @@ router.get("/performance-radar", async (req: AuthRequest, res) => {
 
     res.json({ radarData, peerPercentile, trendData, strengths, weaknesses });
   } catch (err) {
-    console.error("Performance radar error:", err);
+    logger.error({ err }, "Performance radar error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -1860,7 +1861,7 @@ router.post("/offers/:jobId/respond", async (req: AuthRequest, res) => {
     
     res.json({ message: `Successfully responded to the offer with: ${response}`, status });
   } catch (err) {
-    console.error("Offer response error:", err);
+    logger.error({ err }, "Offer response error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -1888,7 +1889,7 @@ router.get("/activity", async (req: AuthRequest, res) => {
 
     res.json({ feed });
   } catch (err) {
-    console.error("Fetch activity feed error:", err);
+    logger.error({ err }, "Fetch activity feed error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -1908,7 +1909,7 @@ router.get("/offers", async (req: AuthRequest, res) => {
 
     res.json({ offers: offers || [] });
   } catch (err) {
-    console.error("Fetch offers error:", err);
+    logger.error({ err }, "Fetch offers error");
     res.status(500).json({ error: "Server error" });
   }
 });

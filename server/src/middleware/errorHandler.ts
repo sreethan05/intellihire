@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/node";
+import { logger } from "../lib/logger.js";
 
 export class AppError extends Error {
   constructor(
@@ -20,12 +21,11 @@ export const errorHandler = (
   res: Response,
   _next: NextFunction
 ) => {
-  // Capture in Sentry if configured
   if (process.env.SENTRY_DSN) {
     Sentry.captureException(err);
   }
 
-  console.error("Unhandled error:", err);
+  logger.error({ err: err.message, stack: err.stack, name: err.name }, "Unhandled error");
 
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({
@@ -34,7 +34,6 @@ export const errorHandler = (
     });
   }
 
-  // In production, never leak stack traces
   const isDev = process.env.NODE_ENV !== "production";
   return res.status(500).json({
     error: "Internal server error",

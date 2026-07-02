@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "../lib/postgres.js";
 import { authMiddleware, type AuthRequest } from "../middleware/auth.js";
 import { hasAiKey, verifyWebcamSnapshot } from "../lib/ai.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 
@@ -16,7 +17,7 @@ async function verifyAndLogSnapshotViolation(
 ) {
   try {
     const analysis = await verifyWebcamSnapshot(snapshotData);
-    console.log(`[AI Proctoring] Snapshot verified:`, analysis);
+    logger.info({ analysis }, `[AI Proctoring] Snapshot verified`);
 
     // Check if candidate is currently taking an AI interview
     const { data: activeInterview } = await db
@@ -52,7 +53,7 @@ async function verifyAndLogSnapshotViolation(
         .limit(1);
 
       if (overrideErr) {
-        console.error("[AI Proctoring] Failed to fetch latest override:", overrideErr);
+        logger.error({ err: overrideErr }, "[AI Proctoring] Failed to fetch latest override");
       }
 
       // Query the database for the current violation count dynamically relative to latest override
@@ -69,11 +70,11 @@ async function verifyAndLogSnapshotViolation(
       const { count, error: countErr } = await countQuery;
 
       if (countErr) {
-        console.error("[AI Proctoring] Failed to fetch existing violation count:", countErr);
+        logger.error({ err: countErr }, "[AI Proctoring] Failed to fetch existing violation count");
       }
 
       const nextViolationCount = (count || 0) + 1;
-      console.log(`[AI Proctoring] Security anomaly flagged. Incrementing warnings to ${nextViolationCount}.`);
+      logger.info({ violationCount: nextViolationCount }, `[AI Proctoring] Security anomaly flagged. Incrementing warnings`);
 
       // Log the violation in the proctoring snapshots table
       await db.from("proctoring_snapshots").insert({
@@ -105,7 +106,7 @@ async function verifyAndLogSnapshotViolation(
       // Symmetrically trigger auto-submission if violations exceed limit of 3
       if (nextViolationCount >= 3) {
         if (isInterview) {
-          console.log(`[AI Proctoring] Violation limit reached for AI Interview ${activeInterview.id}. Auto-submitting.`);
+          logger.info({ interviewId: activeInterview.id }, `[AI Proctoring] Violation limit reached for AI Interview. Auto-submitting`);
           await db
             .from("ai_interviews")
             .update({
@@ -117,7 +118,7 @@ async function verifyAndLogSnapshotViolation(
             })
             .eq("id", activeInterview.id);
         } else {
-          console.log(`[AI Proctoring] Violation limit reached for attempt ${attemptId}. Auto-submitting exam.`);
+          logger.info({ attemptId }, `[AI Proctoring] Violation limit reached for attempt. Auto-submitting exam`);
           // Finalize the attempt overall score using background queue
           await db
             .from("attempts")
@@ -133,7 +134,7 @@ async function verifyAndLogSnapshotViolation(
       }
     }
   } catch (err) {
-    console.error("[AI Proctoring] Failed to analyze snapshot:", err);
+    logger.error({ err }, "[AI Proctoring] Failed to analyze snapshot");
   }
 }
 
@@ -184,7 +185,7 @@ router.post("/events", async (req: AuthRequest, res) => {
     // Backend enforcement of 3-strikes rule logged from frontend
     if (violation_count >= 3) {
       if (message && message.includes("[AI Interview]")) {
-        console.log(`[AI Proctoring] Frontend flagged 3 violations. Auto-submitting AI interview.`);
+        logger.info({ candidateId: req.user!.id }, `[AI Proctoring] Frontend flagged 3 violations. Auto-submitting AI interview`);
         await db
           .from("ai_interviews")
           .update({
@@ -197,7 +198,7 @@ router.post("/events", async (req: AuthRequest, res) => {
           .eq("candidate_id", req.user!.id)
           .eq("status", "in_progress");
       } else {
-        console.log(`[AI Proctoring] Frontend flagged 3 violations. Auto-submitting exam.`);
+        logger.info({ attempt_id }, `[AI Proctoring] Frontend flagged 3 violations. Auto-submitting exam`);
         await db
           .from("attempts")
           .update({
@@ -215,7 +216,7 @@ router.post("/events", async (req: AuthRequest, res) => {
 
     res.json({ message: "Proctoring event logged", event: data });
   } catch (err) {
-    console.error("Proctoring event error:", err);
+    logger.error({ err }, "Proctoring event error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -259,7 +260,7 @@ router.get("/attempt/:attemptId", async (req: AuthRequest, res) => {
 
     res.json({ events: data || [] });
   } catch (err) {
-    console.error("Proctoring fetch error:", err);
+    logger.error({ err }, "Proctoring fetch error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -328,7 +329,7 @@ router.get("/exam/:examId/summary", async (req: AuthRequest, res) => {
 
     res.json({ summary });
   } catch (err) {
-    console.error("Proctoring summary error:", err);
+    logger.error({ err }, "Proctoring summary error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -416,7 +417,7 @@ router.get("/exam/:examId/active-monitoring", async (req: AuthRequest, res) => {
 
     res.json({ attempts: activeAttempts });
   } catch (err) {
-    console.error("Active monitoring error:", err);
+    logger.error({ err }, "Active monitoring error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -468,7 +469,7 @@ router.post("/attempt/:attemptId/override", async (req: AuthRequest, res) => {
 
     res.json({ message: "Override unlock logged", event: data });
   } catch (err) {
-    console.error("Override unlock error:", err);
+    logger.error({ err }, "Override unlock error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -520,7 +521,7 @@ router.get("/attempts/:attemptId/timeline", async (req: AuthRequest, res) => {
     
     res.json({ timeline });
   } catch (err) {
-    console.error("Get proctoring timeline error:", err);
+    logger.error({ err }, "Get proctoring timeline error");
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -548,7 +549,7 @@ router.post("/snapshots/:snapshotId/override", async (req: AuthRequest, res) => 
     
     res.json({ message: "Proctoring snapshot severity overridden successfully", snapshot: updated });
   } catch (err) {
-    console.error("Override snapshot severity error:", err);
+    logger.error({ err }, "Override snapshot severity error");
     res.status(500).json({ error: "Server error" });
   }
 });
