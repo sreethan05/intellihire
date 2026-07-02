@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 );
 
 -- Add reference in exam_assignments
+ALTER TABLE exam_assignments DROP CONSTRAINT IF EXISTS fk_assignments_job;
 ALTER TABLE exam_assignments ADD CONSTRAINT fk_assignments_job FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE SET NULL;
 
 -- 2. Candidate Status Table

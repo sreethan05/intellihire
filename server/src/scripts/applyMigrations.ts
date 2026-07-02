@@ -26,8 +26,7 @@ async function applyMigrations() {
       "06_proctoring.sql",
       "07_interviews_feedback.sql",
       "08_platform_system.sql",
-      "09_seed_core.sql",
-      "seed-question-bank.sql",
+      "09_seed_data.sql",
     ];
 
     for (const file of filesToApply) {
