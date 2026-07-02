@@ -1,6 +1,13 @@
 import { Router } from "express";
 import { db } from "../lib/postgres.js";
 import { authMiddleware, type AuthRequest } from "../middleware/auth.js";
+import {
+  createTopicScores,
+  feedMcqAnswer,
+  feedCodingSubmission,
+  feedCommunicationScore,
+  generateInsights,
+} from "../lib/insights.js";
 
 // --- Hub Payload Types ---
 interface ActionItem {
@@ -232,29 +239,40 @@ async function getCandidateHubData(userId: string) {
     mcqAnswers = data;
   }
 
-  const topicScores: Record<string, { total: number; count: number }> = {
-    "DSA": { total: 0, count: 0 },
-    "DBMS": { total: 0, count: 0 },
-    "OS": { total: 0, count: 0 },
-    "Networking": { total: 0, count: 0 },
-    "Communication": { total: 0, count: 0 },
-    "Aptitude": { total: 0, count: 0 }
-  };
+  const topicScores = createTopicScores();
 
-  if (mcqAnswers) {
-    for (const ans of mcqAnswers) {
-      const topic = ans.question?.topic || "Aptitude";
-      const key = Object.keys(topicScores).find(k => k.toLowerCase() === topic.toLowerCase()) || "Aptitude";
-      topicScores[key].total += ans.is_correct ? 100 : 0;
-      topicScores[key].count += 1;
+  // Fetch AI speaking scores for communication if any
+  const { data: interviews } = await db.from("ai_interviews")
+    .select("communication_score")
+    .eq("candidate_id", userId)
+    .eq("status", "completed");
+  
+  if (interviews) {
+    for (const iv of interviews) {
+      feedCommunicationScore(topicScores, iv.communication_score || 0);
     }
   }
 
-  const radarData = Object.keys(topicScores).map(subject => {
-    const val = topicScores[subject];
-    const score = val.count > 0 ? Math.round(val.total / val.count) : 0;
-    return { subject, score, fullMark: 100 };
-  });
+  if (mcqAnswers) {
+    for (const ans of mcqAnswers) {
+      feedMcqAnswer(topicScores, ans.is_correct, ans.question?.topic);
+    }
+  }
+
+  // Fetch coding submissions to include in DSA topic score
+  const { data: codingSubs } = await db.from("coding_submissions")
+    .select("score, coding_questions(marks)")
+    .in("attempt_id", attemptIds)
+    .eq("status", "tested");
+
+  if (codingSubs) {
+    for (const sub of codingSubs) {
+      const maxMarks = sub.coding_questions?.marks || 10;
+      feedCodingSubmission(topicScores, sub.score, maxMarks);
+    }
+  }
+
+  const { radarData, strengths, weaknesses } = generateInsights(topicScores, "Profile");
 
   const { data: myAttempts } = await db.from("attempts")
     .select("*, exam:exam_id(title)")
@@ -318,7 +336,9 @@ async function getCandidateHubData(userId: string) {
       radarData,
       trendData,
       peerPercentile,
-      trackers
+      trackers,
+      strengths,
+      weaknesses
     },
     quickLinks
   };

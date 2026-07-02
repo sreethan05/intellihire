@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { 
   BarChart3, Bell, Briefcase, CheckCircle, Loader2, MapPin, QrCode, Trophy, User, AlertCircle,
-  Github, Linkedin, Globe, Plus, Trash2, Edit, X
+  Github, Linkedin, Globe, Plus, Trash2, Edit, X, FileText
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { candidateApi, interviewApi } from "@/lib/api";
@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, 
-  ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid 
+  ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend 
 } from "recharts";
 
 export default function CandidateDashboard() {
@@ -26,6 +26,17 @@ export default function CandidateDashboard() {
   const [pendingInterview, setPendingInterview] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  // Dynamic Performance Insights States
+  const [strengths, setStrengths] = useState<string[]>([]);
+  const [weaknesses, setWeaknesses] = useState<string[]>([]);
+
+  // Activity Feed
+  const [activityFeed, setActivityFeed] = useState<any[]>([]);
+
+  // Pending Offers
+  const [offers, setOffers] = useState<any[]>([]);
+  const [respondingOffer, setRespondingOffer] = useState<string | null>(null);
+
   // Profile Edit Modal States
   const [showEditModal, setShowEditModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -37,6 +48,7 @@ export default function CandidateDashboard() {
   const [linkedinUrl, setLinkedinUrl] = useState("");
   const [portfolioUrl, setPortfolioUrl] = useState("");
   const [projectsList, setProjectsList] = useState<any[]>([]);
+  const [semesterGrades, setSemesterGrades] = useState<any[]>([]);
 
   useEffect(() => {
     Promise.all([
@@ -44,9 +56,11 @@ export default function CandidateDashboard() {
       candidateApi.getActionItems(),
       candidateApi.getJourneyTracker(),
       candidateApi.getPerformanceRadar(),
-      interviewApi.pending()
+      interviewApi.pending(),
+      candidateApi.getActivityFeed(),
+      candidateApi.getOffers()
     ])
-      .then(([profileRes, actionRes, trackerRes, radarRes, interviewRes]) => {
+      .then(([profileRes, actionRes, trackerRes, radarRes, interviewRes, activityRes, offersRes]) => {
         const p = profileRes.data.profile || null;
         setProfile(p);
         if (p) {
@@ -58,13 +72,18 @@ export default function CandidateDashboard() {
           setLinkedinUrl(p.linkedin_url || "");
           setPortfolioUrl(p.portfolio_url || "");
           setProjectsList(Array.isArray(p.projects) ? p.projects : []);
+          setSemesterGrades(Array.isArray(p.semester_grades) ? p.semester_grades : []);
         }
         setActionItems(actionRes.data.actionItems || []);
         setTrackers(trackerRes.data.trackers || []);
         setRadarData(radarRes.data.radarData || []);
         setTrendData(radarRes.data.trendData || []);
         setPeerPercentile(radarRes.data.peerPercentile || 75);
+        setStrengths(radarRes.data.strengths || []);
+        setWeaknesses(radarRes.data.weaknesses || []);
         setPendingInterview(interviewRes.data.interview || null);
+        setActivityFeed(activityRes.data.feed || []);
+        setOffers(offersRes.data.offers || []);
       })
       .catch(err => console.error("Dashboard fetch error:", err))
       .finally(() => setLoading(false));
@@ -114,6 +133,20 @@ export default function CandidateDashboard() {
     setProjectsList(updated);
   };
 
+  const handleAddSemester = () => {
+    setSemesterGrades([...semesterGrades, { semester: semesterGrades.length + 1, sgpa: "", cgpa: "" }]);
+  };
+
+  const handleRemoveSemester = (index: number) => {
+    setSemesterGrades(semesterGrades.filter((_, idx) => idx !== index));
+  };
+
+  const handleSemesterChange = (index: number, key: string, value: string) => {
+    const updated = [...semesterGrades];
+    updated[index] = { ...updated[index], [key]: value };
+    setSemesterGrades(updated);
+  };
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -122,6 +155,13 @@ export default function CandidateDashboard() {
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean);
+
+      // Cast grade fields to numbers
+      const formattedSemesters = semesterGrades.map(s => ({
+        semester: Number(s.semester),
+        sgpa: Number(s.sgpa) || 0,
+        cgpa: Number(s.cgpa) || 0
+      })).sort((a, b) => a.semester - b.semester);
 
       const response = await candidateApi.updateProfile({
         phone,
@@ -132,15 +172,42 @@ export default function CandidateDashboard() {
         linkedin_url: linkedinUrl,
         portfolio_url: portfolioUrl,
         projects: projectsList,
+        semester_grades: formattedSemesters,
       });
 
       setProfile(response.data.profile);
+      setSemesterGrades(Array.isArray(response.data.profile.semester_grades) ? response.data.profile.semester_grades : []);
       toast.success("Placement Passport updated successfully!");
       setShowEditModal(false);
     } catch (err: any) {
       toast.error(err.response?.data?.error || "Failed to update profile");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleRespondToOffer = async (jobId: string, response: string) => {
+    const confirmation = window.confirm(
+      `Are you sure you want to ${response === "accept" ? "ACCEPT" : "DECLINE"} this job offer?`
+    );
+    if (!confirmation) return;
+
+    setRespondingOffer(`${jobId}-${response}`);
+    try {
+      await candidateApi.respondToOffer(jobId, response);
+      toast.success(`Successfully ${response === "accept" ? "accepted" : "declined"} the job offer!`);
+      
+      // Refresh offers and activity feed
+      const [offersRes, activityRes] = await Promise.all([
+        candidateApi.getOffers(),
+        candidateApi.getActivityFeed()
+      ]);
+      setOffers(offersRes.data.offers || []);
+      setActivityFeed(activityRes.data.feed || []);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Failed to respond to offer");
+    } finally {
+      setRespondingOffer(null);
     }
   };
 
@@ -183,6 +250,91 @@ export default function CandidateDashboard() {
         </Link>
       )}
 
+      {/* Pending Job Offers */}
+      {offers.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-sm font-extrabold text-slate-950 flex items-center gap-2 mb-2">
+            <Trophy className="h-4 w-4 text-emerald-500 animate-bounce" /> Congratulations! You have pending Job Offers
+          </h2>
+          <div className="grid gap-6 md:grid-cols-2">
+            {offers.map((offer: any) => (
+              <div 
+                key={offer.id} 
+                className="relative overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/40 to-white p-6 shadow-sm flex flex-col justify-between gap-4 transition-all duration-200 hover:shadow-md"
+              >
+                <div className="absolute right-0 top-0 h-16 w-16 overflow-hidden">
+                  <div className="absolute transform rotate-45 bg-emerald-500 text-white text-[9px] font-black text-center py-1 w-24 -right-6 top-3 uppercase tracking-wider">
+                    New Offer
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Briefcase className="h-5 w-5 text-emerald-600" />
+                    <h3 className="text-base font-extrabold text-slate-900">{offer.job?.title}</h3>
+                  </div>
+                  <p className="text-sm font-bold text-emerald-700 mt-1">{offer.job?.company_name}</p>
+                  
+                  {/* Salary block if specified */}
+                  {(offer.job?.salary_min || offer.job?.salary_max) && (
+                    <p className="text-xs text-slate-500 mt-2 font-semibold">
+                      Package: ₹{offer.job.salary_min ? `${offer.job.salary_min} LPA` : ""} 
+                      {offer.job.salary_min && offer.job.salary_max ? " - " : ""} 
+                      {offer.job.salary_max ? `${offer.job.salary_max} LPA` : ""}
+                    </p>
+                  )}
+
+                  {offer.recruiter_notes && (
+                    <div className="mt-3 text-xs text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-3 italic">
+                      " {offer.recruiter_notes} "
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-3.5 mt-2">
+                  {offer.offer_letter_url && (
+                    <a
+                      href={offer.offer_letter_url.startsWith("http") ? offer.offer_letter_url : `${import.meta.env.VITE_API_URL?.replace("/api", "") || ""}${offer.offer_letter_url}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700 shadow-sm transition"
+                    >
+                      <FileText className="h-4 w-4 text-red-500" /> View Offer Letter PDF
+                    </a>
+                  )}
+
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => handleRespondToOffer(offer.job_id, "accept")}
+                      disabled={respondingOffer !== null}
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs h-9 rounded-lg shadow-sm"
+                    >
+                      {respondingOffer === `${offer.job_id}-accept` ? (
+                        <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                      ) : (
+                        "Accept Offer"
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleRespondToOffer(offer.job_id, "decline")}
+                      disabled={respondingOffer !== null}
+                      className="flex-1 border-red-200 hover:bg-red-50 text-red-700 font-extrabold text-xs h-9 rounded-lg"
+                    >
+                      {respondingOffer === `${offer.job_id}-decline` ? (
+                        <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                      ) : (
+                        "Decline"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Grid: Placement Passport & Radar Chart */}
       <div className="grid gap-6 lg:grid-cols-3">
         
@@ -205,9 +357,13 @@ export default function CandidateDashboard() {
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <h2 className="text-lg font-bold text-slate-900">{profile?.roll_number ? `Student ID: ${profile.roll_number}` : "Complete Onboarding"}</h2>
-                    {profile?.documents_verified && (
-                      <span className="inline-flex items-center gap-0.5 rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-bold text-green-700 border border-green-200">
-                        <CheckCircle className="h-3 w-3" /> Verified
+                    {profile?.documents_verified ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-black text-emerald-600 border border-emerald-500/20 shadow-xs backdrop-blur-xs">
+                        <CheckCircle className="h-3.5 w-3.5 fill-emerald-600/10" /> TPO VERIFIED
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-black text-amber-600 border border-amber-500/20 shadow-xs backdrop-blur-xs">
+                        Pending Verification
                       </span>
                     )}
                   </div>
@@ -330,6 +486,100 @@ export default function CandidateDashboard() {
         </div>
       </div>
 
+      {/* Grid: Academic Timeline & Subject Mastery Insights */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Academic Timeline Card */}
+        <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between">
+          <div>
+            <h2 className="text-sm font-extrabold text-slate-950 flex items-center gap-2 mb-4 border-b border-slate-100 pb-2">
+              <BarChart3 className="h-4 w-4 text-blue-600" /> Academic Timeline (SGPA &amp; CGPA Progression)
+            </h2>
+            <div className="h-64">
+              {semesterGrades.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={semesterGrades} margin={{ top: 15, right: 15, left: -20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis 
+                      dataKey="semester" 
+                      tickFormatter={(val) => `Sem ${val}`}
+                      tick={{ fill: '#475569', fontSize: 10, fontWeight: 600 }} 
+                    />
+                    <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} domain={[0, 10]} />
+                    <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0' }} />
+                    <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: 11, fontWeight: 600 }} />
+                    <Line name="SGPA" type="monotone" dataKey="sgpa" stroke="#3b82f6" strokeWidth={3} activeDot={{ r: 6 }} dot={{ r: 4 }} />
+                    <Line name="CGPA" type="monotone" dataKey="cgpa" stroke="#10b981" strokeWidth={3} activeDot={{ r: 6 }} dot={{ r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center text-xs text-slate-400 gap-2">
+                  <p>No academic timeline data declared yet.</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setShowEditModal(true)} 
+                    className="text-[10px] h-7 border-slate-200 text-slate-600 hover:bg-slate-50 font-bold animate-pulse"
+                  >
+                    Edit Profile to Add Semesters
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+          <p className="text-[10px] text-slate-400 text-center font-bold uppercase tracking-wider mt-2">Verifiable semester-wise grade sheet indices</p>
+        </div>
+
+        {/* AI Performance Insights Card */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between">
+          <div>
+            <h2 className="text-sm font-extrabold text-slate-950 flex items-center gap-2 mb-4 border-b border-slate-100 pb-2">
+              <Trophy className="h-4 w-4 text-indigo-600" /> Subject Mastery Insights
+            </h2>
+            
+            <div className="space-y-4">
+              {/* Strengths */}
+              <div>
+                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span> Verified Strengths
+                </h3>
+                <div className="space-y-2">
+                  {strengths.length > 0 ? (
+                    strengths.map((str, idx) => (
+                      <div key={idx} className="flex gap-2 items-start text-xs text-slate-700 bg-emerald-50/50 border border-emerald-100/50 rounded-lg p-2.5">
+                        <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <span>{str}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-[11px] text-slate-400 italic">No evaluated strengths yet.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Weaknesses */}
+              <div>
+                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500"></span> Improvement Areas
+                </h3>
+                <div className="space-y-2">
+                  {weaknesses.length > 0 ? (
+                    weaknesses.map((wk, idx) => (
+                      <div key={idx} className="flex gap-2 items-start text-xs text-slate-700 bg-amber-50/50 border border-amber-100/50 rounded-lg p-2.5">
+                        <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                        <span>{wk}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-[11px] text-slate-400 italic">No evaluated improvement areas yet.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+          <p className="text-[10px] text-slate-400 text-center font-bold uppercase tracking-wider mt-2">Dynamic performance feedback analytics</p>
+        </div>
+      </div>
+
       {/* Grid: Action Items & Peer Percentile */}
       <div className="grid gap-6 md:grid-cols-3">
         
@@ -402,6 +652,39 @@ export default function CandidateDashboard() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Activity Feed */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-sm font-extrabold text-slate-950 flex items-center gap-2 mb-4 border-b border-slate-100 pb-2">
+          <Bell className="h-4 w-4 text-blue-600" /> Recent Activity
+        </h2>
+        <div className="space-y-3">
+          {activityFeed.length > 0 ? (
+            activityFeed.map((item: any, idx: number) => (
+              <div key={idx} className="flex items-start gap-3 rounded-lg border border-slate-100 p-3 bg-slate-50/50 hover:bg-slate-50 transition">
+                <span className={`mt-0.5 h-2 w-2 rounded-full shrink-0 ${
+                  item.type?.includes('offer') ? 'bg-emerald-500' :
+                  item.type?.includes('exam') ? 'bg-blue-500' :
+                  item.type?.includes('interview') ? 'bg-purple-500' :
+                  'bg-slate-400'
+                }`} />
+                <div className="min-w-0">
+                  <h4 className="font-bold text-sm text-slate-900">{item.title}</h4>
+                  <p className="text-xs text-slate-500 mt-0.5">{item.description}</p>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    {item.actorName ? `By ${item.actorName} • ` : ''}
+                    {new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-6 text-slate-400 text-xs">
+              No recent activity yet. Your placement journey events will appear here.
+            </div>
+          )}
         </div>
       </div>
 
@@ -656,6 +939,85 @@ export default function CandidateDashboard() {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              <div className="h-px bg-slate-100" />
+
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <Label className="text-xs font-extrabold text-slate-900 tracking-tight">Academic Timeline (Semester-wise Grades)</Label>
+                  <Button 
+                    type="button" 
+                    onClick={handleAddSemester} 
+                    variant="outline" 
+                    className="h-7 text-[10px] font-bold border-slate-200 text-slate-600 hover:bg-slate-50 flex items-center gap-1 rounded-md"
+                  >
+                    <Plus className="h-3 w-3" /> Add Semester
+                  </Button>
+                </div>
+
+                {semesterGrades.length > 0 ? (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {semesterGrades.map((sem, index) => (
+                      <div key={index} className="rounded-xl border border-slate-100 bg-slate-50/50 p-3.5 space-y-3 relative animate-in fade-in zoom-in-95 duration-150 flex flex-col justify-between">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveSemester(index)}
+                          className="absolute right-2 top-2 text-slate-400 hover:text-red-500 transition"
+                          title="Remove Semester"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+
+                        <div className="grid grid-cols-3 gap-2 pt-2">
+                          <div>
+                            <Label className="text-[9px] font-bold text-slate-500">Semester</Label>
+                            <Input 
+                              type="number" 
+                              required
+                              min="1"
+                              max="10"
+                              value={sem.semester} 
+                              onChange={(e) => handleSemesterChange(index, "semester", e.target.value)} 
+                              placeholder="1" 
+                              className="mt-1 h-8 text-xs font-semibold bg-white"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-[9px] font-bold text-slate-500">SGPA</Label>
+                            <Input 
+                              type="number" 
+                              required
+                              step="0.01"
+                              min="0"
+                              max="10"
+                              value={sem.sgpa} 
+                              onChange={(e) => handleSemesterChange(index, "sgpa", e.target.value)} 
+                              placeholder="9.00" 
+                              className="mt-1 h-8 text-xs font-semibold bg-white"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-[9px] font-bold text-slate-500">CGPA</Label>
+                            <Input 
+                              type="number" 
+                              required
+                              step="0.01"
+                              min="0"
+                              max="10"
+                              value={sem.cgpa} 
+                              onChange={(e) => handleSemesterChange(index, "cgpa", e.target.value)} 
+                              placeholder="9.00" 
+                              className="mt-1 h-8 text-xs font-semibold bg-white"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 italic">No semesters added. Click "Add Semester" to build your academic timeline.</p>
+                )}
               </div>
 
               <div className="h-px bg-slate-100" />

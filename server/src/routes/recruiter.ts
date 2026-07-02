@@ -6,6 +6,10 @@ import { generateAiJson, hasAiKey } from "../lib/ai.js";
 import { getPasswordValidationError, isValidEmail } from "../lib/validation.js";
 import { sendDriveRegisteredEmail } from "../lib/email.js";
 import { logger } from "../lib/logger.js";
+import multer from "multer";
+import path from "path";
+import fs from "fs/promises";
+import { storageRoot } from "../lib/postgres.js";
 
 const router = Router();
 
@@ -13,6 +17,32 @@ router.use(authMiddleware);
 router.use(roleMiddleware(["recruiter"]));
 
 const APP_URL = process.env.VITE_API_URL?.replace("/api", "") || "http://localhost:3000";
+
+// Offer letter upload storage
+const offersDir = path.resolve(storageRoot, "offers");
+fs.mkdir(offersDir, { recursive: true }).catch((err) =>
+  console.error("Failed to create offers storage folder:", err)
+);
+
+const offerStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, offersDir),
+  filename: (_req, file, cb) => {
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`;
+    cb(null, unique);
+  },
+});
+
+const uploadOffer = multer({
+  storage: offerStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype === "application/pdf") {
+      cb(null, true);
+    } else {
+      cb(new Error("Only PDF files are allowed for offer letters"));
+    }
+  },
+});
 
 const formatDate = (date?: string | null) => date ? new Date(date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "";
 
@@ -1057,6 +1087,54 @@ Return a JSON object in this format:
     res.json({ shortlist: result.shortlist || [] });
   } catch (err) {
     console.error("AI shortlist generator error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.post("/offers/:candidateId/:jobId", uploadOffer.single("offerLetter"), async (req: AuthRequest, res) => {
+  try {
+    const { candidateId, jobId } = req.params;
+    const recruiterId = req.user!.id;
+    const file = req.file;
+
+    if (!file) {
+      res.status(400).json({ error: "Offer letter PDF is required" });
+      return;
+    }
+
+    const offerLetterUrl = `/uploads/offers/${file.filename}`;
+
+    const { data, error } = await db
+      .from("candidate_status")
+      .update({
+        status: "offered",
+        offer_letter_url: offerLetterUrl,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("candidate_id", candidateId)
+      .eq("job_id", jobId)
+      .select()
+      .single();
+
+    if (error) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+
+    // Log in activity feed
+    await db.from("activity_feed").insert({
+      actor_id: recruiterId,
+      actor_role: "recruiter",
+      target_user_id: candidateId,
+      type: "offer_made",
+      title: "Job Offer Extended",
+      description: "A recruiter has extended a job offer with an attached letter.",
+      metadata: { job_id: jobId, offer_letter_url: offerLetterUrl },
+    });
+
+    res.json({ message: "Offer letter uploaded and candidate notified", status: data });
+  } catch (err) {
+    console.error("Offer upload error:", err);
     res.status(500).json({ error: "Server error" });
   }
 });

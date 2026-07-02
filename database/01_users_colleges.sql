@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS candidate_profiles (
   documents_verified boolean DEFAULT false,
   profile_complete boolean DEFAULT false,
   placement_ready boolean DEFAULT false,
+  semester_grades jsonb DEFAULT '[]',
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );

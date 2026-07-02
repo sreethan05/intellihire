@@ -3,6 +3,13 @@ import bcrypt from "bcryptjs";
 import { db, storageRoot } from "../lib/postgres.js";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
 import { getPasswordValidationError } from "../lib/validation.js";
+import {
+  createTopicScores,
+  feedMcqAnswer,
+  feedCodingSubmission,
+  feedCommunicationScore,
+  generateInsights,
+} from "../lib/insights.js";
 import path from "path";
 import multer from "multer";
 import fs from "fs/promises";
@@ -49,7 +56,7 @@ router.get("/portfolio/:slug", async (req, res) => {
 
     // Only expose public-safe fields (no email, phone, marksheet_url, etc.)
     let query = db.from("candidate_profiles")
-      .select("id, user_id, photo_url, branch, cgpa, graduation_year, skills, resume_url, documents_verified, public_portfolio_slug, github_url, linkedin_url, portfolio_url, bio, projects, user:user_id(name), college:college_id(name, code)");
+      .select("id, user_id, photo_url, branch, cgpa, graduation_year, skills, resume_url, documents_verified, public_portfolio_slug, github_url, linkedin_url, portfolio_url, bio, projects, semester_grades, user:user_id(name), college:college_id(name, code)");
 
     if (isUuid) {
       query = query.eq("user_id", slug);
@@ -64,11 +71,57 @@ router.get("/portfolio/:slug", async (req, res) => {
       return;
     }
 
+    const userId = profile.user_id;
+
+    // Compile radar data & insights for public portfolio
+    const { data: mcqAnswers } = await db.from("answers")
+      .select("*, question:question_id(topic), attempt:attempt_id(candidate_id)")
+      .eq("attempt.candidate_id", userId);
+    
+    const topicScores = createTopicScores();
+    
+    const { data: interviews } = await db.from("ai_interviews")
+      .select("communication_score")
+      .eq("candidate_id", userId)
+      .eq("status", "completed");
+    
+    if (interviews) {
+      for (const iv of interviews) {
+        feedCommunicationScore(topicScores, iv.communication_score || 0);
+      }
+    }
+    
+    if (mcqAnswers) {
+      for (const ans of mcqAnswers) {
+        feedMcqAnswer(topicScores, ans.is_correct, ans.question?.topic);
+      }
+    }
+
+    const { data: codingSubs } = await db.from("coding_submissions")
+      .select("score, coding_questions(marks), attempt:attempt_id(candidate_id)")
+      .eq("attempt.candidate_id", userId)
+      .eq("status", "tested");
+
+    if (codingSubs) {
+      for (const sub of codingSubs) {
+        const maxMarks = sub.coding_questions?.marks || 10;
+        feedCodingSubmission(topicScores, sub.score, maxMarks);
+      }
+    }
+    
+    const { radarData, strengths, weaknesses } = generateInsights(topicScores, "Profile");
+
     const { data: applications } = await db.from("candidate_status")
       .select("id, status, updated_at, job:job_id(title, company_name)")
-      .eq("candidate_id", profile.user_id);
+      .eq("candidate_id", userId);
 
-    res.json({ profile, applications: applications || [] });
+    res.json({ 
+      profile, 
+      applications: applications || [],
+      radarData,
+      strengths,
+      weaknesses
+    });
   } catch (err) {
     console.error("Public portfolio error:", err);
     res.status(500).json({ error: "Server error" });
@@ -125,6 +178,7 @@ router.put("/profile", async (req: AuthRequest, res) => {
       bio,
       photo_url,
       projects,
+      semester_grades,
     } = req.body;
 
     const { data: profile, error } = await db
@@ -139,6 +193,7 @@ router.put("/profile", async (req: AuthRequest, res) => {
         bio: bio || null,
         photo_url: photo_url || null,
         projects: Array.isArray(projects) ? projects : [],
+        semester_grades: Array.isArray(semester_grades) ? semester_grades : [],
         updated_at: new Date().toISOString(),
       })
       .eq("user_id", req.user!.id)
@@ -1672,14 +1727,7 @@ router.get("/performance-radar", async (req: AuthRequest, res) => {
       .select("*, question:question_id(topic), attempt:attempt_id(candidate_id)")
       .eq("attempt.candidate_id", userId);
     
-    const topicScores: Record<string, { total: number; count: number }> = {
-      "DSA": { total: 0, count: 0 },
-      "DBMS": { total: 0, count: 0 },
-      "OS": { total: 0, count: 0 },
-      "Networking": { total: 0, count: 0 },
-      "Communication": { total: 0, count: 0 },
-      "Aptitude": { total: 0, count: 0 }
-    };
+    const topicScores = createTopicScores();
     
     // Fetch AI speaking scores for communication if any
     const { data: interviews } = await db.from("ai_interviews")
@@ -1687,27 +1735,32 @@ router.get("/performance-radar", async (req: AuthRequest, res) => {
       .eq("candidate_id", userId)
       .eq("status", "completed");
     
-    if (interviews && interviews.length > 0) {
+    if (interviews) {
       for (const iv of interviews) {
-        topicScores["Communication"].total += (iv.communication_score || 0) * 10; // Scale 1-10 to 1-100
-        topicScores["Communication"].count += 1;
+        feedCommunicationScore(topicScores, iv.communication_score || 0);
       }
     }
     
     if (mcqAnswers) {
       for (const ans of mcqAnswers) {
-        const topic = ans.question?.topic || "Aptitude";
-        const key = Object.keys(topicScores).find(k => k.toLowerCase() === topic.toLowerCase()) || "Aptitude";
-        topicScores[key].total += ans.is_correct ? 100 : 0;
-        topicScores[key].count += 1;
+        feedMcqAnswer(topicScores, ans.is_correct, ans.question?.topic);
+      }
+    }
+
+    // Fetch coding submissions to include in DSA topic score
+    const { data: codingSubs } = await db.from("coding_submissions")
+      .select("score, coding_questions(marks), attempt:attempt_id(candidate_id)")
+      .eq("attempt.candidate_id", userId)
+      .eq("status", "tested");
+
+    if (codingSubs) {
+      for (const sub of codingSubs) {
+        const maxMarks = sub.coding_questions?.marks || 10;
+        feedCodingSubmission(topicScores, sub.score, maxMarks);
       }
     }
     
-    const radarData = Object.keys(topicScores).map(subject => {
-      const val = topicScores[subject];
-      const score = val.count > 0 ? Math.round(val.total / val.count) : 0; // no data yet
-      return { subject, score, fullMark: 100 };
-    });
+    const { radarData, strengths, weaknesses } = generateInsights(topicScores, "Profile");
     
     // 2. Peer Percentile calculation
     const { data: myProfile } = await db.from("candidate_profiles")
@@ -1740,56 +1793,31 @@ router.get("/performance-radar", async (req: AuthRequest, res) => {
       score: att.score
     })) || [];
 
-    res.json({ radarData, peerPercentile, trendData });
+    res.json({ radarData, peerPercentile, trendData, strengths, weaknesses });
   } catch (err) {
     console.error("Performance radar error:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
 
-router.post("/offers/:attemptId/respond", async (req: AuthRequest, res) => {
+router.post("/offers/:jobId/respond", async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.id;
-    const { attemptId } = req.params;
-    const { response, recruiterNotes } = req.body; // 'accept', 'decline', 'negotiate'
+    const { jobId } = req.params;
+    const { response, notes } = req.body; // 'accept', 'decline', 'negotiate'
     
     if (!["accept", "decline", "negotiate"].includes(response)) {
       res.status(400).json({ error: "Invalid offer response type" });
       return;
     }
     
-    // Find the attempt
-    const { data: attempt } = await db.from("attempts")
-      .select("exam_id")
-      .eq("id", attemptId)
-      .eq("candidate_id", userId)
-      .maybeSingle();
-    
-    if (!attempt) {
-      res.status(404).json({ error: "Attempt not found" });
-      return;
-    }
-    
-    // Find matching job link
-    const { data: job } = await db.from("jobs")
-      .select("id")
-      .eq("exam_id", attempt.exam_id)
-      .maybeSingle();
-    
-    if (!job) {
-      res.status(404).json({ error: "Job drive associated with this offer not found" });
-      return;
-    }
-    
     const updateFields: any = {
-      recruiter_notes: recruiterNotes || ""
+      recruiter_notes: notes || ""
     };
     
     if (response === "accept") {
-      updateFields.status = "offered";
       updateFields.offer_accepted_at = new Date().toISOString();
     } else if (response === "decline") {
-      updateFields.status = "rejected";
       updateFields.offer_declined_at = new Date().toISOString();
     } else {
       updateFields.status = "on_hold";
@@ -1798,7 +1826,7 @@ router.post("/offers/:attemptId/respond", async (req: AuthRequest, res) => {
     const { data: status, error } = await db.from("candidate_status")
       .update(updateFields)
       .eq("candidate_id", userId)
-      .eq("job_id", job.id)
+      .eq("job_id", jobId)
       .select()
       .single();
     
@@ -1813,13 +1841,61 @@ router.post("/offers/:attemptId/respond", async (req: AuthRequest, res) => {
       actor_role: "candidate",
       target_user_id: userId,
       type: `offer_${response}`,
-      title: `Offer ${response}ed by Candidate`,
+      title: `Offer ${response === "accept" ? "Accepted" : response === "decline" ? "Declined" : "Negotiation Initiated"}`,
       description: `Candidate responded with ${response.toUpperCase()} to the job offer.`
     });
     
     res.json({ message: `Successfully responded to the offer with: ${response}`, status });
   } catch (err) {
     console.error("Offer response error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.get("/activity", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+
+    const { data: activities } = await db.from("activity_feed")
+      .select("*, actor:actor_id(name)")
+      .eq("target_user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    const feed = (activities || []).map((a) => ({
+      id: a.id,
+      type: a.type,
+      title: a.title,
+      description: a.description,
+      actorName: a.actor?.name || null,
+      actorRole: a.actor_role,
+      metadata: a.metadata,
+      createdAt: a.created_at,
+    }));
+
+    res.json({ feed });
+  } catch (err) {
+    console.error("Fetch activity feed error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.get("/offers", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+
+    const { data: offers } = await db
+      .from("candidate_status")
+      .select("*, job:job_id(title, company_name, salary_min, salary_max)")
+      .eq("candidate_id", userId)
+      .eq("status", "offered")
+      .eq("offer_accepted_at", null)
+      .eq("offer_declined_at", null)
+      .order("updated_at", { ascending: false });
+
+    res.json({ offers: offers || [] });
+  } catch (err) {
+    console.error("Fetch offers error:", err);
     res.status(500).json({ error: "Server error" });
   }
 });

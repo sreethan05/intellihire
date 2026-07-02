@@ -2,7 +2,12 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import { QRCodeSVG } from "qrcode.react";
-import { Briefcase, FileText, CheckCircle, MapPin, QrCode, Github, Linkedin, Globe } from "lucide-react";
+import { Briefcase, FileText, CheckCircle, MapPin, QrCode, Github, Linkedin, Globe, Trophy, BarChart3, AlertCircle } from "lucide-react";
+import { 
+  Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, 
+  ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend 
+} from "recharts";
+
 
 export default function PublicPortfolio() {
   const { slug } = useParams<{ slug: string }>();
@@ -71,9 +76,13 @@ export default function PublicPortfolio() {
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <h1 className="text-xl font-extrabold text-slate-900">{profile.user?.name}</h1>
-                    {profile.documents_verified && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-bold text-green-700 border border-green-200">
-                        <CheckCircle className="h-3 w-3" /> Verified
+                    {profile.documents_verified ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-black text-emerald-600 border border-emerald-500/20 shadow-xs backdrop-blur-xs">
+                        <CheckCircle className="h-3.5 w-3.5 fill-emerald-600/10" /> TPO VERIFIED
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-black text-amber-600 border border-amber-500/20 shadow-xs backdrop-blur-xs">
+                        Pending Verification
                       </span>
                     )}
                   </div>
@@ -188,6 +197,31 @@ export default function PublicPortfolio() {
                   </div>
                 </div>
               )}
+              {/* Academic Timeline Chart */}
+              {profile.semester_grades && Array.isArray(profile.semester_grades) && profile.semester_grades.length > 0 && (
+                <div className="pt-4 border-t border-slate-100 space-y-3">
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+                    <BarChart3 className="h-3.5 w-3.5 text-blue-600" /> Academic Grade Timeline
+                  </h3>
+                  <div className="h-48 w-full mt-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={profile.semester_grades} margin={{ top: 10, right: 10, left: -25, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis 
+                          dataKey="semester" 
+                          tickFormatter={(val) => `Sem ${val}`}
+                          tick={{ fill: '#475569', fontSize: 9, fontWeight: 600 }} 
+                        />
+                        <YAxis tick={{ fill: '#94a3b8', fontSize: 9 }} domain={[0, 10]} />
+                        <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 10 }} />
+                        <Legend verticalAlign="top" height={28} iconType="circle" wrapperStyle={{ fontSize: 10, fontWeight: 600 }} />
+                        <Line name="SGPA" type="monotone" dataKey="sgpa" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 3 }} />
+                        <Line name="CGPA" type="monotone" dataKey="cgpa" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -210,8 +244,60 @@ export default function PublicPortfolio() {
         {/* Side Panel: Drives & History */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl flex flex-col justify-between">
           <div>
-            <h2 className="text-md font-extrabold text-slate-900 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
-              <Briefcase className="h-4 w-4 text-blue-600" /> Drive Participation
+            {/* Skill Radar Profile */}
+            {data.radarData && data.radarData.length > 0 && (
+              <div className="border-b border-slate-100 pb-4 mb-4">
+                <h2 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <BarChart3 className="h-3.5 w-3.5 text-blue-600" /> Skill Radar Profile
+                </h2>
+                <div className="h-44">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadarChart cx="50%" cy="50%" outerRadius="75%" data={data.radarData}>
+                      <PolarGrid stroke="#e2e8f0" />
+                      <PolarAngleAxis dataKey="subject" tick={{ fill: '#475569', fontSize: 8, fontWeight: 600 }} />
+                      <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 7 }} />
+                      <Radar name="Skills" dataKey="score" stroke="#2563eb" fill="#3b82f6" fillOpacity={0.4} />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {/* Subject Mastery Insights */}
+            {((data.strengths && data.strengths.length > 0) || (data.weaknesses && data.weaknesses.length > 0)) && (
+              <div className="border-b border-slate-100 pb-4 mb-4 space-y-3">
+                <h2 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Trophy className="h-3.5 w-3.5 text-indigo-600" /> Mastery Insights
+                </h2>
+                
+                {/* Strengths */}
+                {data.strengths && data.strengths.length > 0 && (
+                  <div className="space-y-1.5">
+                    {data.strengths.map((str: string, idx: number) => (
+                      <div key={idx} className="flex gap-1.5 items-start text-[10px] text-slate-700 bg-emerald-50/50 border border-emerald-100/30 rounded-lg p-2">
+                        <CheckCircle className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                        <span>{str}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Weaknesses */}
+                {data.weaknesses && data.weaknesses.length > 0 && (
+                  <div className="space-y-1.5">
+                    {data.weaknesses.map((wk: string, idx: number) => (
+                      <div key={idx} className="flex gap-1.5 items-start text-[10px] text-slate-700 bg-amber-50/50 border border-amber-100/30 rounded-lg p-2">
+                        <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" />
+                        <span>{wk}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <h2 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-1.5">
+              <Briefcase className="h-3.5 w-3.5 text-blue-600" /> Drive Participation
             </h2>
             
             <div className="space-y-3">

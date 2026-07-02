@@ -83,7 +83,14 @@ export const recruiterApi = {
   getProctoringTimeline: (attemptId: string) =>
     api.get(`/proctoring/attempts/${attemptId}/timeline`),
   overrideProctoringSnapshot: (snapshotId: string, violation_severity: string) =>
-    api.post(`/proctoring/snapshots/${snapshotId}/override`, { violation_severity })
+    api.post(`/proctoring/snapshots/${snapshotId}/override`, { violation_severity }),
+  uploadOffer: (candidateId: string, jobId: string, file: File) => {
+    const formData = new FormData();
+    formData.append("offerLetter", file);
+    return api.post(`/recruiter/offers/${candidateId}/${jobId}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" }
+    });
+  }
 };
 
 export const tpoApi = {
@@ -176,8 +183,10 @@ export const candidateApi = {
   getJourneyTracker: () => api.get("/candidate/journey-tracker"),
   getPerformanceRadar: () => api.get("/candidate/performance-radar"),
   getPublicPortfolio: (slug: string) => api.get(`/candidate/portfolio/${slug}`),
-  respondToOffer: (attemptId: string, response: string, recruiterNotes?: string) =>
-    api.post(`/candidate/offers/${attemptId}/respond`, { response, recruiterNotes })
+  respondToOffer: (jobId: string, response: string, notes?: string) =>
+    api.post(`/candidate/offers/${jobId}/respond`, { response, notes }),
+  getActivityFeed: () => api.get("/candidate/activity"),
+  getOffers: () => api.get("/candidate/offers"),
 };
 
 export const resultApi = {

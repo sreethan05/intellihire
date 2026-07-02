@@ -39,15 +39,3 @@ CREATE TABLE IF NOT EXISTS candidate_status (
 
 CREATE INDEX IF NOT EXISTS candidate_status_job_idx ON candidate_status(job_id, status);
 
--- 3. Candidate Pipeline Table (for tracking workflow states)
-CREATE TABLE IF NOT EXISTS candidate_pipeline (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  candidate_id uuid REFERENCES users(id) ON DELETE CASCADE,
-  job_id uuid REFERENCES jobs(id) ON DELETE CASCADE,
-  stage text NOT NULL,
-  entered_at timestamptz DEFAULT now(),
-  exited_at timestamptz,
-  notes text,
-  updated_by uuid REFERENCES users(id),
-  UNIQUE(candidate_id, job_id, stage)
-);
