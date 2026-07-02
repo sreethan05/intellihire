@@ -2,7 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { db, transaction } from "../lib/postgres.js";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
-import { getPasswordValidationError, isValidEmail } from "../lib/validation.js";
+import { getPasswordValidationError } from "../lib/validation.js";
 import { logger } from "../lib/logger.js";
 
 import { createRecruiterSchema, createTpoSchema } from "../lib/schemas.js";

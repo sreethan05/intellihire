@@ -47,6 +47,26 @@ export default function Layout() {
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [editName, setEditName] = useState(user?.name || "");
   const [editEmail, setEditEmail] = useState(user?.email || "");
+  const [currentDate, setCurrentDate] = useState("");
+
+  useEffect(() => {
+    const updateDateTime = () => {
+      const now = new Date();
+      const dateStr = now.toLocaleDateString(undefined, {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      });
+      const timeStr = now.toLocaleTimeString(undefined, {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      setCurrentDate(`${dateStr} • ${timeStr}`);
+    };
+    updateDateTime();
+    const interval = setInterval(updateDateTime, 60000);
+    return () => clearInterval(interval);
+  }, []);
   const [profileStats, setProfileStats] = useState<{ title: string; stats: Array<{ label: string; value: string }> } | null>(null);
 
   useEffect(() => {
@@ -246,7 +266,7 @@ export default function Layout() {
             )}
             <div className="hidden items-center gap-2 text-xs font-bold text-slate-500 lg:flex">
               <CalendarDays className="h-4 w-4 text-slate-400" />
-              May 28, 2026
+              {currentDate}
             </div>
             {/* Dark Mode Toggle Button */}
             <button
@@ -385,7 +405,6 @@ export default function Layout() {
                 </div>
                 <div>
                   <h2 className="text-base font-extrabold text-slate-900 tracking-tight">Edit Profile Settings</h2>
-                  <p className="text-[11px] text-slate-400 font-semibold">Configure your LeetCode-style study account credentials.</p>
                 </div>
               </div>
             </div>

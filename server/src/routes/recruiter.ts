@@ -5,7 +5,7 @@ import { sendRealtimeNotification } from "../websocket.js";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
 import { generateAiJson, hasAiKey } from "../lib/ai.js";
 import { createCandidateSchema } from "../lib/schemas.js";
-import { getPasswordValidationError, isValidEmail } from "../lib/validation.js";
+import { getPasswordValidationError } from "../lib/validation.js";
 import { sendDriveRegisteredEmail } from "../lib/email.js";
 import { logger } from "../lib/logger.js";
 import multer from "multer";

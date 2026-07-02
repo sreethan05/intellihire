@@ -37,7 +37,7 @@ import docsRoutes from "./routes/docs.js";
 import { auditMiddleware } from "./middleware/auditLogger.js";
 
 const NODE_ENV = config.NODE_ENV;
-const API_PREFIX = "/api/v1";
+const API_PREFIXES = ["/api/v1", "/api"];
 
 export function createApp() {
   const app = express();
@@ -63,7 +63,7 @@ export function createApp() {
   );
 
   // ─── Rate Limiting ───
-  const isRateLimitDisabled = config.DISABLE_RATE_LIMITS === "true";
+  const isRateLimitDisabled = config.DISABLE_RATE_LIMITS === "true" || NODE_ENV !== "production";
 
   const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -113,12 +113,14 @@ export function createApp() {
     message: { error: "Interview evaluation rate limit exceeded. Max 10 requests per hour." },
   });
 
-  app.use(API_PREFIX, generalLimiter);
-  app.use(`${API_PREFIX}/auth/login`, loginLimiter);
-  app.use(`${API_PREFIX}/compiler/submit`, codeSubmitLimiter);
-  app.use(`${API_PREFIX}/candidate/resume/upload`, resumeUploadLimiter);
-  app.use(`${API_PREFIX}/ai`, aiLimiter);
-  app.use(`${API_PREFIX}/interview`, interviewLimiter);
+  for (const prefix of API_PREFIXES) {
+    app.use(prefix, generalLimiter);
+    app.use(`${prefix}/auth/login`, loginLimiter);
+    app.use(`${prefix}/compiler/submit`, codeSubmitLimiter);
+    app.use(`${prefix}/candidate/resume/upload`, resumeUploadLimiter);
+    app.use(`${prefix}/ai`, aiLimiter);
+    app.use(`${prefix}/interview`, interviewLimiter);
+  }
 
   // ─── Body Parsing ───
   // Default 1MB JSON limit; bulk upload routes get higher limit below
@@ -130,37 +132,27 @@ export function createApp() {
   app.use(requestLogger);
   app.use(auditMiddleware);
 
-  // ─── API Routes (v1) ───
-  app.use(`${API_PREFIX}/auth`, authRoutes);
-  app.use(`${API_PREFIX}/admin`, adminRoutes);
-  app.use(`${API_PREFIX}/admin`, adminAnalyticsRoutes);
-  app.use(`${API_PREFIX}/recruiter`, recruiterRoutes);
-  app.use(`${API_PREFIX}/recruiter`, recruiterAnalyticsRoutes);
-  app.use(`${API_PREFIX}/tpo`, tpoRoutes);
-  app.use(`${API_PREFIX}/tpo`, tpoAnalyticsRoutes);
-  app.use(`${API_PREFIX}/candidate`, candidateRoutes);
-  app.use(`${API_PREFIX}/candidate`, candidateAnalyticsRoutes);
-  app.use(`${API_PREFIX}/exam`, examRoutes);
-  app.use(`${API_PREFIX}/result`, resultRoutes);
-  app.use(`${API_PREFIX}/compiler`, compilerRoutes);
-  app.use(`${API_PREFIX}/proctoring`, proctoringRoutes);
-  app.use(`${API_PREFIX}/ai`, aiRoutes);
-  app.use(`${API_PREFIX}/interview`, interviewRoutes);
-  app.use(`${API_PREFIX}/assets`, candidateAssetsRoutes);
-  app.use(`${API_PREFIX}/hub`, hubRoutes);
-  app.use(`${API_PREFIX}/docs`, docsRoutes);
-
-  // ─── Legacy /api routes (redirect to v1) ───
-  app.use("/api", (req, res, next) => {
-    // Health check stays at /api/health for compatibility
-    if (req.path === "/health") {
-      return next("route");
-    }
-    // Everything else redirect to v1
-    const target = `${API_PREFIX}${req.path}`;
-    logger.warn({ originalUrl: req.originalUrl, target }, "Legacy API path used; redirecting to v1");
-    res.redirect(308, target);
-  });
+  // ─── API Routes ───
+  for (const prefix of API_PREFIXES) {
+    app.use(`${prefix}/auth`, authRoutes);
+    app.use(`${prefix}/admin`, adminRoutes);
+    app.use(`${prefix}/admin`, adminAnalyticsRoutes);
+    app.use(`${prefix}/recruiter`, recruiterRoutes);
+    app.use(`${prefix}/recruiter`, recruiterAnalyticsRoutes);
+    app.use(`${prefix}/tpo`, tpoRoutes);
+    app.use(`${prefix}/tpo`, tpoAnalyticsRoutes);
+    app.use(`${prefix}/candidate`, candidateRoutes);
+    app.use(`${prefix}/candidate`, candidateAnalyticsRoutes);
+    app.use(`${prefix}/exam`, examRoutes);
+    app.use(`${prefix}/result`, resultRoutes);
+    app.use(`${prefix}/compiler`, compilerRoutes);
+    app.use(`${prefix}/proctoring`, proctoringRoutes);
+    app.use(`${prefix}/ai`, aiRoutes);
+    app.use(`${prefix}/interview`, interviewRoutes);
+    app.use(`${prefix}/assets`, candidateAssetsRoutes);
+    app.use(`${prefix}/hub`, hubRoutes);
+    app.use(`${prefix}/docs`, docsRoutes);
+  }
 
   // ─── Health Check ───
   /**
@@ -175,7 +167,7 @@ export function createApp() {
    *       503:
    *         description: System is degraded
    */
-  app.get("/api/health", async (_req, res) => {
+  app.get(["/api/health", "/api/v1/health"], async (_req, res) => {
     const isPostgresHealthy = isPostgresConfigured();
     const isGroqConfigured = Boolean(config.GROQ_API_KEY);
 
