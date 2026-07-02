@@ -45,6 +45,16 @@ async function applyMigrations() {
       console.log("Analytics schema updates applied successfully.");
     }
 
+    // 1.7. Read schema-unified-features.sql
+    const unifiedSchemaPath = resolve(__dirname, "../../../database/schema-unified-features.sql");
+    console.log(`Reading unified features schema updates from: ${unifiedSchemaPath}`);
+    if (await fs.stat(unifiedSchemaPath).then(() => true).catch(() => false)) {
+      const unifiedSql = await fs.readFile(unifiedSchemaPath, "utf-8");
+      console.log("Applying unified features schema updates...");
+      await pool.query(unifiedSql);
+      console.log("Unified features schema updates applied successfully.");
+    }
+
     // 2. Read seed-question-bank.sql
     const seedPath = resolve(__dirname, "../../../database/seed-question-bank.sql");
     console.log(`Reading base seed data from: ${seedPath}`);

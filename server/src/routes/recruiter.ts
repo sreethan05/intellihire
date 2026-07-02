@@ -923,4 +923,142 @@ Schema:
   }
 });
 
+router.get("/candidates/compare", async (req: AuthRequest, res) => {
+  try {
+    const candidateIds = (req.query.candidateIds as string || "").split(",").filter(Boolean);
+    if (candidateIds.length === 0) {
+      res.status(400).json({ error: "At least one candidate ID is required for comparison" });
+      return;
+    }
+    
+    const results: any[] = [];
+    for (const cid of candidateIds) {
+      const { data: user } = await db.from("users")
+        .select("id, name, email, roll_number")
+        .eq("id", cid)
+        .single();
+      
+      const { data: profile } = await db.from("candidate_profiles")
+        .select("*")
+        .eq("user_id", cid)
+        .maybeSingle();
+      
+      const { data: attempts } = await db.from("attempts")
+        .select("score, status")
+        .eq("candidate_id", cid)
+        .eq("status", "completed");
+      
+      const { data: interviews } = await db.from("ai_interviews")
+        .select("communication_score, technical_score, speaking_score")
+        .eq("candidate_id", cid)
+        .eq("status", "completed");
+      
+      const avgExamScore = attempts && attempts.length > 0
+        ? Math.round(attempts.reduce((sum, a) => sum + (a.score || 0), 0) / attempts.length)
+        : 0;
+        
+      const avgCommScore = interviews && interviews.length > 0
+        ? Math.round(interviews.reduce((sum, i) => sum + (i.communication_score || 0), 0) / interviews.length)
+        : 0;
+        
+      const avgTechScore = interviews && interviews.length > 0
+        ? Math.round(interviews.reduce((sum, i) => sum + (i.technical_score || 0), 0) / interviews.length)
+        : 0;
+        
+      results.push({
+        candidateId: cid,
+        name: user?.name || "Candidate",
+        rollNumber: user?.roll_number || "",
+        branch: profile?.branch || "Unknown",
+        cgpa: profile?.cgpa || 0,
+        skills: profile?.skills || [],
+        avgExamScore,
+        avgCommScore,
+        avgTechScore,
+        proctorFlags: 0
+      });
+    }
+    
+    res.json({ comparison: results });
+  } catch (err) {
+    console.error("Compare candidates error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.post("/ai/shortlist", async (req: AuthRequest, res) => {
+  try {
+    const { criteria } = req.body;
+    if (!criteria) {
+      res.status(400).json({ error: "Shortlist criteria is required" });
+      return;
+    }
+    
+    const { data: profiles } = await db.from("candidate_profiles")
+      .select("*, user:user_id(name, email, roll_number)");
+    
+    if (!profiles || profiles.length === 0) {
+      res.json({ shortlist: [] });
+      return;
+    }
+    
+    const candidatesSummary: any[] = [];
+    for (const p of profiles) {
+      const { data: attempts } = await db.from("attempts")
+        .select("score")
+        .eq("candidate_id", p.user_id)
+        .eq("status", "completed");
+      
+      const { data: interviews } = await db.from("ai_interviews")
+        .select("communication_score")
+        .eq("candidate_id", p.user_id)
+        .eq("status", "completed");
+      
+      const avgExamScore = attempts && attempts.length > 0
+        ? Math.round(attempts.reduce((sum, a) => sum + (a.score || 0), 0) / attempts.length)
+        : 0;
+      
+      const avgCommScore = interviews && interviews.length > 0
+        ? Math.round(interviews.reduce((sum, i) => sum + (i.communication_score || 0), 0) / interviews.length)
+        : 0;
+        
+      candidatesSummary.push({
+        id: p.user_id,
+        name: p.user?.name || "Unknown",
+        cgpa: p.cgpa,
+        skills: p.skills || [],
+        avgExamScore,
+        avgCommScore,
+        branch: p.branch
+      });
+    }
+    
+    const systemPrompt = `You are an AI recruiting assistant. Analyze the candidate pool and select the best matches according to the recruiter's criteria. Return a JSON object containing a 'shortlist' array.`;
+    const userPrompt = `
+Recruiter Shortlist Criteria: "${criteria}"
+
+Candidate Pool:
+${JSON.stringify(candidatesSummary, null, 2)}
+
+Return a JSON object in this format:
+{
+  "shortlist": [
+    {
+      "candidate_id": "UUID",
+      "name": "Candidate Name",
+      "rank": 1,
+      "justification": "Why selected based on the criteria"
+    }
+  ]
+}
+`;
+    
+    const result = await generateAiJson<{ shortlist: any[] }>({ systemPrompt, userPrompt });
+    res.json({ shortlist: result.shortlist || [] });
+  } catch (err) {
+    console.error("AI shortlist generator error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 export default router;

@@ -1,10 +1,4 @@
 import { scanMarksheetOCR } from "./ocr.js";
-import {
-  ollamaGeneratePromptJson,
-  ollamaGenerateText,
-  isOllamaAvailable,
-  checkOllamaStatus,
-} from "./ollama.js";
 
 type MarksheetFile = {
   name: string;
@@ -35,7 +29,6 @@ function getKeys() {
   return {
     GROQ_API_KEY: process.env.GROQ_API_KEY,
     GROQ_MODEL: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
-    OLLAMA_MODEL: process.env.OLLAMA_MODEL || "llama3.2:3b",
   };
 }
 
@@ -74,14 +67,14 @@ export function hasAiKey() {
  * This is the preferred provider for exams to avoid API costs.
  */
 export async function hasLocalModel(): Promise<boolean> {
-  return isOllamaAvailable();
+  return false;
 }
 
 /**
  * Get the active Ollama status for health checks and diagnostics.
  */
 export async function getOllamaStatus() {
-  return checkOllamaStatus();
+  return { available: false, model: "", models: [], error: "Ollama integration disabled" };
 }
 
 export async function generateGroqText(prompt: string | { systemPrompt?: string; userPrompt: string }): Promise<string> {
@@ -168,47 +161,18 @@ export async function generateGroqJson<T>(prompt: string | { systemPrompt?: stri
 }
 
 export async function generateAiText(prompt: string | { systemPrompt?: string; userPrompt: string }): Promise<string> {
-  // Try local Ollama first for zero-cost, zero-latency generation
-  const { OLLAMA_MODEL } = getKeys();
-  if (await isOllamaAvailable()) {
-    try {
-      const systemPrompt = typeof prompt === "object" ? prompt.systemPrompt : undefined;
-      const userPrompt = typeof prompt === "object" ? prompt.userPrompt : prompt;
-      return await ollamaGenerateText(userPrompt, { model: OLLAMA_MODEL, system: systemPrompt, temperature: 0.35 });
-    } catch (err: any) {
-      console.warn("[AI] Ollama text generation failed, falling back to cloud...", err.message);
-    }
-  }
-
   const { GROQ_API_KEY } = getKeys();
   if (!GROQ_API_KEY) {
-    throw new Error("GROQ_API_KEY is not configured and Ollama is unavailable");
+    throw new Error("GROQ_API_KEY is not configured");
   }
-
   return generateGroqText(prompt);
 }
 
-
 export async function generateAiJson<T>(prompt: string | { systemPrompt?: string; userPrompt: string }): Promise<T> {
-  // Try local Ollama FIRST for exam generation — zero API cost, zero latency, fully private
-  const { OLLAMA_MODEL } = getKeys();
-  if (await isOllamaAvailable()) {
-    try {
-      const systemPrompt = typeof prompt === "object" ? prompt.systemPrompt : undefined;
-      const userPrompt = typeof prompt === "object" ? prompt.userPrompt : prompt;
-      const result = await ollamaGeneratePromptJson<T>(userPrompt, systemPrompt, { model: OLLAMA_MODEL, temperature: 0.2 });
-      console.log("[AI] Ollama JSON generation succeeded — no cloud API used.");
-      return result;
-    } catch (err: any) {
-      console.warn("[AI] Ollama JSON generation failed, falling back to cloud...", err.message);
-    }
-  }
-
   const { GROQ_API_KEY } = getKeys();
   if (!GROQ_API_KEY) {
-    throw new Error("GROQ_API_KEY is not configured and Ollama is unavailable");
+    throw new Error("GROQ_API_KEY is not configured");
   }
-
   return generateGroqJson<T>(prompt);
 }
 
@@ -307,7 +271,7 @@ Return ONLY valid JSON matching this schema:
       "Authorization": `Bearer ${GROQ_API_KEY}`,
     },
     body: JSON.stringify({
-      model: "meta-llama/llama-4-scout-17b-16e-instruct",
+      model: "llama-3.2-11b-vision-preview",
       messages: [
         {
           role: "user",

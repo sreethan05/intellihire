@@ -1,6 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { db } from "../lib/postgres.js";
+import { db, transaction } from "../lib/postgres.js";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
 import { getPasswordValidationError, isValidEmail } from "../lib/validation.js";
 
@@ -81,43 +81,34 @@ router.post("/create-tpo", async (req: AuthRequest, res) => {
       return;
     }
 
-    const { data: college, error: collegeError } = await db
-      .from("colleges")
-      .upsert({
-        name: college_name,
-        code: String(college_code).toUpperCase(),
-        location: location || null,
-        created_by: req.user!.id,
-      }, { onConflict: "code" })
-      .select()
-      .single();
-
-    if (collegeError || !college) {
-      res.status(400).json({ error: collegeError?.message || "College could not be created" });
-      return;
-    }
-
     const password_hash = await bcrypt.hash(password, 10);
-    const { data, error } = await db
-      .from("users")
-      .insert({
-        name,
-        email,
-        password_hash,
-        role: "tpo",
-        college_id: college.id,
-        profile_complete: true,
-        created_by: req.user!.id,
-      })
-      .select("id, name, email, role, college_id, created_at")
-      .single();
 
-    if (error) {
-      res.status(400).json({ error: error.message });
-      return;
-    }
+    const { college, tpo } = await transaction(async (client) => {
+      // Upsert college inside transaction
+      const collegeResult = await client.query(
+        `INSERT INTO "colleges" ("name", "code", "location", "created_by")
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT ("code") DO UPDATE SET "name" = EXCLUDED."name", "location" = EXCLUDED."location"
+         RETURNING *`,
+        [college_name, String(college_code).toUpperCase(), location || null, req.user!.id]
+      );
+      const college = collegeResult.rows[0];
+      if (!college) throw new Error("College could not be created");
 
-    res.json({ message: "TPO and college created", tpo: data, college });
+      // Create TPO user inside same transaction
+      const userResult = await client.query(
+        `INSERT INTO "users" ("name", "email", "password_hash", "role", "college_id", "profile_complete", "created_by")
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING "id", "name", "email", "role", "college_id", "created_at"`,
+        [name, email, password_hash, "tpo", college.id, true, req.user!.id]
+      );
+      const tpo = userResult.rows[0];
+      if (!tpo) throw new Error("TPO user could not be created");
+
+      return { college, tpo };
+    });
+
+    res.json({ message: "TPO and college created", tpo, college });
   } catch (err) {
     console.error("Create TPO error:", err);
     res.status(500).json({ error: "Server error" });

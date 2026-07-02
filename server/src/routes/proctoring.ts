@@ -473,4 +473,78 @@ router.post("/attempt/:attemptId/override", async (req: AuthRequest, res) => {
   }
 });
 
+router.get("/attempts/:attemptId/timeline", async (req: AuthRequest, res) => {
+  try {
+    const { attemptId } = req.params;
+    
+    const { data: attempt, error: attemptErr } = await db.from("attempts")
+      .select("started_at, submitted_at")
+      .eq("id", attemptId)
+      .single();
+    
+    if (attemptErr || !attempt) {
+      res.status(404).json({ error: "Attempt not found" });
+      return;
+    }
+    
+    const { data: snapshots, error: snapErr } = await db.from("proctoring_snapshots")
+      .select("*")
+      .eq("attempt_id", attemptId)
+      .order("captured_at", { ascending: true });
+    
+    if (snapErr) {
+      res.status(400).json({ error: snapErr.message });
+      return;
+    }
+    
+    const startMs = new Date(attempt.started_at).getTime();
+    const timeline = (snapshots || []).map(snap => {
+      const snapMs = new Date(snap.captured_at).getTime();
+      const diffSec = Math.max(0, Math.floor((snapMs - startMs) / 1000));
+      const mins = Math.floor(diffSec / 60);
+      const secs = diffSec % 60;
+      const relativeTime = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+      
+      return {
+        ...snap,
+        relativeTime,
+        diffSec
+      };
+    });
+    
+    res.json({ timeline });
+  } catch (err) {
+    console.error("Get proctoring timeline error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.post("/snapshots/:snapshotId/override", async (req: AuthRequest, res) => {
+  try {
+    const { snapshotId } = req.params;
+    const { violation_severity } = req.body;
+    
+    if (!["low", "medium", "high", "critical"].includes(violation_severity)) {
+      res.status(400).json({ error: "Invalid severity level" });
+      return;
+    }
+    
+    const { data: updated, error } = await db.from("proctoring_snapshots")
+      .update({ violation_severity })
+      .eq("id", snapshotId)
+      .select()
+      .single();
+    
+    if (error) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    
+    res.json({ message: "Proctoring snapshot severity overridden successfully", snapshot: updated });
+  } catch (err) {
+    console.error("Override snapshot severity error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 export default router;

@@ -24,6 +24,22 @@ export const verifyToken = (token: string) => {
   return jwt.verify(token, JWT_SECRET) as { id: string; email: string; role: string };
 };
 
+/** Sliding-window threshold: auto-refresh if token expires within this many seconds. */
+const REFRESH_WINDOW_SECONDS = 2 * 60 * 60; // 2 hours
+
+/**
+ * Issue a fresh token from an existing valid one.
+ * Returns null if the current token is invalid.
+ */
+export const refreshToken = (currentToken: string): string | null => {
+  try {
+    const decoded = verifyToken(currentToken);
+    return generateToken({ id: decoded.id, email: decoded.email, role: decoded.role });
+  } catch {
+    return null;
+  }
+};
+
 export const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -35,6 +51,17 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
   try {
     const decoded = verifyToken(token);
     req.user = decoded;
+
+    // Sliding-window token renewal: if token expires within 2 hours, attach a fresh one
+    const payload = decoded as typeof decoded & { exp?: number };
+    if (payload.exp) {
+      const remainingSeconds = payload.exp - Math.floor(Date.now() / 1000);
+      if (remainingSeconds > 0 && remainingSeconds < REFRESH_WINDOW_SECONDS) {
+        const fresh = generateToken({ id: decoded.id, email: decoded.email, role: decoded.role });
+        res.setHeader("X-Refreshed-Token", fresh);
+      }
+    }
+
     next();
   } catch {
     res.status(401).json({ error: "Invalid token" });

@@ -76,6 +76,14 @@ export const recruiterApi = {
   saveDriveAiConfig: (driveId: string, aiConfig: any) => api.post(`/recruiter/drives/${driveId}/ai-config`, { aiConfig }),
   testDriveAiConfig: (driveId: string, data: { question: string; answer: string; aiConfig: any }) =>
     api.post(`/recruiter/drives/${driveId}/test-evaluation`, data),
+  compareCandidates: (candidateIds: string[]) =>
+    api.get("/recruiter/candidates/compare", { params: { candidateIds: candidateIds.join(",") } }),
+  aiShortlist: (criteria: string) =>
+    api.post("/recruiter/ai/shortlist", { criteria }),
+  getProctoringTimeline: (attemptId: string) =>
+    api.get(`/proctoring/attempts/${attemptId}/timeline`),
+  overrideProctoringSnapshot: (snapshotId: string, violation_severity: string) =>
+    api.post(`/proctoring/snapshots/${snapshotId}/override`, { violation_severity })
 };
 
 export const tpoApi = {
@@ -87,6 +95,9 @@ export const tpoApi = {
   getStudents: () => api.get("/tpo/students"),
   verifyDocuments: (candidate_profile_id: string, documents_verified: boolean) =>
     api.patch(`/tpo/students/${candidate_profile_id}/verification`, { documents_verified }),
+  getDashboardSummary: () => api.get("/tpo/dashboard/summary"),
+  verifyStudentBatch: (studentIds: string[], documents_verified: boolean) =>
+    api.post("/tpo/verify/batch", { studentIds, documents_verified }),
 };
 
 export const examApi = {
@@ -159,7 +170,13 @@ export const candidateApi = {
       headers: { "Content-Type": "multipart/form-data" }
     });
   },
-  deleteResume: () => api.delete("/candidate/resume")
+  deleteResume: () => api.delete("/candidate/resume"),
+  getActionItems: () => api.get("/candidate/action-items"),
+  getJourneyTracker: () => api.get("/candidate/journey-tracker"),
+  getPerformanceRadar: () => api.get("/candidate/performance-radar"),
+  getPublicPortfolio: (slug: string) => api.get(`/candidate/portfolio/${slug}`),
+  respondToOffer: (attemptId: string, response: string, recruiterNotes?: string) =>
+    api.post(`/candidate/offers/${attemptId}/respond`, { response, recruiterNotes })
 };
 
 export const resultApi = {
@@ -291,4 +308,8 @@ export const adminAnalyticsApi = {
   getPlatformGrowth: () => api.get("/admin/platform-growth"),
   getSystemHealth: () => api.get("/admin/system-health"),
   getRealTimeActivity: () => api.get("/admin/real-time-activity"),
+};
+
+export const hubApi = {
+  getOverview: () => api.get("/hub/overview"),
 };

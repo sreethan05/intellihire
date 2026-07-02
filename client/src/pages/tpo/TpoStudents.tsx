@@ -41,6 +41,7 @@ export default function TpoStudents() {
   const [scanning, setScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const rows = useMemo(() => parseCsv(csv), [csv]);
 
@@ -133,16 +134,40 @@ export default function TpoStudents() {
       toast.error(err.response?.data?.error || "Verification update failed");
     }
   };
+ 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === filteredStudents.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredStudents.map(s => s.id));
+    }
+  };
+
+  const handleBatchVerify = async (verifyStatus: boolean) => {
+    if (selectedIds.length === 0) return;
+    try {
+      await tpoApi.verifyStudentBatch(selectedIds, verifyStatus);
+      toast.success(`Successfully batch ${verifyStatus ? "verified" : "unverified"} ${selectedIds.length} students!`);
+      setSelectedIds([]);
+      loadStudents();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Batch update failed");
+    }
+  };
 
   // Filtered student list
-  const filteredStudents = useMemo(() => {
-    return students.filter(s =>
-      s.roll_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.branch.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (s.user?.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (s.user?.email || "").toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [students, searchQuery]);
+  const filteredStudents = students.filter(s =>
+    s.roll_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    s.branch.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (s.user?.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (s.user?.email || "").toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const initials = (name: string) => name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
   const avatarColors = ["bg-blue-50 text-blue-700 border-blue-100", "bg-emerald-50 text-emerald-700 border-emerald-100", "bg-violet-50 text-violet-700 border-violet-100", "bg-amber-50 text-amber-700 border-amber-100", "bg-rose-50 text-rose-700 border-rose-100"];
@@ -303,6 +328,28 @@ export default function TpoStudents() {
               </div>
             </CardHeader>
             <CardContent className="p-0">
+              {selectedIds.length > 0 && (
+                <div className="bg-violet-50 px-4 py-2.5 border-b border-violet-100 flex items-center justify-between text-xs font-bold text-violet-800 transition">
+                  <span>Selected {selectedIds.length} candidate(s)</span>
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      onClick={() => handleBatchVerify(true)} 
+                      className="h-7 px-3 bg-violet-600 hover:bg-violet-700 text-white font-extrabold text-[10px]"
+                    >
+                      Verify Selected
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => handleBatchVerify(false)} 
+                      className="h-7 px-3 border-violet-200 hover:bg-violet-100 text-violet-800 font-extrabold text-[10px] bg-white"
+                    >
+                      Unverify Selected
+                    </Button>
+                  </div>
+                </div>
+              )}
               {loading ? (
                 <div className="p-8 space-y-3">
                   <div className="h-10 animate-pulse rounded-lg bg-slate-100" />
@@ -319,7 +366,12 @@ export default function TpoStudents() {
                     <thead className="bg-slate-50/50 border-b border-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                       <tr>
                         <th className="px-4 py-3 text-center w-8">
-                          <input type="checkbox" className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" readOnly checked />
+                          <input 
+                            type="checkbox" 
+                            className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" 
+                            checked={filteredStudents.length > 0 && selectedIds.length === filteredStudents.length}
+                            onChange={toggleSelectAll} 
+                          />
                         </th>
                         <th className="px-4 py-3">Student Name</th>
                         <th className="px-4 py-3">Branch</th>
@@ -339,7 +391,12 @@ export default function TpoStudents() {
                         return (
                           <tr key={student.id} className="hover:bg-slate-50/40 transition duration-150">
                             <td className="px-4 py-3 text-center">
-                              <input type="checkbox" className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" readOnly checked={isVerified} />
+                              <input 
+                                type="checkbox" 
+                                className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" 
+                                checked={selectedIds.includes(student.id)} 
+                                onChange={() => toggleSelect(student.id)}
+                              />
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-3">

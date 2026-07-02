@@ -1,97 +1,395 @@
 import { useEffect, useState } from "react";
-import { Award, BarChart3, Bell, CalendarDays, CheckCircle, Lock, Trophy, Video } from "lucide-react";
+import { 
+  BarChart3, Bell, Briefcase, CheckCircle, Loader2, MapPin, QrCode, Trophy, User, AlertCircle
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import { candidateApi, interviewApi } from "@/lib/api";
-import { MetricCard } from "@/components/dashboard/DashboardKit";
-import type { DashboardStats } from "@/types";
+import { 
+  Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, 
+  ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid 
+} from "recharts";
 
 export default function CandidateDashboard() {
-  const [stats, setStats] = useState<DashboardStats>({});
+  const [profile, setProfile] = useState<any>(null);
+  const [actionItems, setActionItems] = useState<any[]>([]);
+  const [trackers, setTrackers] = useState<any[]>([]);
+  const [radarData, setRadarData] = useState<any[]>([]);
+  const [trendData, setTrendData] = useState<any[]>([]);
+  const [peerPercentile, setPeerPercentile] = useState<number>(75);
   const [pendingInterview, setPendingInterview] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
-      candidateApi.getDashboard(),
-      interviewApi.pending(),
+      candidateApi.getProfile(),
+      candidateApi.getActionItems(),
+      candidateApi.getJourneyTracker(),
+      candidateApi.getPerformanceRadar(),
+      interviewApi.pending()
     ])
-      .then(([dashRes, pendingRes]) => {
-        setStats(dashRes.data.stats || {});
-        setPendingInterview(pendingRes.data.interview || null);
+      .then(([profileRes, actionRes, trackerRes, radarRes, interviewRes]) => {
+        setProfile(profileRes.data.profile || null);
+        setActionItems(actionRes.data.actionItems || []);
+        setTrackers(trackerRes.data.trackers || []);
+        setRadarData(radarRes.data.radarData || []);
+        setTrendData(radarRes.data.trendData || []);
+        setPeerPercentile(radarRes.data.peerPercentile || 75);
+        setPendingInterview(interviewRes.data.interview || null);
       })
+      .catch(err => console.error("Dashboard fetch error:", err))
       .finally(() => setLoading(false));
   }, []);
 
   if (loading) {
-    return <div className="grid grid-cols-1 gap-4 md:grid-cols-4">{[1, 2, 3, 4].map((item) => <div key={item} className="h-24 animate-pulse rounded-lg bg-slate-200" />)}</div>;
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto" />
+          <p className="mt-2 text-sm text-slate-500 font-medium">Loading Placement Dashboard...</p>
+        </div>
+      </div>
+    );
   }
 
-  const hasQualifiedExam = (stats.passCount || 0) > 0;
+  // Derive public URL for portfolio
+  const publicSlug = profile?.public_portfolio_slug || profile?.user_id || "";
+  const publicPortfolioUrl = `${window.location.origin}/portfolio/${publicSlug}`;
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(publicPortfolioUrl)}`;
+
+  // Helper to resolve stages matching Kanban columns
+  const getKanbanStageName = (currentStage: string) => {
+    switch (currentStage) {
+      case "registered": return "Applied";
+      case "eligible": return "Eligible";
+      case "exam_assigned": return "Exam Assigned";
+      case "exam_taken": return "Exam Taken";
+      case "shortlisted": return "Shortlisted";
+      case "interview_scheduled": return "Interview Scheduled";
+      case "offered": return "Selected";
+      case "rejected": return "Rejected";
+      default: return "Applied";
+    }
+  };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6 pb-12">
+      {/* Title Header */}
       <div>
-        <h2 className="text-lg font-extrabold text-slate-950">Overview</h2>
-        <p className="mt-1 text-sm text-slate-500">Your exam schedule, qualification status, and interview readiness.</p>
+        <h1 className="text-2xl font-black text-slate-900">Placement Command Center</h1>
+        <p className="text-sm text-slate-500">Track your verified profile, pipeline stage eligibility, and proctored exam performance.</p>
       </div>
 
       {/* Pending Interview Banner */}
       {pendingInterview && (
         <Link
           to="/candidate/interview"
-          className="flex items-center gap-4 rounded-lg border border-blue-300 bg-blue-600 px-5 py-4 text-white shadow-lg transition hover:bg-blue-700"
+          className="flex items-center gap-4 rounded-xl border border-blue-200 bg-blue-600 px-5 py-4 text-white shadow-md hover:bg-blue-700 transition"
         >
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20">
             <Bell className="h-5 w-5" />
           </div>
           <div className="flex-1">
-            <div className="font-bold">AI Interview Ready — You've Been Shortlisted! 🎉</div>
-            <div className="mt-0.5 text-sm text-blue-100">
+            <div className="font-bold">AI Interview Unlocked! 🎉</div>
+            <div className="mt-0.5 text-xs text-blue-100">
               {pendingInterview.job?.company_name
                 ? `${pendingInterview.job.title} at ${pendingInterview.job.company_name}`
-                : pendingInterview.exam?.title
-                ? `Based on: ${pendingInterview.exam.title}`
-                : "Your AI interview is waiting. Click to begin."}
+                : "Your face-to-face AI placement interview session is active. Click to start."}
             </div>
           </div>
-          <div className="shrink-0 rounded-md bg-white px-4 py-2 text-sm font-bold text-blue-700">
-            Start Interview →
+          <div className="shrink-0 rounded-lg bg-white px-4 py-2 text-xs font-bold text-blue-700">
+            Start Interview
           </div>
         </Link>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title="Upcoming Exams" value={stats.pending || 0} icon={CalendarDays} tone="violet" />
-        <MetricCard title="Completed Exams" value={stats.completed || 0} icon={CheckCircle} tone="green" />
-        <MetricCard title="Average Score" value={`${stats.averagePercentage || 0}%`} icon={BarChart3} tone="blue" />
-        <MetricCard title="Rank" value={`${stats.rank || 0} / ${stats.totalRanked || 0}`} icon={Trophy} tone="amber" />
+      {/* Grid: Placement Passport & Radar Chart */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        
+        {/* Placement Passport Card */}
+        <div className="lg:col-span-2 relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm flex flex-col justify-between">
+          <div className="h-2 bg-gradient-to-r from-blue-600 to-indigo-600"></div>
+          
+          <div className="p-6 flex-1 flex flex-col justify-between gap-6">
+            <div className="flex flex-col sm:flex-row gap-5 items-start justify-between">
+              
+              {/* Profile Details */}
+              <div className="flex gap-4 items-center">
+                <div className="h-16 w-16 rounded-full bg-slate-200 border-2 border-slate-300 overflow-hidden shrink-0 flex items-center justify-center text-slate-400 font-bold text-xl">
+                  {profile?.photo_url ? (
+                    <img src={profile.photo_url} alt="Profile" className="h-full w-full object-cover" />
+                  ) : (
+                    <User className="h-8 w-8" />
+                  )}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-bold text-slate-900">{profile?.roll_number ? `Student ID: ${profile.roll_number}` : "Complete Onboarding"}</h2>
+                    {profile?.documents_verified && (
+                      <span className="inline-flex items-center gap-0.5 rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-bold text-green-700 border border-green-200">
+                        <CheckCircle className="h-3 w-3" /> Verified
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm font-semibold text-blue-600">{profile?.branch || "Department pending"}</p>
+                  <p className="mt-0.5 text-xs text-slate-400 flex items-center gap-1">
+                    <MapPin className="h-3.5 w-3.5" /> IIT Campus Placement
+                  </p>
+                </div>
+              </div>
+
+              {/* QR Code */}
+              <div className="flex flex-col items-center border border-slate-100 bg-slate-50 p-2 rounded-lg self-center sm:self-auto shrink-0">
+                <img src={qrCodeUrl} alt="Passport QR" className="h-20 w-20 object-contain" />
+                <span className="mt-1 text-[9px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-0.5">
+                  <QrCode className="h-2.5 w-2.5" /> Share Profile
+                </span>
+              </div>
+            </div>
+
+            {/* Academic stats */}
+            <div className="grid grid-cols-3 gap-4 border-y border-slate-100 py-3 text-center">
+              <div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">CGPA</div>
+                <div className="mt-0.5 text-md font-black text-slate-900">{profile?.cgpa || "N/A"}</div>
+              </div>
+              <div className="border-x border-slate-100">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Graduation</div>
+                <div className="mt-0.5 text-md font-black text-slate-900">{profile?.graduation_year || "N/A"}</div>
+              </div>
+              <div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Placement Status</div>
+                <div className="mt-0.5 text-xs font-bold text-green-600 uppercase flex justify-center items-center gap-1">
+                  <span className="h-2 w-2 rounded-full bg-green-500"></span> Ready
+                </div>
+              </div>
+            </div>
+
+            {/* Skills */}
+            <div>
+              <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Core Competencies</h3>
+              <div className="flex flex-wrap gap-1.5">
+                {profile?.skills && Array.isArray(profile.skills) && profile.skills.length > 0 ? (
+                  profile.skills.map((skill: string, index: number) => (
+                    <span key={index} className="inline-block rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                      {skill}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-xs text-slate-400">Complete onboarding to declare skills.</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-slate-50 border-t border-slate-100 p-4 flex flex-col sm:flex-row gap-3 justify-between items-center text-xs">
+            <span className="text-slate-400 font-bold tracking-wider">SHAREABLE PORTFOLIO LINK:</span>
+            <a 
+              href={publicPortfolioUrl} 
+              target="_blank" 
+              rel="noreferrer" 
+              className="text-blue-600 hover:text-blue-700 font-bold underline break-all"
+            >
+              {publicPortfolioUrl}
+            </a>
+          </div>
+        </div>
+
+        {/* Radar Skills Evaluation */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between">
+          <div>
+            <h2 className="text-sm font-extrabold text-slate-950 flex items-center gap-2 mb-4 border-b border-slate-100 pb-2">
+              <BarChart3 className="h-4 w-4 text-blue-600" /> Skill Radar Profile
+            </h2>
+            <div className="h-56">
+              {radarData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
+                    <PolarGrid stroke="#e2e8f0" />
+                    <PolarAngleAxis dataKey="subject" tick={{ fill: '#475569', fontSize: 10, fontWeight: 600 }} />
+                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 8 }} />
+                    <Radar name="Skills" dataKey="score" stroke="#2563eb" fill="#3b82f6" fillOpacity={0.4} />
+                  </RadarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full items-center justify-center text-xs text-slate-400">
+                  Insufficient evaluation data to generate skill radar.
+                </div>
+              )}
+            </div>
+          </div>
+          <p className="text-[10px] text-slate-400 text-center font-bold uppercase tracking-wider mt-2">Compiled across proctored exam attempts</p>
+        </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Link to="/candidate/interview" className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:border-blue-200 hover:bg-blue-50">
-          <div>
-            <div className="font-bold text-slate-950">
-              {pendingInterview ? "AI Interview Pending" : hasQualifiedExam ? "Attempt AI Interview" : "AI Interview Locked"}
+      {/* Grid: Action Items & Peer Percentile */}
+      <div className="grid gap-6 md:grid-cols-3">
+        
+        {/* Action Items List */}
+        <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-sm font-extrabold text-slate-950 flex items-center gap-2 mb-4 border-b border-slate-100 pb-2">
+            <AlertCircle className="h-4 w-4 text-red-500" /> High-Priority Actions
+          </h2>
+          
+          <div className="space-y-3">
+            {actionItems.length > 0 ? (
+              actionItems.map((item, idx) => (
+                <div key={idx} className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center rounded-lg border border-slate-100 p-3 bg-slate-50/50 hover:bg-slate-50 transition">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className={`h-2 w-2 rounded-full ${item.priority === 'urgent' ? 'bg-red-500' : 'bg-amber-500'}`}></span>
+                      <h4 className="font-bold text-sm text-slate-900">{item.title}</h4>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">{item.description}</p>
+                  </div>
+                  {item.action_url && (
+                    <Link
+                      to={item.action_url}
+                      className="rounded-md bg-slate-900 hover:bg-slate-800 px-3 py-1.5 text-xs font-bold text-white shadow shrink-0 self-end sm:self-auto"
+                    >
+                      Resolve Action
+                    </Link>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-6 text-slate-400 text-xs">
+                Awesome! You have no pending action items. Your profile is ready.
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Peer Percentile & Trend */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between">
+          <div className="space-y-4">
+            <h2 className="text-sm font-extrabold text-slate-950 flex items-center gap-2 border-b border-slate-100 pb-2">
+              <Trophy className="h-4 w-4 text-amber-500" /> Rank &amp; Percentile
+            </h2>
+            
+            <div className="bg-gradient-to-br from-amber-50 to-orange-50/50 rounded-xl p-4 border border-amber-100 text-center">
+              <div className="text-xs font-bold text-amber-800 uppercase tracking-wide">College Percentile</div>
+              <div className="text-3xl font-black text-amber-900 mt-1">{peerPercentile}%</div>
+              <p className="text-[10px] text-amber-700 mt-1 font-semibold">You are scoring higher than {peerPercentile}% of peers in your batch.</p>
             </div>
-            <div className="mt-1 text-sm text-slate-500">
-              {pendingInterview
-                ? "You have been shortlisted. Your AI interview is ready."
-                : hasQualifiedExam
-                ? "Start the on-spot face-to-face AI interview unlocked by your exam result."
-                : "Pass an assigned exam to unlock the on-spot face-to-face AI interview."}
+
+            <div>
+              <div className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">DSA Score Trend</div>
+              <div className="h-28">
+                {trendData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={trendData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fontSize: 8 }} />
+                      <YAxis tick={{ fontSize: 8 }} domain={[0, 100]} />
+                      <Tooltip />
+                      <Line type="monotone" dataKey="score" stroke="#f59e0b" strokeWidth={2} dot={{ r: 4 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex h-full items-center justify-center text-xs text-slate-400">
+                    No score history.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-          {pendingInterview || hasQualifiedExam
-            ? <Video className="h-5 w-5 text-blue-600" />
-            : <Lock className="h-5 w-5 text-amber-600" />}
-        </Link>
-        <Link to="/candidate/certificates" className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:border-blue-200 hover:bg-blue-50">
-          <div>
-            <div className="font-bold text-slate-950">Certificates &amp; Badges</div>
-            <div className="mt-1 text-sm text-slate-500">View earned placement credentials.</div>
+        </div>
+      </div>
+
+      {/* Visual Journey Pipeline trackers */}
+      {trackers.length > 0 && (
+        <div className="space-y-5">
+          <h2 className="text-sm font-extrabold text-slate-950 flex items-center gap-2 border-b border-slate-100 pb-2">
+            <Briefcase className="h-4 w-4 text-blue-600" /> Active Placement Pipelines
+          </h2>
+
+          <div className="space-y-6">
+            {trackers.map((track, idx) => (
+              <div key={idx} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="font-extrabold text-slate-950 text-md">{track.jobTitle}</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">{track.companyName}</p>
+                  </div>
+                  <span className="inline-block rounded-md bg-blue-50 border border-blue-200 px-2.5 py-1 text-[10px] font-black uppercase text-blue-700">
+                    Current stage: {getKanbanStageName(track.currentStage)}
+                  </span>
+                </div>
+
+                {/* Horizontal journey nodes */}
+                <div className="relative pt-4 pb-2">
+                  <div className="absolute left-4 right-4 top-1/2 -translate-y-1/2 h-1 bg-slate-100 -z-10"></div>
+                  <div className="flex justify-between items-center">
+                    {track.stages.map((stage: any, sidx: number) => (
+                      <div key={sidx} className="flex flex-col items-center text-center">
+                        <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition ${
+                          stage.completed 
+                            ? 'bg-blue-600 border-blue-600 text-white shadow-sm' 
+                            : 'bg-white border-slate-200 text-slate-400'
+                        }`}>
+                          {sidx + 1}
+                        </div>
+                        <span className={`text-[10px] font-bold mt-2 ${stage.completed ? 'text-slate-900' : 'text-slate-400'}`}>{stage.name}</span>
+                        {stage.date && (
+                          <span className="text-[8px] text-slate-400 mt-0.5">
+                            {new Date(stage.date).toLocaleDateString("en-IN", { month: "short", day: "numeric" })}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
-          <Award className="h-5 w-5 text-blue-600" />
-        </Link>
+        </div>
+      )}
+
+      {/* Drive Application Kanban Board */}
+      <div className="space-y-3">
+        <h2 className="text-sm font-extrabold text-slate-950 flex items-center gap-2 border-b border-slate-100 pb-2">
+          <Briefcase className="h-4 w-4 text-blue-600" /> Drive Status Board (Kanban)
+        </h2>
+        
+        <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-6 overflow-x-auto pb-4">
+          
+          {/* Column definitions mapping Kanban stages */}
+          {[
+            { title: "Applied", stage: "registered", color: "bg-slate-100 text-slate-800" },
+            { title: "Eligible", stage: "eligible", color: "bg-blue-100 text-blue-800" },
+            { title: "Exam Assigned", stage: "exam_assigned", color: "bg-purple-100 text-purple-800" },
+            { title: "Exam Taken", stage: "exam_taken", color: "bg-indigo-100 text-indigo-800" },
+            { title: "Shortlisted", stage: "shortlisted", color: "bg-amber-100 text-amber-800" },
+            { title: "Selected", stage: "offered", color: "bg-green-100 text-green-800" }
+          ].map((col, cidx) => {
+            const drivesInStage = trackers.filter(t => t.currentStage === col.stage);
+            return (
+              <div key={cidx} className="min-w-[200px] rounded-xl border border-slate-200 bg-slate-50/50 p-4 shrink-0 flex flex-col justify-start">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="font-bold text-xs text-slate-900 uppercase tracking-wider">{col.title}</h3>
+                  <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-black ${col.color}`}>
+                    {drivesInStage.length}
+                  </span>
+                </div>
+
+                <div className="space-y-2 flex-1">
+                  {drivesInStage.length > 0 ? (
+                    drivesInStage.map((d, didx) => (
+                      <div key={didx} className="rounded-lg border border-slate-200 bg-white p-3 shadow-xs space-y-2">
+                        <div className="font-bold text-xs text-slate-900">{d.jobTitle}</div>
+                        <div className="text-[10px] text-slate-400 font-semibold">{d.companyName}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-6 text-[10px] text-slate-400 font-medium italic border border-dashed border-slate-200 rounded-lg">
+                      Empty stage
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

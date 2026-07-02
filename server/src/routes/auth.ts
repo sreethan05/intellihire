@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { db } from "../lib/postgres.js";
-import { generateToken } from "../middleware/auth.js";
+import { generateToken, authMiddleware, refreshToken, type AuthRequest } from "../middleware/auth.js";
 import { isValidEmail } from "../lib/validation.js";
 import { loginSchema } from "../lib/schemas.js";
 
@@ -124,6 +124,35 @@ router.post("/login", async (req, res) => {
     console.error("Login error:", err);
     res.status(500).json({ error: "Server error" });
   }
+});
+
+/**
+ * @openapi
+ * /api/auth/refresh:
+ *   post:
+ *     summary: Refresh an expiring JWT token
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: New token issued
+ *       401:
+ *         description: Invalid or expired token
+ */
+router.post("/refresh", authMiddleware, (req: AuthRequest, res) => {
+  const authHeader = req.headers.authorization;
+  const currentToken = authHeader?.split(" ")[1];
+  if (!currentToken) {
+    res.status(401).json({ error: "No token provided" });
+    return;
+  }
+  const newToken = refreshToken(currentToken);
+  if (!newToken) {
+    res.status(401).json({ error: "Token could not be refreshed" });
+    return;
+  }
+  res.json({ token: newToken });
 });
 
 export default router;

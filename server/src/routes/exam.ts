@@ -45,26 +45,19 @@ router.post("/create", recruiterOrAdmin, async (req: AuthRequest, res) => {
     if (available_from) payload.available_from = available_from;
     if (available_until) payload.available_until = available_until;
 
-    let data: any = null;
-    let error: any = null;
-    let attempts = 0;
-    while (attempts < 10) {
-      const res = await db.from("exams").insert(payload).select().single();
-      if (res.error) {
-        const match = res.error.message.match(/Could not find the '([^']+)' column/);
-        if (match && match[1]) {
-          const col = match[1];
-          logger.warn(`Omitting missing column ${col} from exams insert payload`);
-          delete payload[col];
-          attempts++;
-          continue;
-        }
-        error = res.error;
-        break;
+    const allowedColumns = [
+      "title", "description", "duration", "total_marks", "pass_marks",
+      "status", "shuffle_questions", "negative_marking", "created_by",
+      "available_from", "available_until",
+    ];
+    const sanitizedPayload: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(payload)) {
+      if (allowedColumns.includes(key)) {
+        sanitizedPayload[key] = value;
       }
-      data = res.data;
-      break;
     }
+
+    const { data, error } = await db.from("exams").insert(sanitizedPayload).select().single();
     if (error) { res.status(400).json({ error: error.message }); return; }
     res.json({ message: "Exam created", exam: data });
   } catch (err) { console.error("Create exam error:", err); res.status(500).json({ error: "Server error" }); }

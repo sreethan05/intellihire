@@ -80,6 +80,7 @@ export default function Layout() {
     { path: "/recruiter/ai-studio", label: "AI Studio", icon: Sparkles },
     { path: "/recruiter/create-exam", label: "Create Exam", icon: PenSquare },
     { path: "/recruiter/create-drive", label: "Manage", icon: Landmark },
+    { path: "/recruiter/candidates", label: "Candidates", icon: Users },
     { path: "/recruiter/results", label: "Reports", icon: BarChart3 },
     { path: "/recruiter/candidate-analytics", label: "Candidate Analytics", icon: Users },
     { path: "/recruiter/voice-interviews", label: "AI Interviews", icon: Bot },
@@ -95,6 +96,7 @@ export default function Layout() {
     { path: "/candidate/interview", label: "Interview", icon: Video },
     { path: "/candidate/certificates", label: "Certificates", icon: ShieldCheck },
     { path: "/candidate/exam-analysis", label: "Reports", icon: BarChart3 },
+    { path: "/candidate/sandbox", label: "Practice Sandbox", icon: PenSquare },
   ];
 
   const links =

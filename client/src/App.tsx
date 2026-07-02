@@ -2,17 +2,17 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { CollegeProvider } from "./context/CollegeContext";
 import Login from "./pages/Login";
-import AdminDashboard from "./pages/admin/AdminDashboard";
+// AdminDashboard removed
 import AdminExamActivity from "./pages/admin/AdminExamActivity";
 import AdminRecruiterAnalytics from "./pages/admin/AdminRecruiterAnalytics";
 import AdminManage from "./pages/admin/AdminManage";
 import CreateRecruiter from "./pages/admin/CreateRecruiter";
 import CreateTpo from "./pages/admin/CreateTpo";
-import TpoDashboard from "./pages/tpo/TpoDashboard";
+// TpoDashboard removed
 import TpoStudents from "./pages/tpo/TpoStudents";
 import TpoReports from "./pages/tpo/TpoReports";
 import TpoActivity from "./pages/tpo/TpoActivity";
-import RecruiterDashboard from "./pages/recruiter/RecruiterDashboard";
+// RecruiterDashboard removed
 import RecruiterCandidateAnalytics from "./pages/recruiter/RecruiterCandidateAnalytics";
 import RecruiterExamAnalytics from "./pages/recruiter/RecruiterExamAnalytics";
 import CreateDrive from "./pages/recruiter/CreateDrive";
@@ -24,7 +24,8 @@ import RecruiterProctoring from "./pages/recruiter/RecruiterProctoring";
 import RecruiterActiveMonitoring from "./pages/recruiter/RecruiterActiveMonitoring";
 import VoiceInterviews from "./pages/recruiter/VoiceInterviews";
 import AIInterviewScheduling from "./pages/recruiter/AIInterviewScheduling";
-import CandidateDashboard from "./pages/candidate/CandidateDashboard";
+// CandidateDashboard removed
+import CandidateSandbox from "./pages/candidate/CandidateSandbox";
 import CandidateExamAnalytics from "./pages/candidate/CandidateExamAnalytics";
 import CandidateMyExams from "./pages/candidate/CandidateMyExams";
 import CandidateOnboarding from "./pages/candidate/CandidateOnboarding";
@@ -34,6 +35,8 @@ import TakeExam from "./pages/candidate/TakeExam";
 import Layout from "./components/layout/Layout";
 import RecruiterAIStudio from "./pages/recruiter/RecruiterAIStudio";
 import RecruiterColleges from "./pages/recruiter/RecruiterColleges";
+import PublicPortfolio from "./pages/PublicPortfolio";
+import HubPage from "./pages/HubPage";
 
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles: string[] }) {
@@ -80,7 +83,7 @@ function AppRoutes() {
       >
         <Route index element={<Navigate to="overview" replace />} />
         <Route path="dashboard" element={<Navigate to="/admin/overview" replace />} />
-        <Route path="overview" element={<AdminDashboard />} />
+        <Route path="overview" element={<HubPage />} />
         <Route path="manage" element={<AdminManage />} />
         <Route path="recruiter-analytics" element={<AdminRecruiterAnalytics />} />
         <Route path="exam-activity" element={<AdminExamActivity />} />
@@ -98,7 +101,7 @@ function AppRoutes() {
       >
         <Route index element={<Navigate to="overview" replace />} />
         <Route path="dashboard" element={<Navigate to="/tpo/overview" replace />} />
-        <Route path="overview" element={<TpoDashboard />} />
+        <Route path="overview" element={<HubPage />} />
         <Route path="students" element={<TpoStudents />} />
         <Route path="reports" element={<TpoReports />} />
         <Route path="activity" element={<TpoActivity />} />
@@ -114,7 +117,7 @@ function AppRoutes() {
       >
         <Route index element={<Navigate to="overview" replace />} />
         <Route path="dashboard" element={<Navigate to="/recruiter/overview" replace />} />
-        <Route path="overview" element={<RecruiterDashboard />} />
+        <Route path="overview" element={<HubPage />} />
         <Route path="exam-analytics" element={<RecruiterExamAnalytics />} />
         <Route path="candidate-analytics" element={<RecruiterCandidateAnalytics />} />
         <Route path="voice-interviews" element={<VoiceInterviews />} />
@@ -141,14 +144,16 @@ function AppRoutes() {
         <Route index element={<Navigate to="overview" replace />} />
         <Route path="dashboard" element={<Navigate to="/candidate/overview" replace />} />
         <Route path="onboarding" element={<CandidateOnboarding />} />
-        <Route path="overview" element={<CandidateDashboard />} />
+        <Route path="overview" element={<HubPage />} />
         <Route path="exam-analysis" element={<CandidateExamAnalytics />} />
         <Route path="interview" element={<CandidateInterview />} />
         <Route path="certificates" element={<CandidateCertificates />} />
         <Route path="my-exams" element={<CandidateMyExams />} />
         <Route path="exam/:examId" element={<TakeExam />} />
-
+        <Route path="sandbox" element={<CandidateSandbox />} />
       </Route>
+
+      <Route path="/portfolio/:slug" element={<PublicPortfolio />} />
 
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>

@@ -314,4 +314,110 @@ router.patch("/students/:profileId/verification", async (req: AuthRequest, res) 
   }
 });
 
+router.get("/dashboard/summary", async (req: AuthRequest, res) => {
+  try {
+    const { data: tpo } = await db.from("users").select("college_id").eq("id", req.user!.id).single();
+    if (!tpo?.college_id) {
+      res.status(400).json({ error: "TPO is not linked to a college" });
+      return;
+    }
+    
+    // 1. Counters
+    const [{ count: totalRegistered }, { count: totalEligible }, { count: pendingVerification }] = await Promise.all([
+      db.from("users").select("*", { count: "exact", head: true }).eq("college_id", tpo.college_id).eq("role", "candidate"),
+      db.from("candidate_profiles").select("*", { count: "exact", head: true }).eq("college_id", tpo.college_id).eq("documents_verified", true),
+      db.from("candidate_profiles").select("*", { count: "exact", head: true }).eq("college_id", tpo.college_id).eq("documents_verified", false)
+    ]);
+    
+    const { data: jobs } = await db.from("jobs")
+      .select("id, title, status, drive_date")
+      .eq("college_id", tpo.college_id);
+    
+    const activeDrivesCount = jobs?.filter(j => j.status === "active").length || 0;
+    
+    const { data: placedRes } = await db.from("candidate_status")
+      .select("*, candidate:candidate_id(college_id)")
+      .eq("candidate.college_id", tpo.college_id)
+      .in("status", ["offered", "placed"]);
+    
+    const totalPlaced = placedRes?.length || 0;
+    
+    const placementRate = totalRegistered && totalRegistered > 0 ? Math.round((totalPlaced / totalRegistered) * 100) : 0;
+    
+    // TPO Action Items compilation
+    const actionItems: any[] = [];
+    if (pendingVerification && pendingVerification > 0) {
+      actionItems.push({
+        id: "tpo_docs_verify",
+        title: "Pending Document Verification",
+        description: `${pendingVerification} students are waiting for profile marksheet approvals.`,
+        priority: "urgent",
+        action_url: "/tpo/students?tab=pending"
+      });
+    }
+    
+    if (jobs) {
+      const closingSoonJobs = jobs.filter(j => j.status === "active" && j.drive_date && new Date(j.drive_date).getTime() - Date.now() < 2 * 24 * 60 * 60 * 1000);
+      for (const job of closingSoonJobs) {
+        actionItems.push({
+          id: `tpo_job_${job.id}`,
+          title: `Drive: '${job.title}' closing soon`,
+          description: `The application deadline is in less than 2 days.`,
+          priority: "high",
+          action_url: "/tpo/drives"
+        });
+      }
+    }
+    
+    res.json({
+      summary: {
+        totalRegistered: totalRegistered || 0,
+        totalEligible: totalEligible || 0,
+        totalPlaced,
+        activeDrives: activeDrivesCount,
+        pendingVerification: pendingVerification || 0,
+        placementRate,
+        actionItems
+      }
+    });
+  } catch (err) {
+    console.error("Fetch TPO dashboard summary error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.post("/verify/batch", async (req: AuthRequest, res) => {
+  try {
+    const { studentIds, documents_verified } = req.body;
+    if (!Array.isArray(studentIds) || studentIds.length === 0) {
+      res.status(400).json({ error: "No student profile IDs provided for batch verification" });
+      return;
+    }
+    
+    const { data: tpo } = await db.from("users").select("college_id").eq("id", req.user!.id).single();
+    if (!tpo?.college_id) {
+      res.status(400).json({ error: "TPO is not linked to a college" });
+      return;
+    }
+    
+    const updated: any[] = [];
+    for (const profileId of studentIds) {
+      const { data } = await db.from("candidate_profiles")
+        .update({ documents_verified: Boolean(documents_verified), placement_ready: Boolean(documents_verified) })
+        .eq("id", profileId)
+        .eq("college_id", tpo.college_id)
+        .select()
+        .maybeSingle();
+      if (data) {
+        updated.push(data);
+      }
+    }
+    
+    res.json({ message: `Batch updated ${updated.length} profile(s).`, updated });
+  } catch (err) {
+    console.error("Batch verification error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 export default router;

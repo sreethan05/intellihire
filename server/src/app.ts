@@ -35,6 +35,7 @@ import candidateAnalyticsRoutes from "./routes/candidateAnalytics.js";
 import recruiterAnalyticsRoutes from "./routes/recruiterAnalytics.js";
 import tpoAnalyticsRoutes from "./routes/tpoAnalytics.js";
 import adminAnalyticsRoutes from "./routes/adminAnalytics.js";
+import hubRoutes from "./routes/hub.js";
 
 import docsRoutes from "./routes/docs.js";
 
@@ -117,6 +118,7 @@ export function createApp() {
   app.use("/api/ai", aiRoutes);
   app.use("/api/interview", interviewRoutes);
   app.use("/api/assets", candidateAssetsRoutes);
+  app.use("/api/hub", hubRoutes);
   app.use("/api/docs", docsRoutes);
 
   // ─── Health Check ───

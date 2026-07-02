@@ -41,6 +41,39 @@ const upload = multer({
 });
  
 const router = Router();
+
+router.get("/portfolio/:slug", async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
+
+    // Only expose public-safe fields (no email, phone, marksheet_url, etc.)
+    let query = db.from("candidate_profiles")
+      .select("id, user_id, photo_url, branch, cgpa, graduation_year, skills, resume_url, documents_verified, public_portfolio_slug, user:user_id(name), college:college_id(name, code)");
+
+    if (isUuid) {
+      query = query.eq("user_id", slug);
+    } else {
+      query = query.eq("public_portfolio_slug", slug);
+    }
+
+    const { data: profile, error } = await query.maybeSingle();
+
+    if (error || !profile) {
+      res.status(404).json({ error: "Portfolio not found" });
+      return;
+    }
+
+    const { data: applications } = await db.from("candidate_status")
+      .select("id, status, updated_at, job:job_id(title, company_name)")
+      .eq("candidate_id", profile.user_id);
+
+    res.json({ profile, applications: applications || [] });
+  } catch (err) {
+    console.error("Public portfolio error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
  
 router.use(authMiddleware);
 router.use(roleMiddleware(["candidate"]));
@@ -615,6 +648,14 @@ router.post("/resume/upload", upload.single("resume"), async (req: AuthRequest, 
 
     const filePath = req.file.path;
     const fileBuffer = await fs.readFile(filePath);
+
+    // Validate PDF magic bytes (%PDF-) to prevent forged uploads
+    const pdfMagic = fileBuffer.subarray(0, 5).toString("ascii");
+    if (pdfMagic !== "%PDF-") {
+      await fs.unlink(filePath).catch(() => {});
+      res.status(400).json({ error: "Invalid file: not a genuine PDF document" });
+      return;
+    }
     
     // Parse PDF
     const parsedPdf = await pdfParse(fileBuffer);
@@ -1362,6 +1403,20 @@ router.post("/resume/upload", upload.single("resume"), async (req: AuthRequest, 
 
 router.delete("/resume", async (req: AuthRequest, res) => {
   try {
+    // Fetch current resume_url so we can delete the physical file
+    const { data: current } = await db
+      .from("candidate_profiles")
+      .select("resume_url")
+      .eq("user_id", req.user!.id)
+      .maybeSingle();
+
+    // Delete physical file if it exists (best-effort, don't fail request)
+    if (current?.resume_url) {
+      const filename = path.basename(current.resume_url);
+      const filePath = path.join(resumesDir, filename);
+      await fs.unlink(filePath).catch(() => {});
+    }
+
     const { data: profile, error } = await db
       .from("candidate_profiles")
       .update({
@@ -1380,6 +1435,347 @@ router.delete("/resume", async (req: AuthRequest, res) => {
     res.json({ message: "Resume deleted successfully", profile });
   } catch (err: any) {
     console.error("Resume delete error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.get("/action-items", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const items: any[] = [];
+    
+    // 1. Check candidate profile completion
+    const { data: profile } = await db.from("candidate_profiles")
+      .select("profile_complete, resume_url, marksheet_url, documents_verified")
+      .eq("user_id", userId)
+      .maybeSingle();
+    
+    if (!profile || !profile.profile_complete) {
+      items.push({
+        id: "profile_incomplete",
+        type: "profile_incomplete",
+        title: "Complete your profile",
+        description: "Fill in onboarding details to start applying to drives.",
+        priority: "urgent",
+        action_url: "/candidate/onboarding"
+      });
+    } else {
+      if (!profile.resume_url) {
+        items.push({
+          id: "resume_missing",
+          type: "resume_missing",
+          title: "Upload your resume",
+          description: "A resume is required by 3 active placement drives.",
+          priority: "high",
+          action_url: "/candidate/profile"
+        });
+      }
+      if (!profile.marksheet_url) {
+        items.push({
+          id: "marksheet_missing",
+          type: "marksheet_missing",
+          title: "Upload your marksheet",
+          description: "Pending verification marksheet for active drive eligibility.",
+          priority: "high",
+          action_url: "/candidate/profile"
+        });
+      }
+    }
+    
+    // 2. Check pending assigned exams
+    const { data: assignments } = await db.from("exam_assignments")
+      .select("*, exam:exam_id(title, available_until)")
+      .eq("candidate_id", userId);
+    
+    if (assignments) {
+      const { data: completedAttempts } = await db.from("attempts")
+        .select("exam_id, status")
+        .eq("candidate_id", userId)
+        .eq("status", "completed");
+      
+      const completedExamIds = new Set(completedAttempts?.map(a => a.exam_id) || []);
+      
+      for (const assignment of assignments) {
+        if (!completedExamIds.has(assignment.exam_id)) {
+          items.push({
+            id: `exam_${assignment.exam_id}`,
+            type: "exam_deadline",
+            title: `Exam: ${assignment.exam?.title || "Assigned Exam"}`,
+            description: "Assigned assessment is pending. Complete before the deadline.",
+            priority: "urgent",
+            action_url: `/candidate/exams`,
+            entity_id: assignment.exam_id,
+            entity_type: "exam",
+            due_at: assignment.exam?.available_until
+          });
+        }
+      }
+    }
+    
+    // 3. Fetch from action_items table
+    const { data: dbItems } = await db.from("action_items")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("role", "candidate")
+      .eq("read_at", null)
+      .eq("dismissed_at", null);
+    
+    if (dbItems) {
+      items.push(...dbItems);
+    }
+    
+    res.json({ actionItems: items });
+  } catch (err) {
+    console.error("Fetch action items error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.get("/journey-tracker", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    
+    // Look up all jobs candidate is in candidate_status for
+    const { data: appStatuses } = await db.from("candidate_status")
+      .select("*, job:job_id(*, exam:exam_id(title))")
+      .eq("candidate_id", userId);
+    
+    const trackers: any[] = [];
+    
+    if (appStatuses) {
+      for (const app of appStatuses) {
+        const job = app.job;
+        const stages = [
+          { name: "Registered", completed: true, date: app.updated_at },
+          { name: "Assigned Exam", completed: false },
+          { name: "Exam Taken", completed: false },
+          { name: "Shortlisted", completed: false },
+          { name: "Interview Scheduled", completed: false },
+          { name: "Offered", completed: false }
+        ];
+        
+        // Check if exam is assigned
+        const { data: assigned } = await db.from("exam_assignments")
+          .select("assigned_at")
+          .eq("candidate_id", userId)
+          .eq("exam_id", job.exam_id)
+          .maybeSingle();
+        
+        if (assigned) {
+          stages[1].completed = true;
+          stages[1].date = assigned.assigned_at;
+        }
+        
+        // Check if exam is taken
+        const { data: attempt } = await db.from("attempts")
+          .select("submitted_at, score, status")
+          .eq("candidate_id", userId)
+          .eq("exam_id", job.exam_id)
+          .maybeSingle();
+        
+        if (attempt && attempt.status === "completed") {
+          stages[2].completed = true;
+          stages[2].date = attempt.submitted_at;
+        }
+        
+        // Check if shortlisted/passed
+        if (["passed", "shortlisted", "offered"].includes(app.status)) {
+          stages[3].completed = true;
+          stages[3].date = app.updated_at;
+        }
+        
+        // Check if interview is scheduled
+        const { data: interview } = await db.from("ai_interviews")
+          .select("scheduled_start_at, status")
+          .eq("candidate_id", userId)
+          .eq("job_id", job.id)
+          .maybeSingle();
+        
+        if (interview && ["scheduled", "completed"].includes(interview.status)) {
+          stages[4].completed = true;
+          stages[4].date = interview.scheduled_start_at;
+        }
+        
+        // Check if offered
+        if (app.status === "offered") {
+          stages[5].completed = true;
+          stages[5].date = app.updated_at;
+        }
+        
+        trackers.push({
+          jobId: job.id,
+          jobTitle: job.title,
+          companyName: job.company_name,
+          currentStage: app.status,
+          stages
+        });
+      }
+    }
+    
+    res.json({ trackers });
+  } catch (err) {
+    console.error("Fetch journey tracker error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.get("/performance-radar", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    
+    // 1. Get average scores by topic
+    const { data: mcqAnswers } = await db.from("answers")
+      .select("*, question:question_id(topic), attempt:attempt_id(candidate_id)")
+      .eq("attempt.candidate_id", userId);
+    
+    const topicScores: Record<string, { total: number; count: number }> = {
+      "DSA": { total: 0, count: 0 },
+      "DBMS": { total: 0, count: 0 },
+      "OS": { total: 0, count: 0 },
+      "Networking": { total: 0, count: 0 },
+      "Communication": { total: 0, count: 0 },
+      "Aptitude": { total: 0, count: 0 }
+    };
+    
+    // Fetch AI speaking scores for communication if any
+    const { data: interviews } = await db.from("ai_interviews")
+      .select("communication_score")
+      .eq("candidate_id", userId)
+      .eq("status", "completed");
+    
+    if (interviews && interviews.length > 0) {
+      for (const iv of interviews) {
+        topicScores["Communication"].total += (iv.communication_score || 0) * 10; // Scale 1-10 to 1-100
+        topicScores["Communication"].count += 1;
+      }
+    }
+    
+    if (mcqAnswers) {
+      for (const ans of mcqAnswers) {
+        const topic = ans.question?.topic || "Aptitude";
+        const key = Object.keys(topicScores).find(k => k.toLowerCase() === topic.toLowerCase()) || "Aptitude";
+        topicScores[key].total += ans.is_correct ? 100 : 0;
+        topicScores[key].count += 1;
+      }
+    }
+    
+    const radarData = Object.keys(topicScores).map(subject => {
+      const val = topicScores[subject];
+      const score = val.count > 0 ? Math.round(val.total / val.count) : 0; // no data yet
+      return { subject, score, fullMark: 100 };
+    });
+    
+    // 2. Peer Percentile calculation
+    const { data: myProfile } = await db.from("candidate_profiles")
+      .select("college_id, cgpa")
+      .eq("user_id", userId)
+      .maybeSingle();
+    
+    let peerPercentile = 0; // No data until calculated
+    
+    if (myProfile) {
+      const { data: peers } = await db.from("candidate_profiles")
+        .select("cgpa")
+        .eq("college_id", myProfile.college_id);
+      
+      if (peers && peers.length > 0) {
+        const lowerCgpaCount = peers.filter(p => Number(p.cgpa) <= Number(myProfile.cgpa)).length;
+        peerPercentile = Math.round((lowerCgpaCount / peers.length) * 100);
+      }
+    }
+    
+    // 3. Improvement Trend (past attempts score history)
+    const { data: myAttempts } = await db.from("attempts")
+      .select("*, exam:exam_id(title)")
+      .eq("candidate_id", userId)
+      .eq("status", "completed")
+      .order("submitted_at", { ascending: true });
+    
+    const trendData = myAttempts?.map((att, idx) => ({
+      name: att.exam?.title || `Exam ${idx + 1}`,
+      score: att.score
+    })) || [];
+
+    res.json({ radarData, peerPercentile, trendData });
+  } catch (err) {
+    console.error("Performance radar error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.post("/offers/:attemptId/respond", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const { attemptId } = req.params;
+    const { response, recruiterNotes } = req.body; // 'accept', 'decline', 'negotiate'
+    
+    if (!["accept", "decline", "negotiate"].includes(response)) {
+      res.status(400).json({ error: "Invalid offer response type" });
+      return;
+    }
+    
+    // Find the attempt
+    const { data: attempt } = await db.from("attempts")
+      .select("exam_id")
+      .eq("id", attemptId)
+      .eq("candidate_id", userId)
+      .maybeSingle();
+    
+    if (!attempt) {
+      res.status(404).json({ error: "Attempt not found" });
+      return;
+    }
+    
+    // Find matching job link
+    const { data: job } = await db.from("jobs")
+      .select("id")
+      .eq("exam_id", attempt.exam_id)
+      .maybeSingle();
+    
+    if (!job) {
+      res.status(404).json({ error: "Job drive associated with this offer not found" });
+      return;
+    }
+    
+    const updateFields: any = {
+      recruiter_notes: recruiterNotes || ""
+    };
+    
+    if (response === "accept") {
+      updateFields.status = "offered";
+      updateFields.offer_accepted_at = new Date().toISOString();
+    } else if (response === "decline") {
+      updateFields.status = "rejected";
+      updateFields.offer_declined_at = new Date().toISOString();
+    } else {
+      updateFields.status = "on_hold";
+    }
+    
+    const { data: status, error } = await db.from("candidate_status")
+      .update(updateFields)
+      .eq("candidate_id", userId)
+      .eq("job_id", job.id)
+      .select()
+      .single();
+    
+    if (error) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    
+    // Log in activity feed
+    await db.from("activity_feed").insert({
+      actor_id: userId,
+      actor_role: "candidate",
+      target_user_id: userId,
+      type: `offer_${response}`,
+      title: `Offer ${response}ed by Candidate`,
+      description: `Candidate responded with ${response.toUpperCase()} to the job offer.`
+    });
+    
+    res.json({ message: `Successfully responded to the offer with: ${response}`, status });
+  } catch (err) {
+    console.error("Offer response error:", err);
     res.status(500).json({ error: "Server error" });
   }
 });

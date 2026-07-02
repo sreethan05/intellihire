@@ -872,9 +872,44 @@ export const db = {
         getPublicUrl(key: string) {
           return { data: { publicUrl: publicStorageUrl(bucket, key) } };
         },
+        async remove(keys: string[]) {
+          const errors: Array<{ key: string; message: string }> = [];
+          for (const key of keys) {
+            try {
+              const { targetPath } = safeStoragePath(bucket, key);
+              await fs.unlink(targetPath);
+            } catch (err: unknown) {
+              const code = (err as NodeJS.ErrnoException).code;
+              if (code !== "ENOENT") {
+                errors.push({ key, message: (err as Error).message });
+              }
+            }
+          }
+          return { data: null, error: errors.length ? { message: errors.map(e => `${e.key}: ${e.message}`).join("; ") } : null };
+        },
       };
     },
   },
 };
+
+/**
+ * Run a callback inside a database transaction (BEGIN / COMMIT / ROLLBACK).
+ * The callback receives a raw `pg.PoolClient` for direct queries.
+ * If the callback throws, the transaction is rolled back automatically.
+ */
+export async function transaction<T>(callback: (client: pg.PoolClient) => Promise<T>): Promise<T> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await callback(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
 
 export { EMPTY_UUID, storageRoot };

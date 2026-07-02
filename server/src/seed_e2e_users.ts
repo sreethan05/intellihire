@@ -78,6 +78,25 @@ async function main() {
     console.log("Upserted recruiter successfully.");
   }
 
+  // 3.5. Seed TPO
+  const tpoEmail = "tpo@example.com";
+  const tpoHash = await bcryptjs.hash("tpo123", 10);
+  const { error: tpoError } = await db
+    .from("users")
+    .upsert({
+      name: "Test TPO",
+      email: tpoEmail,
+      password_hash: tpoHash,
+      role: "tpo",
+      college_id: collegeId
+    }, { onConflict: "email" });
+
+  if (tpoError) {
+    console.error("Error upserting TPO:", tpoError);
+  } else {
+    console.log("Upserted TPO successfully.");
+  }
+
   // 4. Seed Candidate
   const candidateEmail = "candidate@example.com";
   const candidateHash = await bcryptjs.hash("candidate123", 10);

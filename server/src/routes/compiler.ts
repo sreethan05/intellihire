@@ -33,24 +33,22 @@ router.post("/submit", async (req, res) => {
       return;
     }
 
-    const results: any[] = [];
-    let passed = 0;
-
-    for (const tc of test_cases) {
-      const result = await runWithJudge0(code, language, tc.input || "");
-      const actual = result.stdout.trim();
-      const expected = (tc.expected_output || "").trim();
-      const isPassed = actual === expected;
-      if (isPassed) passed++;
-
-      results.push({
-        input: tc.input,
-        expected_output: expected,
-        actual_output: actual,
-        passed: isPassed,
-        status: result.status,
-      });
-    }
+    const results = await Promise.all(
+      test_cases.map(async (tc: any) => {
+        const result = await runWithJudge0(code, language, tc.input || "");
+        const actual = result.stdout.trim();
+        const expected = (tc.expected_output || "").trim();
+        const isPassed = actual === expected;
+        return {
+          input: tc.input,
+          expected_output: expected,
+          actual_output: actual,
+          passed: isPassed,
+          status: result.status,
+        };
+      })
+    );
+    const passed = results.filter((r) => r.passed).length;
 
     const score = test_cases.length > 0
       ? Math.round((passed / test_cases.length) * 100)
