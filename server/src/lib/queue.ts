@@ -1,14 +1,47 @@
-import { db } from "./postgres.js";
+import { db, storageRoot } from "./postgres.js";
 import { runWithJudge0 } from "./judge0.js";
 import { runPlagiarismCheck } from "./plagiarism.js";
 import { sendResultPublishedEmail } from "./email.js";
 import { logger } from "./logger.js";
+import fs from "fs/promises";
+import path from "path";
 
 const APP_URL = process.env.VITE_API_URL?.replace("/api", "") || "http://localhost:3000";
 
 class BackgroundGradingQueue {
   private queue: string[] = [];
   private isProcessing = false;
+  private queueFilePath = path.join(storageRoot, "grading_queue.json");
+
+  constructor() {
+    void this.initQueue();
+  }
+
+  private async initQueue() {
+    try {
+      await fs.mkdir(storageRoot, { recursive: true });
+      const data = await fs.readFile(this.queueFilePath, "utf8");
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        this.queue = parsed;
+        logger.info({ queueSize: this.queue.length }, "Loaded pending attempts from disk queue");
+        if (!this.isProcessing) {
+          void this.processQueue();
+        }
+      }
+    } catch {
+      // File doesn't exist or is invalid, which is fine
+    }
+  }
+
+  private async saveQueue() {
+    try {
+      await fs.mkdir(storageRoot, { recursive: true });
+      await fs.writeFile(this.queueFilePath, JSON.stringify(this.queue), "utf8");
+    } catch (err) {
+      logger.error({ err }, "Failed to save grading queue to disk");
+    }
+  }
 
   /**
    * Pushes a new candidate attempt ID to the background grading queue.
@@ -19,6 +52,7 @@ class BackgroundGradingQueue {
     if (!this.queue.includes(attemptId)) {
       this.queue.push(attemptId);
       logger.info({ attemptId, queueSize: this.queue.length }, "Added attempt to grading queue");
+      void this.saveQueue();
     }
 
     if (!this.isProcessing) {
@@ -34,6 +68,7 @@ class BackgroundGradingQueue {
 
     while (this.queue.length > 0) {
       const currentAttemptId = this.queue.shift()!;
+      void this.saveQueue();
       logger.info({ attemptId: currentAttemptId }, "Starting grading");
 
       try {

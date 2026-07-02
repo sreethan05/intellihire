@@ -90,8 +90,26 @@ export function createApp() {
     message: { error: "Too many login attempts, please try again later." },
   });
 
+  const codeSubmitLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: process.env.DISABLE_RATE_LIMITS === "true" ? 10000 : 5, // 5 requests per minute
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many compilation attempts, please try again in a minute." },
+  });
+
+  const resumeUploadLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000, // 5 minutes
+    max: process.env.DISABLE_RATE_LIMITS === "true" ? 10000 : 5, // 5 uploads per 5 minutes
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many resume uploads, please try again in a few minutes." },
+  });
+
   app.use("/api", generalLimiter);
   app.use("/api/auth/login", loginLimiter);
+  app.use("/api/compiler/submit", codeSubmitLimiter);
+  app.use("/api/candidate/resume/upload", resumeUploadLimiter);
 
   // ─── Body Parsing ───
   app.use(express.json({ limit: "50mb" }));

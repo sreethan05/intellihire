@@ -1,6 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { db } from "../lib/postgres.js";
+import { db, transaction } from "../lib/postgres.js";
 import { scanMarksheetOCR } from "../lib/ocr.js";
 import { scanMarksheet, hasAiKey } from "../lib/ai.js";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
@@ -58,44 +58,41 @@ async function provisionCandidateAccounts(rows: StudentRow[], tpo: TpoCollege, t
 
     const email = row.email || `${rollNumber.toLowerCase()}@${String(collegeCode).toLowerCase()}.student.local`;
     const password_hash = await bcrypt.hash(rollNumber, 10);
-    const { data: user, error: userError } = await db
-      .from("users")
-      .upsert({
-        name,
-        email,
-        password_hash,
-        role: "candidate",
-        roll_number: rollNumber,
-        college_id: tpo.college_id,
-        must_change_password: true,
-        profile_complete: false,
-        created_by: tpoUserId,
-      }, { onConflict: "roll_number" })
-      .select("id, name, email, roll_number")
-      .single();
+    try {
+      const user = await transaction(async (client) => {
+        const userResult = await client.query(
+          `INSERT INTO "users" ("name", "email", "password_hash", "role", "roll_number", "college_id", "must_change_password", "profile_complete", "created_by")
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+           ON CONFLICT ("roll_number") DO UPDATE SET
+             "name" = EXCLUDED."name",
+             "email" = EXCLUDED."email",
+             "password_hash" = EXCLUDED."password_hash",
+             "college_id" = EXCLUDED."college_id"
+           RETURNING "id", "name", "email", "roll_number"`,
+          [name, email, password_hash, "candidate", rollNumber, tpo.college_id, true, false, tpoUserId]
+        );
+        const userRow = userResult.rows[0];
+        if (!userRow) throw new Error("Could not create user record");
 
-    if (userError || !user) {
-      failed.push({ row, reason: userError?.message || "Could not create user" });
-      continue;
+        await client.query(
+          `INSERT INTO "candidate_profiles" ("user_id", "college_id", "roll_number", "branch", "cgpa", "graduation_year")
+           VALUES ($1, $2, $3, $4, $5, $6)
+           ON CONFLICT ("user_id") DO UPDATE SET
+             "college_id" = EXCLUDED."college_id",
+             "roll_number" = EXCLUDED."roll_number",
+             "branch" = EXCLUDED."branch",
+             "cgpa" = EXCLUDED."cgpa",
+             "graduation_year" = EXCLUDED."graduation_year"`,
+          [userRow.id, tpo.college_id, rollNumber, branch, cgpa, graduationYear]
+        );
+
+        return userRow;
+      });
+
+      created.push(user);
+    } catch (txErr: any) {
+      failed.push({ row, reason: txErr.message || "Database transaction failed" });
     }
-
-    const { error: profileError } = await db
-      .from("candidate_profiles")
-      .upsert({
-        user_id: user.id,
-        college_id: tpo.college_id,
-        roll_number: rollNumber,
-        branch,
-        cgpa,
-        graduation_year: graduationYear,
-      }, { onConflict: "user_id" });
-
-    if (profileError) {
-      failed.push({ row, reason: profileError.message });
-      continue;
-    }
-
-    created.push(user);
   }
 
   return { created, failed };
