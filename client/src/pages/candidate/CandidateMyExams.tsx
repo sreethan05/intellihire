@@ -2,7 +2,7 @@ import { type CSSProperties, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertCircle, ArrowRight, Award, CheckCircle, Clock, FileText, Lock, Target, Video } from "lucide-react";
 import { Pie, PieChart, ResponsiveContainer, Tooltip, Cell } from "recharts";
-import { candidateApi } from "@/lib/api";
+import { candidateApi, proctoringApi } from "@/lib/api";
 import type { DashboardStats, ExamAssignment } from "@/types";
 
 const PIE_COLORS = ["#10b981", "#2563eb", "#f59e0b"];
@@ -70,6 +70,26 @@ export default function CandidateMyExams() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  const [activeAttemptIdForTimeline, setActiveAttemptIdForTimeline] = useState<string | null>(null);
+  const [timelineEvents, setTimelineEvents] = useState<any[]>([]);
+  const [timelineLoading, setTimelineLoading] = useState(false);
+
+  useEffect(() => {
+    if (activeAttemptIdForTimeline) {
+      setTimelineLoading(true);
+      proctoringApi.getTimeline(activeAttemptIdForTimeline)
+        .then(({ data }) => {
+          setTimelineEvents(data.timeline || []);
+        })
+        .catch(err => {
+          console.error("Failed to load proctoring logs:", err);
+        })
+        .finally(() => setTimelineLoading(false));
+    } else {
+      setTimelineEvents([]);
+    }
+  }, [activeAttemptIdForTimeline]);
 
   if (loading) {
     return (
@@ -202,6 +222,16 @@ export default function CandidateMyExams() {
                         </span>
                       </div>
                     </div>
+                    <button
+                      onClick={() => latestAttempt && setActiveAttemptIdForTimeline(latestAttempt.id)}
+                      style={{
+                        padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", background: "white",
+                        fontSize: 12, fontWeight: 700, cursor: "pointer", color: "#475569", display: "flex", alignItems: "center", justifyContent: "center", gap: 5
+                      }}
+                    >
+                      <Video size={13} />
+                      View Proctoring Logs
+                    </button>
                     {qualifiedForInterview ? (
                       <button
                         onClick={() => navigate("/candidate/interview")}
@@ -256,6 +286,87 @@ export default function CandidateMyExams() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Self-Proctoring Review Modal */}
+      {activeAttemptIdForTimeline && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(15,23,42,0.6)", zIndex: 1000,
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 16, backdropFilter: "blur(4px)"
+        }}>
+          <div style={{
+            background: "white", borderRadius: 16, width: "100%", maxWidth: 500,
+            display: "flex", flexDirection: "column", maxHeight: "85vh", border: "1px solid #e2e8f0", boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1)"
+          }}>
+            <div style={{ padding: "20px 24px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 800, color: "#0f172a" }}>Proctoring Compliance Logs</h3>
+                <p style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Review webcam proctoring check events and security alerts.</p>
+              </div>
+              <button
+                onClick={() => setActiveAttemptIdForTimeline(null)}
+                style={{ background: "none", border: "none", fontSize: 18, color: "#94a3b8", cursor: "pointer", fontWeight: "bold" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ padding: "20px 24px", overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 16 }}>
+              {timelineLoading ? (
+                <div style={{ textAlign: "center", padding: "40px 0", color: "#64748b", fontSize: 13 }}>
+                  Fetching compliance records...
+                </div>
+              ) : timelineEvents.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "40px 0", color: "#94a3b8", fontSize: 13 }}>
+                  No proctoring logs found for this attempt.
+                </div>
+              ) : (
+                <div style={{ borderLeft: "2px solid #e2e8f0", paddingLeft: 16, display: "flex", flexDirection: "column", gap: 20 }}>
+                  {timelineEvents.map((evt, idx) => {
+                    const isViolation = evt.event_type === "violation";
+                    const isCamera = evt.event_type === "camera_check";
+                    return (
+                      <div key={idx} style={{ position: "relative" }}>
+                        <span style={{
+                          position: "absolute", left: -21, top: 4, borderRadius: "50%",
+                          background: isViolation ? "#ef4444" : isCamera ? "#8b5cf6" : "#10b981",
+                          border: "2px solid white", width: 10, height: 10
+                        }} />
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                          <span style={{
+                            fontSize: 10, fontWeight: 800, padding: "2px 6px", borderRadius: 4, textTransform: "uppercase",
+                            background: isViolation ? "#fee2e2" : isCamera ? "#ede9fe" : "#dcfce7",
+                            color: isViolation ? "#991b1b" : isCamera ? "#5b21b6" : "#15803d"
+                          }}>
+                            {evt.event_type}
+                          </span>
+                          <span style={{ fontSize: 11, color: "#94a3b8", fontFamily: "monospace" }}>
+                            Time: {evt.relativeTime}
+                          </span>
+                        </div>
+                        <p style={{ fontSize: 12, color: "#334155", marginTop: 4, fontWeight: isViolation ? 600 : 400 }}>
+                          {evt.message || (isCamera ? "Webcam validation passed" : "System state snapshot captured")}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div style={{ padding: "16px 24px", borderTop: "1px solid #f1f5f9", textAlign: "right" }}>
+              <button
+                onClick={() => setActiveAttemptIdForTimeline(null)}
+                style={{
+                  padding: "8px 16px", borderRadius: 8, border: "1px solid #d1d5db", background: "white",
+                  fontSize: 12, fontWeight: 700, cursor: "pointer", color: "#374151"
+                }}
+              >
+                Close Logs
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

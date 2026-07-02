@@ -3,6 +3,8 @@ import type { Server as HTTPServer } from "http";
 import { logger } from "./lib/logger.js";
 import { db } from "./lib/postgres.js";
 
+let ioInstance: Server | null = null;
+
 export function setupWebSocket(httpServer: HTTPServer) {
   const io = new Server(httpServer, {
     cors: {
@@ -28,6 +30,8 @@ export function setupWebSocket(httpServer: HTTPServer) {
     },
   });
 
+  ioInstance = io;
+
   // Authentication middleware for socket connections
   io.use((socket, next) => {
     const token = socket.handshake.auth.token as string;
@@ -42,6 +46,13 @@ export function setupWebSocket(httpServer: HTTPServer) {
 
   io.on("connection", (socket) => {
     logger.info({ socketId: socket.id }, "WebSocket client connected");
+
+    // Candidate/User joins their personal notification room
+    socket.on("notifications:join", (data: { userId: string }) => {
+      const room = `user:${data.userId}`;
+      socket.join(room);
+      logger.info({ socketId: socket.id, room }, "Joined personal notifications room");
+    });
 
     // Candidate joins their exam attempt room
     socket.on("proctor:join", (data: { attemptId: string; role: string }) => {
@@ -119,4 +130,14 @@ export function setupWebSocket(httpServer: HTTPServer) {
   });
 
   return io;
+}
+
+export function sendRealtimeNotification(
+  userId: string,
+  payload: { title: string; body: string; type: string; metadata?: any }
+) {
+  if (ioInstance) {
+    ioInstance.to(`user:${userId}`).emit("notification", payload);
+    logger.info({ userId, type: payload.type }, "Sent real-time WebSocket notification");
+  }
 }

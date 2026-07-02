@@ -217,17 +217,8 @@ export const resultApi = {
   getAttempt: (attemptId: string) => api.get(`/result/attempt/${attemptId}`),
 };
 
-export const compilerApi = {
-  runCode: (data: { code: string; language: string; stdin?: string }) =>
-    api.post("/compiler/run", data),
-  submitCode: (data: {
-    code: string;
-    language: string;
-    test_cases: Array<{ input: string; expected_output: string }>;
-  }) => api.post("/compiler/submit", data),
-};
-
 export const proctoringApi = {
+  getTimeline: (attemptId: string) => api.get(`/proctoring/attempts/${attemptId}/timeline`),
   logEvent: (data: {
     attempt_id: string;
     exam_id: string;
@@ -242,6 +233,16 @@ export const proctoringApi = {
   getActiveMonitoring: (examId: string, collegeId?: string | null) =>
     api.get(`/proctoring/exam/${examId}/active-monitoring`, { params: collegeId ? { collegeId } : undefined }),
   overrideAttempt: (attemptId: string) => api.post(`/proctoring/attempt/${attemptId}/override`),
+};
+
+export const compilerApi = {
+  runCode: (data: { code: string; language: string; stdin?: string }) =>
+    api.post("/compiler/run", data),
+  submitCode: (data: {
+    code: string;
+    language: string;
+    test_cases: Array<{ input: string; expected_output: string }>;
+  }) => api.post("/compiler/submit", data),
 };
 
 export const aiApi = {

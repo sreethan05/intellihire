@@ -1,6 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { db, recordPipelineStage } from "../lib/postgres.js";
+import { sendRealtimeNotification } from "../websocket.js";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
 import { generateAiJson, hasAiKey } from "../lib/ai.js";
 import { getPasswordValidationError, isValidEmail } from "../lib/validation.js";
@@ -1140,6 +1141,14 @@ router.post("/offers/:candidateId/:jobId", uploadOffer.single("offerLetter"), as
       "Offer Letter extended by recruiter",
       recruiterId
     );
+
+    // Send real-time notification to the candidate
+    sendRealtimeNotification(candidateId as string, {
+      title: "New Job Offer Extended! 🎉",
+      body: "You have received a new job offer with an attached letter. Go to your command center to review it.",
+      type: "offer_received",
+      metadata: { jobId }
+    });
 
     // Log in activity feed
     await db.from("activity_feed").insert({

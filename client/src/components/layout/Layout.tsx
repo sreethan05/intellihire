@@ -3,6 +3,8 @@ import { useCollege } from "@/context/CollegeContext";
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { useTheme } from "next-themes";
+import { io } from "socket.io-client";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -30,6 +32,8 @@ import {
   UserCheck,
   X,
   Sparkles,
+  Sun,
+  Moon,
 } from "lucide-react";
 
 
@@ -37,6 +41,7 @@ export default function Layout() {
   const { user, logout, updateUser } = useAuth();
   const { selectedCollegeId, setSelectedCollegeId, collegesSummary } = useCollege();
   const location = useLocation();
+  const { theme, setTheme } = useTheme();
 
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
@@ -60,6 +65,34 @@ export default function Layout() {
       })
       .catch((err) => console.error("Error fetching profile stats:", err));
   }, [user]);
+
+  // Connect to notifications WebSocket
+  useEffect(() => {
+    if (!user) return;
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const socket = io(import.meta.env.VITE_API_URL?.replace("/api", "") || "http://localhost:5000", {
+      auth: { token },
+      transports: ["websocket"],
+    });
+
+    socket.on("connect", () => {
+      socket.emit("notifications:join", { userId: user.id });
+    });
+
+    socket.on("notification", (data: { title: string; body: string; type: string }) => {
+      toast(data.title, {
+        description: data.body,
+        duration: 8000,
+      });
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [user]);
+
   const [editPassword, setEditPassword] = useState("");
   const [editConfirm, setEditConfirm] = useState("");
 
@@ -122,15 +155,15 @@ export default function Layout() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#f8fafc]">
+    <div className="flex h-screen overflow-hidden bg-[#f8fafc] dark:bg-slate-950">
       {/* Sidebar - white background, slate borders, light violet accents */}
-      <aside className="flex h-full w-[260px] shrink-0 flex-col bg-white border-r border-slate-200/60 shadow-[4px_0_24px_rgba(0,0,0,0.015)]">
-        <div className="flex items-center gap-3 px-5 py-5 border-b border-slate-100">
+      <aside className="flex h-full w-[260px] shrink-0 flex-col bg-white dark:bg-slate-900 border-r border-slate-200/60 dark:border-slate-800 shadow-[4px_0_24px_rgba(0,0,0,0.015)]">
+        <div className="flex items-center gap-3 px-5 py-5 border-b border-slate-100 dark:border-slate-800">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-sm font-extrabold text-lg select-none">
             I
           </div>
           <div>
-            <div className="text-base font-extrabold text-slate-900 tracking-tight">IntelliHire</div>
+            <div className="text-base font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">IntelliHire</div>
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider capitalize leading-none mt-0.5">{user?.role}</div>
           </div>
         </div>
@@ -146,8 +179,8 @@ export default function Layout() {
                   to={link.path}
                   className={`flex h-10 items-center gap-3 rounded-lg px-3.5 text-[13px] font-bold transition-all ${
                     isActive
-                      ? "bg-violet-50 text-violet-700 shadow-sm"
-                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                      ? "bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-400 shadow-sm"
+                      : "text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-100"
                   }`}
                 >
                   <Icon className={`h-4 w-4 ${isActive ? "text-violet-600" : "text-slate-400"}`} />
@@ -181,14 +214,14 @@ export default function Layout() {
 
       <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
         {/* Header - White background, slate bottom border, Search bar */}
-        <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center justify-between border-b border-slate-200/60 bg-white px-6 shadow-[0_2px_12px_rgba(0,0,0,0.01)]">
+        <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center justify-between border-b border-slate-200/60 dark:border-slate-800 bg-white dark:bg-slate-900 px-6 shadow-[0_2px_12px_rgba(0,0,0,0.01)]">
           <div className="flex items-center gap-5 w-full max-w-[150px] sm:max-w-xs md:max-w-sm transition-all duration-200">
             <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 placeholder="Search global reports..."
-                className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50/50 pl-9 pr-4 text-xs font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:bg-white"
+                className="h-9 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 pl-9 pr-4 text-xs font-semibold text-slate-900 dark:text-slate-100 outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:bg-white"
               />
             </div>
           </div>
@@ -215,8 +248,19 @@ export default function Layout() {
               <CalendarDays className="h-4 w-4 text-slate-400" />
               May 28, 2026
             </div>
-            <div className="hidden lg:block h-6 w-px bg-slate-200" />
-            
+            {/* Dark Mode Toggle Button */}
+            <button
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900 transition focus:outline-none cursor-pointer"
+              title="Toggle Dark Mode"
+            >
+              {theme === "dark" ? (
+                <Sun className="h-4.5 w-4.5 text-amber-500 animate-spin-slow" />
+              ) : (
+                <Moon className="h-4.5 w-4.5 text-slate-500" />
+              )}
+            </button>
+
             {/* Google / Leetcode Styled Profile Trigger Dropdown */}
             <div className="relative">
               <button

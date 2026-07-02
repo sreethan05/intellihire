@@ -478,12 +478,18 @@ router.get("/attempts/:attemptId/timeline", async (req: AuthRequest, res) => {
     const { attemptId } = req.params;
     
     const { data: attempt, error: attemptErr } = await db.from("attempts")
-      .select("started_at, submitted_at")
+      .select("started_at, submitted_at, candidate_id")
       .eq("id", attemptId)
-      .single();
+      .single() as any;
     
     if (attemptErr || !attempt) {
       res.status(404).json({ error: "Attempt not found" });
+      return;
+    }
+
+    // Security check: Candidate can only view their own proctoring logs
+    if (req.user!.role === "candidate" && attempt.candidate_id !== req.user!.id) {
+      res.status(403).json({ error: "Access denied. You can only view your own proctoring timeline." });
       return;
     }
     

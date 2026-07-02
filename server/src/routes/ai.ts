@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, recordPipelineStage } from "../lib/postgres.js";
+import { db } from "../lib/postgres.js";
 import { generateExam, getBankStats } from "../lib/examPipeline.js";
 import { authMiddleware, type AuthRequest } from "../middleware/auth.js";
 

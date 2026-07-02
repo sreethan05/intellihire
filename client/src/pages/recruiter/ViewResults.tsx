@@ -9,6 +9,7 @@ import {
 import { BarChart3, ChevronDown } from "lucide-react";
 import type { Exam, Attempt } from "@/types";
 import AttemptDetailModal from "@/components/AttemptDetailModal";
+import { exportToCSV } from "@/lib/csvExport";
 
 const PIE_COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444"];
 
@@ -129,8 +130,23 @@ export default function ViewResults() {
 
           {/* Results table */}
           <div style={{ background: "white", borderRadius: 12, border: "1px solid #e8ecf0", overflow: "hidden" }}>
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid #f1f5f9" }}>
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>Candidate Results</span>
+              <button
+                onClick={() => {
+                  const formatted = results.map(r => ({
+                    name: r.users?.name || "Unknown",
+                    email: r.users?.email || "Unknown",
+                    status: r.status === "completed" ? "Completed" : "In Progress",
+                    score: r.status === "completed" ? `${r.score ?? 0} / ${(r as any).exams?.total_marks ?? ""}` : "—",
+                    submitted: r.submitted_at ? new Date(r.submitted_at).toLocaleString() : "—"
+                  }));
+                  exportToCSV(formatted, ["name", "email", "status", "score", "submitted"], `exam_results_${selectedExam}`, ["Candidate Name", "Email", "Status", "Score", "Submitted At"]);
+                }}
+                style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #059669", background: "#059669", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "Inter,sans-serif", color: "white" }}
+              >
+                Export CSV
+              </button>
             </div>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>

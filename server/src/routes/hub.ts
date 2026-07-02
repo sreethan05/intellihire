@@ -48,6 +48,48 @@ const router = Router();
 
 router.use(authMiddleware);
 
+/**
+ * @openapi
+ * /api/hub/overview:
+ *   get:
+ *     summary: Get dashboard overview data based on the authenticated user's role
+ *     tags: [Hub]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Successfully retrieved hub overview dashboard payload
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 role:
+ *                   type: string
+ *                   example: "candidate"
+ *                 stats:
+ *                   type: object
+ *                 actionItems:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 recentActivity:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 upcomingSchedule:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 insights:
+ *                   type: object
+ *                 quickLinks:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *       401:
+ *         description: Unauthorized or missing token
+ */
 router.get("/overview", async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.id;

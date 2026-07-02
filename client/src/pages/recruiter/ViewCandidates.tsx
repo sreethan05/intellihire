@@ -3,6 +3,7 @@ import { recruiterApi, examApi } from "@/lib/api";
 import { toast } from "sonner";
 import { Search, UserCheck } from "lucide-react";
 import type { User, Exam } from "@/types";
+import { exportToCSV } from "@/lib/csvExport";
 
 export default function ViewCandidates() {
   const [candidates, setCandidates] = useState<User[]>([]);
@@ -105,9 +106,15 @@ export default function ViewCandidates() {
               if (selectedCandidates.size === filtered.length) setSelectedCandidates(new Set());
               else setSelectedCandidates(new Set(filtered.map(c => c.id)));
             }}
-            style={{ padding: "7px 12px", borderRadius: 7, border: "1px solid #e8ecf0", background: "white", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "Inter,sans-serif", color: "#374151" }}
+            style={{ padding: "7px 12px", borderRadius: 7, border: "1px solid #e8ecf0", background: "white", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "Inter,sans-serif", color: "#374151", marginRight: 8 }}
           >
             {selectedCandidates.size === filtered.length && filtered.length > 0 ? "Deselect all" : "Select all"}
+          </button>
+          <button
+            onClick={() => exportToCSV(filtered, ["name", "email"], "candidates_list", ["Name", "Email"])}
+            style={{ padding: "7px 12px", borderRadius: 7, border: "1px solid #059669", background: "#059669", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "Inter,sans-serif", color: "white" }}
+          >
+            Export CSV
           </button>
         </div>
 

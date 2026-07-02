@@ -80,7 +80,14 @@ const swaggerSpec = swaggerJsdoc({
       },
     },
   },
-  apis: ["./server/src/routes/*.ts"],
+  apis: [
+    "./src/routes/*.ts",
+    "./server/src/routes/*.ts",
+    "./dist/routes/*.js",
+    "./server/dist/routes/*.js",
+    "./src/routes/*.js",
+    "./server/src/routes/*.js",
+  ],
 });
 
 router.use("/", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
