@@ -40,10 +40,13 @@ intellihire/
 │   ├── src/                   # Routing, core libraries, DB scripts
 │   └── tests/                 # Jest backend unit & integration tests
 ├── database/                  # SQL schema & seed scripts
-│   ├── postgres-schema.sql    # Base schemas & core seeds
-│   ├── schema-question-bank.sql# Question table modifications
-│   ├── schema-analytics.sql   # Candidate analytics structures
-│   └── seed-question-bank.sql # MCQ & Coding question bank seeds
+│   ├── 01_users_colleges.sql  # Users and colleges schema
+│   ├── 02_questions.sql       # Questions tables schema
+│   ├── 03_exams.sql           # Exams tables schema
+│   ├── ...                    # Migrations 04 through 08
+│   ├── 09_seed_data.sql       # Default MCQ and coding questions seed data
+│   ├── 10_indexes.sql         # Primary database optimization indexes
+│   └── 11_audit_logs.sql      # System audit logging schema
 ├── e2e/                       # Playwright E2E integration test suites
 └── .github/workflows/ci.yml   # CI/CD pipeline configuration
 ```
@@ -54,7 +57,7 @@ intellihire/
 
 ### Prerequisites
 - Node.js (v18+ recommended)
-- PostgreSQL instance (running locally or via container)
+- Docker & Docker Compose (for running DB & Redis services locally)
 
 ### Step 1: Install Dependencies
 Run the following commands to install dependencies for the workspace, client, and server:
@@ -71,6 +74,17 @@ cp .env.example .env
 # Edit .env with your local credentials
 ```
 
+### Step 3: Run Database & Cache via Docker Compose (Recommended)
+You can start a local PostgreSQL database, Redis instance, and MinIO storage server in one command:
+```bash
+docker compose up -d
+```
+This starts:
+- **PostgreSQL** on port `5432` (database: `intellihire`, user: `dev`, password: `devpass`)
+- **Redis** on port `6379`
+- **MinIO** console on [http://localhost:9001](http://localhost:9001) (credentials: `minioadmin` / `minioadminpass`)
+
+
 ---
 
 ## Database Schema & Migrations
@@ -80,11 +94,7 @@ To apply all database schemas, table setups, and seed data automatically to your
 npm --prefix server run migrate
 ```
 
-This runs the migration script which sequentially applies:
-1. `database/postgres-schema.sql` (Core tables, indexes, and primary admin account)
-2. `database/schema-question-bank.sql` (Question-bank structures)
-3. `database/schema-analytics.sql` (Proctoring & analytics logging)
-4. `database/seed-question-bank.sql` (Seeding default MCQs and coding questions with conflict handling)
+This runs the migration script which sequentially applies the SQL migration files located in the `database/` folder (from `01_users_colleges.sql` through `11_audit_logs.sql`).
 
 To seed additional test roles (Recruiter, Candidate) for E2E tests or manual verification:
 ```bash

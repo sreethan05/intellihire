@@ -5,6 +5,7 @@ import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 import pg from "pg";
 import { config } from "../config.js";
+import { logger } from "./logger.js";
 
 const { Pool } = pg;
 
@@ -207,21 +208,42 @@ function databaseUrl() {
 export const isPostgresConfigured = () =>
   Boolean(databaseUrl() || (process.env.PGHOST && process.env.PGUSER && process.env.PGDATABASE));
 
-export const pool = new Pool(
-  databaseUrl()
-    ? {
-        connectionString: databaseUrl(),
-        ssl: process.env.PGSSL === "true" ? { rejectUnauthorized: false } : undefined,
-      }
-    : {
-        host: process.env.PGHOST,
-        port: process.env.PGPORT ? Number(process.env.PGPORT) : undefined,
-        database: process.env.PGDATABASE,
-        user: process.env.PGUSER,
-        password: process.env.PGPASSWORD,
-        ssl: process.env.PGSSL === "true" ? { rejectUnauthorized: false } : undefined,
-      }
-);
+const poolConfig = databaseUrl()
+  ? {
+      connectionString: databaseUrl(),
+      ssl: process.env.PGSSL === "true" ? { rejectUnauthorized: false } : undefined,
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000,
+    }
+  : {
+      host: process.env.PGHOST,
+      port: process.env.PGPORT ? Number(process.env.PGPORT) : undefined,
+      database: process.env.PGDATABASE,
+      user: process.env.PGUSER,
+      password: process.env.PGPASSWORD,
+      ssl: process.env.PGSSL === "true" ? { rejectUnauthorized: false } : undefined,
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000,
+    };
+
+export const pool = new Pool(poolConfig);
+
+const originalQuery = pool.query.bind(pool);
+pool.query = async function (text: any, params: any) {
+  const start = Date.now();
+  try {
+    const res = await originalQuery(text, params);
+    const duration = Date.now() - start;
+    if (duration > 100) {
+      logger.warn({ sql: typeof text === "string" ? text : text?.text, durationMs: duration }, "Slow database query detected");
+    }
+    return res;
+  } catch (err) {
+    throw err;
+  }
+} as any;
 
 function toQueryError(error: unknown): QueryError {
   if (error instanceof Error) {

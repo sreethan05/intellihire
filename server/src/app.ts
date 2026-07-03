@@ -13,6 +13,7 @@ initSentry();
 import { errorHandler } from "./middleware/errorHandler.js";
 import { requestLogger } from "./middleware/logger.js";
 import { logger } from "./lib/logger.js";
+import { requestIdMiddleware } from "./middleware/requestId.js";
 
 import authRoutes from "./routes/auth.js";
 import adminRoutes from "./routes/admin.js";
@@ -41,6 +42,9 @@ const API_PREFIXES = ["/api/v1", "/api"];
 
 export function createApp() {
   const app = express();
+
+  // ─── Request Correlation ───
+  app.use(requestIdMiddleware);
 
   // ─── Security Headers ───
   app.use(helmet());

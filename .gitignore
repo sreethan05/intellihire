@@ -50,3 +50,8 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# Test coverage
+coverage/
+**/coverage/
+

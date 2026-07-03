@@ -32,6 +32,12 @@ const envSchema = z.object({
   FILE_STORAGE_DIR: z.string().optional().default("uploads"),
   DISABLE_RATE_LIMITS: z.enum(["true", "false"]).default("false"),
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
+  REDIS_URL: z.string().optional().default("redis://localhost:6379"),
+  S3_ENDPOINT: z.string().optional().default("http://localhost:9000"),
+  S3_ACCESS_KEY_ID: z.string().optional().default("minioadmin"),
+  S3_SECRET_ACCESS_KEY: z.string().optional().default("minioadmin"),
+  S3_BUCKET_NAME: z.string().optional().default("intellihire"),
+  S3_REGION: z.string().optional().default("us-east-1"),
 });
 
 function parseEnv() {

@@ -1,11 +1,23 @@
 import { Server } from "socket.io";
 import type { Server as HTTPServer } from "http";
+import { createAdapter } from "@socket.io/redis-adapter";
+import { Redis } from "ioredis";
 import { logger } from "./lib/logger.js";
 import { db } from "./lib/postgres.js";
+import { config } from "./config.js";
 
 let ioInstance: Server | null = null;
 
 export function setupWebSocket(httpServer: HTTPServer) {
+  const pubClient = new Redis(config.REDIS_URL || "redis://localhost:6379", {
+    maxRetriesPerRequest: 1,
+    enableOfflineQueue: false,
+  });
+  const subClient = pubClient.duplicate();
+
+  pubClient.on("error", (err) => logger.warn({ err: err.message }, "WebSocket PubClient Redis error"));
+  subClient.on("error", (err) => logger.warn({ err: err.message }, "WebSocket SubClient Redis error"));
+
   const io = new Server(httpServer, {
     cors: {
       origin: (origin, callback) => {
@@ -29,6 +41,10 @@ export function setupWebSocket(httpServer: HTTPServer) {
       credentials: true,
     },
   });
+
+  if (config.NODE_ENV !== "test") {
+    io.adapter(createAdapter(pubClient, subClient));
+  }
 
   ioInstance = io;
 

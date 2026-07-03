@@ -160,13 +160,17 @@ function AppRoutes() {
   );
 }
 
+import { ErrorBoundary } from "./components/ErrorBoundary";
+
 function App() {
   return (
-    <AuthProvider>
-      <CollegeProvider>
-        <AppRoutes />
-      </CollegeProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <CollegeProvider>
+          <AppRoutes />
+        </CollegeProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

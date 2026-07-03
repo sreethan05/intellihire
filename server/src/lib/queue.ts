@@ -5,28 +5,57 @@ import { sendResultPublishedEmail } from "./email.js";
 import { logger } from "./logger.js";
 import fs from "fs/promises";
 import path from "path";
+import Queue from "bull";
+import { config } from "../config.js";
 
 const APP_URL = process.env.VITE_API_URL?.replace("/api", "") || "http://localhost:3000";
 
 class BackgroundGradingQueue {
-  private queue: string[] = [];
-  private isProcessing = false;
+  private bullQueue: Queue.Queue | null = null;
+  private localQueue: string[] = [];
+  private isLocalProcessing = false;
   private queueFilePath = path.join(storageRoot, "grading_queue.json");
 
   constructor() {
-    void this.initQueue();
+    const isTest = config.NODE_ENV === "test";
+    if (!isTest) {
+      try {
+        this.bullQueue = new Queue("grading-queue", config.REDIS_URL || "redis://localhost:6379");
+        
+        void this.bullQueue.process(async (job) => {
+          const { attemptId } = job.data;
+          logger.info({ attemptId, jobId: job.id }, "Starting background grading job");
+          await this.gradeAttempt(attemptId);
+        });
+
+        this.bullQueue.on("error", (error) => {
+          logger.error({ error: error.message }, "Bull queue error");
+        });
+
+        this.bullQueue.on("failed", (job, error) => {
+          logger.error({ jobId: job?.id, attemptId: job?.data?.attemptId, error: error.message }, "Bull grading job failed");
+        });
+
+        logger.info("Bull grading queue initialized successfully");
+      } catch (err: any) {
+        logger.warn({ err: err.message }, "Failed to initialize Bull queue, falling back to local queue");
+        void this.initLocalQueue();
+      }
+    } else {
+      void this.initLocalQueue();
+    }
   }
 
-  private async initQueue() {
+  private async initLocalQueue() {
     try {
       await fs.mkdir(storageRoot, { recursive: true });
       const data = await fs.readFile(this.queueFilePath, "utf8");
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        this.queue = parsed;
-        logger.info({ queueSize: this.queue.length }, "Loaded pending attempts from disk queue");
-        if (!this.isProcessing) {
-          void this.processQueue();
+        this.localQueue = parsed;
+        logger.info({ queueSize: this.localQueue.length }, "Loaded pending attempts from disk queue");
+        if (!this.isLocalProcessing) {
+          void this.processLocalQueue();
         }
       }
     } catch {
@@ -34,12 +63,12 @@ class BackgroundGradingQueue {
     }
   }
 
-  private async saveQueue() {
+  private async saveLocalQueue() {
     try {
       await fs.mkdir(storageRoot, { recursive: true });
-      await fs.writeFile(this.queueFilePath, JSON.stringify(this.queue), "utf8");
+      await fs.writeFile(this.queueFilePath, JSON.stringify(this.localQueue), "utf8");
     } catch (err) {
-      logger.error({ err }, "Failed to save grading queue to disk");
+      logger.error({ err }, "Failed to save local grading queue to disk");
     }
   }
 
@@ -49,38 +78,44 @@ class BackgroundGradingQueue {
   public push(attemptId: string) {
     if (!attemptId) return;
 
-    if (!this.queue.includes(attemptId)) {
-      this.queue.push(attemptId);
-      logger.info({ attemptId, queueSize: this.queue.length }, "Added attempt to grading queue");
-      void this.saveQueue();
+    if (this.bullQueue) {
+      void this.bullQueue.add({ attemptId }, { removeOnComplete: true, attempts: 3 });
+      logger.info({ attemptId }, "Added attempt to Bull queue");
+      return;
     }
 
-    if (!this.isProcessing) {
-      void this.processQueue();
+    if (!this.localQueue.includes(attemptId)) {
+      this.localQueue.push(attemptId);
+      logger.info({ attemptId, queueSize: this.localQueue.length }, "Added attempt to local queue");
+      void this.saveLocalQueue();
+    }
+
+    if (!this.isLocalProcessing) {
+      void this.processLocalQueue();
     }
   }
 
   /**
-   * Background queue worker processing loops.
+   * Background local queue worker processing loops.
    */
-  private async processQueue() {
-    this.isProcessing = true;
+  private async processLocalQueue() {
+    this.isLocalProcessing = true;
 
-    while (this.queue.length > 0) {
-      const currentAttemptId = this.queue.shift()!;
-      void this.saveQueue();
-      logger.info({ attemptId: currentAttemptId }, "Starting grading");
+    while (this.localQueue.length > 0) {
+      const currentAttemptId = this.localQueue.shift()!;
+      void this.saveLocalQueue();
+      logger.info({ attemptId: currentAttemptId }, "Starting local grading");
 
       try {
         await this.gradeAttempt(currentAttemptId);
-        logger.info({ attemptId: currentAttemptId }, "Grading completed successfully");
+        logger.info({ attemptId: currentAttemptId }, "Local grading completed successfully");
       } catch (error) {
-        logger.error({ error, attemptId: currentAttemptId }, "Grading failed");
+        logger.error({ error, attemptId: currentAttemptId }, "Local grading failed");
       }
     }
 
-    this.isProcessing = false;
-    logger.info("Worker idle — no more items in queue");
+    this.isLocalProcessing = false;
+    logger.info("Local worker idle — no more items in local queue");
   }
 
   /**

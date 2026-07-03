@@ -5,44 +5,95 @@
 IntelliHire is a full-stack recruitment examination platform with four user roles: Admin, TPO, Recruiter, and Candidate.
 
 ```mermaid
-flowchart LR
+flowchart TD
   User["User Browser"] --> Frontend["React + Vite Frontend"]
   Frontend --> API["Express Backend API"]
-  API --> Auth["JWT + bcrypt Auth"]
-  API --> DB["PostgreSQL"]
-  API --> AI["Groq / Ollama AI"]
-  API --> Judge["Judge0 Code Runner"]
-  API --> Proctor["Proctoring Event Logger"]
+  
+  subgraph Backend ["Backend Layers"]
+    API --> Routes["Routes (HTTP Controller)"]
+    Routes --> Services["Services (Business Logic)"]
+    Services --> Repositories["Repositories (Database Layer)"]
+  end
+
+  Repositories --> DB["PostgreSQL DB"]
+  Services --> Cache["Redis Cache / Queues"]
+  Services --> AI["Groq AI Service"]
+  Services --> Judge["Judge0 Code Runner"]
 ```
 
-## Main Modules
+## 3-Layer Backend Architecture
 
-| Module | Responsibility |
-| --- | --- |
-| Authentication | Login, JWT generation, password hashing, protected routes |
-| Admin | Manage recruiters, TPOs, colleges, and platform analytics |
-| TPO | Manage students, verification, and college reports |
-| Recruiter | Create exams, drives, question banks, assignments, and review results |
-| Candidate | Onboarding, exam attempt, results, certificates, and interview flow |
-| Proctoring | Camera checks, snapshots, warning count, and recruiter review |
-| AI | Question generation, marksheet scanning, and AI interview/evaluation support |
-| Compiler | Coding question execution and test-case scoring |
+To maintain clean codebase separation and adherence to the Single Responsibility Principle, we organize our backend code into three specialized layers:
 
-## Data Flow
+1. **Routes (HTTP Layer)**:
+   - Handle incoming requests (validate inputs, verify route access, extract path/query variables).
+   - Direct work to the appropriate Service and return the HTTP response envelope.
+   - Forward errors cleanly using the Express centralized error handler `next(err)`.
+2. **Services (Business Logic)**:
+   - Contain the core business rules, calculations, AI scoring pipeline invocations, and integrations.
+   - Orchestrate calls to multiple repository methods or helper utilities.
+   - Throw semantic custom errors (e.g. `ValidationError`, `NotFoundError`).
+3. **Repositories (Database Layer)**:
+   - The sole location for SQL query builders and direct database connection pool queries.
+   - Handle tables mapping, schema transformations, and direct record CRUD.
 
-1. User logs in through the frontend.
-2. Backend validates credentials using bcrypt password comparison.
-3. Backend returns a JWT token and role details.
-4. Frontend uses the token for protected API requests.
-5. Backend checks role permissions before serving protected resources.
-6. Exam answers, code submissions, proctoring events, and results are stored in Supabase.
+---
+
+## Detailed Data Flows
+
+### 1. Candidate Exam Attempt Flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Candidate as Candidate
+    participant FE as Frontend (React)
+    participant RT as Route / Controller
+    participant SV as Exam Service
+    participant RP as Database Repository
+    participant DB as PostgreSQL
+
+    Candidate->>FE: Click "Start Exam"
+    FE->>RT: POST /api/exams/:id/start
+    RT->>SV: startAttempt(examId, userId)
+    SV->>RP: getActiveAttempt() / createAttempt()
+    RP->>DB: INSERT INTO attempts (status = "started")
+    DB-->>RP: Return attempt row
+    SV-->>FE: Return attempt session + token
+    
+    Candidate->>FE: Submit Question Answers
+    FE->>RT: POST /api/exams/:id/submit
+    RT->>SV: submitAnswer(attemptId, questionId, answerData)
+    SV->>RP: saveAnswer()
+    RP->>DB: INSERT INTO answers
+    SV-->>FE: Confirm submission success
+```
+
+### 2. Real-Time Proctoring & Websocket Synchronization
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Candidate as Candidate
+    participant FE as Candidate Frontend
+    participant WS as Socket.IO Websocket Node
+    participant RD as Redis Adapter
+    participant REC as Recruiter Dashboard
+
+    Candidate->>FE: Focus lost / tab switched
+    FE->>WS: Emit "proctor:tab-switch" (with attempt context)
+    WS->>RD: Broadcast event to Redis channel
+    RD->>WS: Sync event across websocket nodes
+    WS->>REC: Push real-time alert "Candidate tab switched"
+```
+
+---
 
 ## Security Controls
 
-- Passwords are stored as bcrypt hashes.
-- JWT tokens protect backend API routes.
-- Role middleware restricts admin, recruiter, TPO, and candidate routes.
-- Exam-management routes are limited to recruiter/admin access.
-- Candidate answer submission verifies attempt ownership.
-- Sensitive keys remain in `.env` and backend-only.
+- **Encryption**: Passwords hashed using standard `bcrypt` algorithms.
+- **Session Tokens**: REST routes and websocket handshakes authenticated via JSON Web Tokens (JWT).
+- **Access Control**: Role-based access control (RBAC) middleware verifying user authorizations (Candidate, Recruiter, TPO, Admin).
+- **Environment Isolation**: Database URLs, JWT secrets, and API credentials stored securely in environment configurations.
+
 

@@ -16,3 +16,7 @@ CREATE INDEX IF NOT EXISTS idx_candidate_status_candidate_id ON candidate_status
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_ai_interviews_candidate_id ON ai_interviews(candidate_id);
 CREATE INDEX IF NOT EXISTS idx_ai_interviews_exam_id ON ai_interviews(exam_id);
+CREATE INDEX IF NOT EXISTS idx_candidate_profiles_user_id ON candidate_profiles(user_id);
+CREATE INDEX IF NOT EXISTS idx_candidate_profiles_college_id ON candidate_profiles(college_id);
+CREATE INDEX IF NOT EXISTS idx_candidate_profiles_slug ON candidate_profiles(public_portfolio_slug);
+CREATE INDEX IF NOT EXISTS idx_users_college_id ON users(college_id);

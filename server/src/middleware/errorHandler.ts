@@ -1,23 +1,13 @@
 import * as Sentry from "@sentry/node";
 import { logger } from "../lib/logger.js";
-
-export class AppError extends Error {
-  constructor(
-    public statusCode: number,
-    message: string,
-    public code: string = "APP_ERROR"
-  ) {
-    super(message);
-    this.name = "AppError";
-    Error.captureStackTrace(this, this.constructor);
-  }
-}
-
+import { AppError } from "../lib/errors.js";
 import type { Request, Response, NextFunction } from "express";
+
+export { AppError };
 
 export const errorHandler = (
   err: Error,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ) => {
@@ -25,19 +15,34 @@ export const errorHandler = (
     Sentry.captureException(err);
   }
 
-  logger.error({ err: err.message, stack: err.stack, name: err.name }, "Unhandled error");
+  const requestId = req.id || "unknown";
+
+  logger.error(
+    { 
+      err: err.message, 
+      stack: err.stack, 
+      name: err.name,
+      requestId 
+    }, 
+    "Unhandled error"
+  );
 
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({
+      success: false,
       error: err.message,
       code: err.code,
+      requestId,
+      details: err.details || []
     });
   }
 
   const isDev = process.env.NODE_ENV !== "production";
   return res.status(500).json({
+    success: false,
     error: "Internal server error",
     code: "INTERNAL_ERROR",
-    ...(isDev && { stack: err.stack }),
+    requestId,
+    ...(isDev && { details: [{ stack: err.stack }] })
   });
 };
