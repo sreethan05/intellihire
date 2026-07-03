@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "../lib/postgres.js";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { cacheMiddleware } from "../lib/cache.js";
 import { logger } from "../lib/logger.js";
 
 const router = Router();
@@ -8,7 +9,7 @@ router.use(authMiddleware);
 router.use(roleMiddleware(["candidate"]));
 
 // ─── 1. Topic Mastery Radar ─────────────────────────────────────────────────
-router.get("/topic-mastery", async (req: AuthRequest, res) => {
+router.get("/topic-mastery", cacheMiddleware(300), async (req: AuthRequest, res) => {
   try {
     const candidateId = req.user!.id;
 

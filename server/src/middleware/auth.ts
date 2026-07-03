@@ -36,14 +36,26 @@ export const refreshToken = (currentToken: string): string | null => {
   }
 };
 
+const getCookie = (cookieHeader: string | undefined, name: string): string | null => {
+  if (!cookieHeader) return null;
+  const match = cookieHeader.match(new RegExp('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)'));
+  return match ? decodeURIComponent(match[2]) : null;
+};
+
 export const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  let token: string | null = getCookie(req.headers.cookie, "token");
+  if (!token) {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.split(" ")[1];
+    }
+  }
+
+  if (!token) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
 
-  const token = authHeader.split(" ")[1];
   try {
     const decoded = verifyToken(token);
     req.user = decoded;
@@ -55,6 +67,13 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
       if (remainingSeconds > 0 && remainingSeconds < REFRESH_WINDOW_SECONDS) {
         const fresh = generateToken({ id: decoded.id, email: decoded.email, role: decoded.role });
         res.setHeader("X-Refreshed-Token", fresh);
+        res.cookie("token", fresh, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          path: "/",
+          maxAge: 24 * 60 * 60 * 1000 // 24 hours
+        });
       }
     }
 

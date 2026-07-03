@@ -2,6 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { db, transaction } from "../lib/postgres.js";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { validateBody } from "../middleware/validation.js";
 import { getPasswordValidationError } from "../lib/validation.js";
 import { logger } from "../lib/logger.js";
 
@@ -25,14 +26,9 @@ const monthsBack = (count: number) => {
   });
 };
 
-router.post("/create-recruiter", async (req: AuthRequest, res) => {
+router.post("/create-recruiter", validateBody(createRecruiterSchema), async (req: AuthRequest, res) => {
   try {
-    const parsed = createRecruiterSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.issues[0].message });
-      return;
-    }
-    const { name, email, password } = parsed.data;
+    const { name, email, password } = req.body;
 
     const passwordError = getPasswordValidationError(password);
     if (passwordError) {
@@ -65,14 +61,9 @@ router.post("/create-recruiter", async (req: AuthRequest, res) => {
   }
 });
 
-router.post("/create-tpo", async (req: AuthRequest, res) => {
+router.post("/create-tpo", validateBody(createTpoSchema), async (req: AuthRequest, res) => {
   try {
-    const parsed = createTpoSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.issues[0].message });
-      return;
-    }
-    const { name, email, password, college_name, college_code, location } = parsed.data;
+    const { name, email, password, college_name, college_code, location } = req.body;
 
     const passwordError = getPasswordValidationError(password);
     if (passwordError) {

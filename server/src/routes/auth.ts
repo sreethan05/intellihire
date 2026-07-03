@@ -2,6 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { db } from "../lib/postgres.js";
 import { generateToken, authMiddleware, refreshToken, type AuthRequest } from "../middleware/auth.js";
+import { validateBody } from "../middleware/validation.js";
 import { isValidEmail } from "../lib/validation.js";
 import { loginSchema } from "../lib/schemas.js";
 import { logger } from "../lib/logger.js";
@@ -47,20 +48,9 @@ import { logger } from "../lib/logger.js";
 
 const router = Router();
 
-router.post("/login", async (req, res) => {
+router.post("/login", validateBody(loginSchema), async (req, res) => {
   try {
-    // Zod validation
-    const parsed = loginSchema.safeParse(req.body);
-    if (!parsed.success) {
-      const firstError = parsed.error.issues[0];
-      res.status(400).json({
-        error: firstError.message,
-        field: firstError.path.join("."),
-      });
-      return;
-    }
-
-    const { email, password } = parsed.data;
+    const { email, password } = req.body;
     const identifier = email.trim();
 
     // Check if it is a roll number (alphanumeric, 5-20 characters)
@@ -108,6 +98,14 @@ router.post("/login", async (req, res) => {
       role: user.role,
     });
 
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    });
+
     res.json({
       token,
       user: {
@@ -142,18 +140,48 @@ router.post("/login", async (req, res) => {
  *         description: Invalid or expired token
  */
 router.post("/refresh", authMiddleware, (req: AuthRequest, res) => {
-  const authHeader = req.headers.authorization;
-  const currentToken = authHeader?.split(" ")[1];
+  const getCookie = (cookieHeader: string | undefined, name: string): string | null => {
+    if (!cookieHeader) return null;
+    const match = cookieHeader.match(new RegExp('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)'));
+    return match ? decodeURIComponent(match[2]) : null;
+  };
+
+  let currentToken: string | null = getCookie(req.headers.cookie, "token");
+  if (!currentToken) {
+    const authHeader = req.headers.authorization;
+    currentToken = authHeader?.split(" ")[1] || null;
+  }
+
   if (!currentToken) {
     res.status(401).json({ error: "No token provided" });
     return;
   }
+
   const newToken = refreshToken(currentToken);
   if (!newToken) {
     res.status(401).json({ error: "Token could not be refreshed" });
     return;
   }
+
+  res.cookie("token", newToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 24 * 60 * 60 * 1000
+  });
+
   res.json({ token: newToken });
+});
+
+router.post("/logout", (req, res) => {
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/"
+  });
+  res.json({ success: true });
 });
 
 export default router;

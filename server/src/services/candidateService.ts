@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import * as candidateRepo from "../repositories/candidateRepository.js";
+import { candidateRepository as candidateRepo } from "../repositories/candidateRepository.js";
 import {
   createTopicScores,
   feedMcqAnswer,
@@ -10,7 +10,7 @@ import {
 import { formatDate, monthsBack } from "../lib/dateUtils.js";
 import { getPasswordValidationError } from "../lib/validation.js";
 import { NotFoundError, ValidationError } from "../lib/errors.js";
-import * as cache from "../lib/cache.js";
+import { cache } from "../lib/cache.js";
 
 export async function buildPublicPortfolio(slug: string) {
   const cacheKey = `portfolio:${slug}`;
@@ -106,10 +106,7 @@ export async function updateProfile(userId: string, body: any) {
 
   const updated = await candidateRepo.updateProfile(userId, profileData);
   if (updated) {
-    if (updated.public_portfolio_slug) {
-      await cache.del(`portfolio:${updated.public_portfolio_slug}`);
-    }
-    await cache.del(`portfolio:${userId}`);
+    await cache.invalidatePattern("portfolio:*");
   }
   return updated;
 }
@@ -145,10 +142,7 @@ export async function completeOnboarding(userId: string, body: any) {
   ]);
 
   if (profile) {
-    if (profile.public_portfolio_slug) {
-      await cache.del(`portfolio:${profile.public_portfolio_slug}`);
-    }
-    await cache.del(`portfolio:${userId}`);
+    await cache.invalidatePattern("portfolio:*");
   }
 
   return profile;

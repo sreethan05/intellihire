@@ -1,10 +1,8 @@
 import { Router } from "express";
-import bcrypt from "bcryptjs";
 import { db, storageRoot, recordPipelineStage } from "../lib/postgres.js";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
 import * as candidateService from "../services/candidateService.js";
 import { uploadFile } from "../lib/storage.js";
-import { getPasswordValidationError } from "../lib/validation.js";
 import {
   createTopicScores,
   feedMcqAnswer,

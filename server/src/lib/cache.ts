@@ -4,7 +4,7 @@ import { logger } from "./logger.js";
 
 const isTest = config.NODE_ENV === "test";
 
-let redisClient: Redis | null = null;
+export let redisClient: Redis | null = null;
 let isConnected = false;
 
 if (!isTest) {
@@ -72,6 +72,43 @@ export async function invalidatePattern(pattern: string): Promise<void> {
   }
 }
 
+export function cacheMiddleware(ttlSeconds = 300) {
+  return async (req: any, res: any, next: any) => {
+    if (!redisClient || !isConnected || req.method !== "GET") {
+      return next();
+    }
+    const key = `cache:api:${req.originalUrl || req.url}`;
+    try {
+      const cachedData = await get(key);
+      if (cachedData) {
+        res.setHeader("X-Cache", "HIT");
+        return res.json(cachedData);
+      }
+      const originalJson = res.json.bind(res);
+      res.json = (body: any) => {
+        set(key, body, ttlSeconds).catch((err) => {
+          logger.error({ err }, "Failed to write response to cache");
+        });
+        res.setHeader("X-Cache", "MISS");
+        return originalJson(body);
+      };
+      next();
+    } catch (err) {
+      logger.error({ err }, "cacheMiddleware error");
+      next();
+    }
+  };
+}
+
 export function isCacheActive(): boolean {
   return isConnected;
 }
+
+export const cache = {
+  get,
+  set,
+  del,
+  invalidatePattern,
+  isCacheActive,
+  cacheMiddleware,
+};

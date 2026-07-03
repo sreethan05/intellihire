@@ -47,6 +47,7 @@ async function applyMigrations() {
       "09_seed_data.sql",
       "10_indexes.sql",
       "11_audit_logs.sql",
+      "12_soft_deletes.sql",
     ];
 
     for (const file of filesToApply) {

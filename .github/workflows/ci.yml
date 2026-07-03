@@ -63,8 +63,8 @@ jobs:
       - name: Install server dependencies
         run: npm --prefix server ci
 
-      - name: Run Server Tests
-        run: npm --prefix server run test
+      - name: Run Server Tests with Coverage
+        run: npm --prefix server run test:coverage
 
   build:
     name: Build Frontend
@@ -92,6 +92,19 @@ jobs:
         with:
           name: frontend-dist
           path: server/dist/
+
+  test-client:
+    name: Client Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+      - run: npm ci
+      - run: npm --prefix client ci
+      - run: npm --prefix client run test
 
   e2e:
     name: E2E Tests (Playwright)

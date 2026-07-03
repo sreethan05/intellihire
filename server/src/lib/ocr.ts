@@ -118,7 +118,7 @@ function inferGraduationYear(text: string): number | null {
 
 // ─── Core Parser ─────────────────────────────────────────────────────────────
 
-function parseMarksheetText(text: string, fileName: string): ScannedStudent {
+export function parseMarksheetText(text: string, fileName: string): ScannedStudent {
   const warnings: string[] = [];
   const upper = text.toUpperCase();
 
@@ -144,7 +144,7 @@ function parseMarksheetText(text: string, fileName: string): ScannedStudent {
   // ── Student Name ──────────────────────────────────────
   let name = "";
   const namePatterns: RegExp[] = [
-    /(?:name\s+of\s+(?:the\s+)?student|student['']?s?\s+name|name)\s*[:\-.]?\s*([A-Z][A-Za-z\s.]{2,45})/i,
+    /(?:name\s+of\s+(?:the\s+)?student|student['']?s?\s+name|name)\s*[:\-.]?\s*([A-Z][A-Za-z\t .]{2,45})/i,
   ];
   for (const pat of namePatterns) {
     const m = text.match(pat);

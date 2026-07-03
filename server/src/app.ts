@@ -46,8 +46,20 @@ export function createApp() {
   // ─── Request Correlation ───
   app.use(requestIdMiddleware);
 
-  // ─── Security Headers ───
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", "data:", "https://*.s3.amazonaws.com", "https://*.amazonaws.com"],
+          connectSrc: ["'self'", "ws:", "wss:"],
+          frameAncestors: ["'none'"],
+        },
+      },
+    })
+  );
 
   // ─── CORS (environment-aware) ───
   const allowedOrigins = getAllowedOrigins();

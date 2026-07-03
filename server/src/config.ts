@@ -53,6 +53,21 @@ function parseEnv() {
     console.error("\n❌ Invalid environment variables:\n  - DATABASE_URL: DATABASE_URL is required\n");
     process.exit(1);
   }
+  // Enforce production S3 security constraints
+  if (data.NODE_ENV === "production") {
+    if (!process.env.S3_ACCESS_KEY_ID || process.env.S3_ACCESS_KEY_ID === "minioadmin") {
+      console.error("\n❌ Invalid environment variables:\n  - S3_ACCESS_KEY_ID: S3_ACCESS_KEY_ID is required and must not be 'minioadmin' in production\n");
+      process.exit(1);
+    }
+    if (!process.env.S3_SECRET_ACCESS_KEY || process.env.S3_SECRET_ACCESS_KEY === "minioadmin") {
+      console.error("\n❌ Invalid environment variables:\n  - S3_SECRET_ACCESS_KEY: S3_SECRET_ACCESS_KEY is required and must not be 'minioadmin' in production\n");
+      process.exit(1);
+    }
+    if (!data.JUDGE0_API_URL || data.JUDGE0_API_URL.includes("ce.judge0.com")) {
+      console.error("\n❌ Invalid environment variables:\n  - JUDGE0_API_URL: A private Judge0 instance is required in production; public ce.judge0.com is not allowed.\n");
+      process.exit(1);
+    }
+  }
   return data;
 }
 

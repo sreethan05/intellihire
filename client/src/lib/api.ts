@@ -7,6 +7,7 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  withCredentials: true,
 });
 
 api.interceptors.request.use((config) => {
@@ -18,7 +19,13 @@ api.interceptors.request.use((config) => {
 });
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const refreshedToken = response.headers["x-refreshed-token"];
+    if (refreshedToken) {
+      localStorage.setItem("token", refreshedToken);
+    }
+    return response;
+  },
   (error) => {
     if (error.response?.status === 401 && !error.config?.url?.includes("/auth/login")) {
       localStorage.removeItem("token");
@@ -271,6 +278,7 @@ export const interviewApi = {
   summaries: (collegeId?: string | null) =>
     api.get("/interview/summaries", { params: collegeId ? { collegeId } : undefined }),
   getAnswers: (interviewId: string) => api.get(`/interview/${interviewId}/answers`),
+  get: (interviewId: string) => api.get(`/interview/${interviewId}`),
 };
 
 export const assetApi = {

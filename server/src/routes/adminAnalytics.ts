@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "../lib/postgres.js";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { cacheMiddleware } from "../lib/cache.js";
 import { logger } from "../lib/logger.js";
 
 const router = Router();
@@ -31,7 +32,7 @@ function inferViolationType(message: string | null, eventType: string): string {
   return "violation";
 }
 
-router.get("/platform-growth", async (req: AuthRequest, res) => {
+router.get("/platform-growth", cacheMiddleware(300), async (req: AuthRequest, res) => {
   try {
     const [
       { data: users },

@@ -363,12 +363,24 @@ export default function CandidateInterview() {
     void exitInterviewFullscreen();
     try {
       const { data } = await interviewApi.submit(interviewId);
-      setResult(data.interview);
+      
+      // Poll interview status until completed
+      let currentInterview = data.interview;
+      const startTime = Date.now();
+      const timeoutMs = 60000; // 1-minute timeout
+      
+      while (currentInterview && currentInterview.status === "processing" && (Date.now() - startTime) < timeoutMs) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const res = await interviewApi.get(interviewId);
+        currentInterview = res.data.interview;
+      }
+      
+      setResult(currentInterview);
       setInterviewId("");
       stopDevices();
       const histRes = await interviewApi.mine();
       setHistory(histRes.data.interviews || []);
-      toast.success("AI interview submitted");
+      toast.success("AI interview submitted and evaluated successfully");
     } catch (error: any) {
       submittedRef.current = false;
       toast.error(error.response?.data?.error || "Could not submit interview");

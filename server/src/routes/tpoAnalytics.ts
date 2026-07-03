@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "../lib/postgres.js";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { cacheMiddleware } from "../lib/cache.js";
 import { logger } from "../lib/logger.js";
 
 const router = Router();
@@ -16,7 +17,7 @@ async function getTpoCollegeId(req: AuthRequest): Promise<string | null> {
   return tpo?.college_id || null;
 }
 
-router.get("/placement-stats", async (req: AuthRequest, res) => {
+router.get("/placement-stats", cacheMiddleware(300), async (req: AuthRequest, res) => {
   try {
     const collegeId = await getTpoCollegeId(req);
     if (!collegeId) {

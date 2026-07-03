@@ -12,6 +12,7 @@ const APP_URL = process.env.VITE_API_URL?.replace("/api", "") || "http://localho
 
 class BackgroundGradingQueue {
   private bullQueue: Queue.Queue | null = null;
+  private interviewQueue: Queue.Queue | null = null;
   private localQueue: string[] = [];
   private isLocalProcessing = false;
   private queueFilePath = path.join(storageRoot, "grading_queue.json");
@@ -21,6 +22,7 @@ class BackgroundGradingQueue {
     if (!isTest) {
       try {
         this.bullQueue = new Queue("grading-queue", config.REDIS_URL || "redis://localhost:6379");
+        this.interviewQueue = new Queue("interview-queue", config.REDIS_URL || "redis://localhost:6379");
         
         void this.bullQueue.process(async (job) => {
           const { attemptId } = job.data;
@@ -28,17 +30,28 @@ class BackgroundGradingQueue {
           await this.gradeAttempt(attemptId);
         });
 
+        void this.interviewQueue.process(async (job) => {
+          const { interviewId } = job.data;
+          logger.info({ interviewId, jobId: job.id }, "Starting background interview evaluation job");
+          const { evaluateInterview } = await import("../services/interviewService.js");
+          await evaluateInterview(interviewId);
+        });
+
         this.bullQueue.on("error", (error) => {
           logger.error({ error: error.message }, "Bull queue error");
+        });
+
+        this.interviewQueue.on("error", (error) => {
+          logger.error({ error: error.message }, "Interview Bull queue error");
         });
 
         this.bullQueue.on("failed", (job, error) => {
           logger.error({ jobId: job?.id, attemptId: job?.data?.attemptId, error: error.message }, "Bull grading job failed");
         });
 
-        logger.info("Bull grading queue initialized successfully");
+        logger.info("Bull queues initialized successfully");
       } catch (err: any) {
-        logger.warn({ err: err.message }, "Failed to initialize Bull queue, falling back to local queue");
+        logger.warn({ err: err.message }, "Failed to initialize Bull queues, falling back to local queue");
         void this.initLocalQueue();
       }
     } else {
@@ -92,6 +105,23 @@ class BackgroundGradingQueue {
 
     if (!this.isLocalProcessing) {
       void this.processLocalQueue();
+    }
+  }
+
+  /**
+   * Pushes a new interview ID to the background evaluation queue.
+   */
+  public pushInterviewEvaluation(interviewId: string) {
+    if (this.interviewQueue) {
+      void this.interviewQueue.add({ interviewId }, { removeOnComplete: true, attempts: 3 });
+      logger.info({ interviewId }, "Added interview to Bull evaluation queue");
+    } else {
+      logger.info({ interviewId }, "Running interview evaluation inline (fallback)");
+      import("../services/interviewService.js").then(({ evaluateInterview }) => {
+        evaluateInterview(interviewId).catch((err) => {
+          logger.error({ err, interviewId }, "Inline interview evaluation failed");
+        });
+      });
     }
   }
 

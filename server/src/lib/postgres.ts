@@ -1,11 +1,10 @@
 import dotenv from "dotenv";
-import fs from "fs/promises";
-import path from "path";
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 import pg from "pg";
 import { config } from "../config.js";
 import { logger } from "./logger.js";
+import { uploadFile, deleteFile } from "./storage.js";
 
 const { Pool } = pg;
 
@@ -233,16 +232,12 @@ export const pool = new Pool(poolConfig);
 const originalQuery = pool.query.bind(pool);
 pool.query = async function (text: any, params: any) {
   const start = Date.now();
-  try {
-    const res = await originalQuery(text, params);
-    const duration = Date.now() - start;
-    if (duration > 100) {
-      logger.warn({ sql: typeof text === "string" ? text : text?.text, durationMs: duration }, "Slow database query detected");
-    }
-    return res;
-  } catch (err) {
-    throw err;
+  const res = await originalQuery(text, params);
+  const duration = Date.now() - start;
+  if (duration > 100) {
+    logger.warn({ sql: typeof text === "string" ? text : text?.text, durationMs: duration }, "Slow database query detected");
   }
+  return res;
 } as any;
 
 function toQueryError(error: unknown): QueryError {
@@ -510,6 +505,10 @@ class PostgresQueryBuilder implements PromiseLike<QueryResponse> {
 
   constructor(private readonly table: string) {
     assertIdentifier(table);
+    const softDeleteTables = ["users", "exams", "questions"];
+    if (softDeleteTables.includes(table)) {
+      this.filters.push({ kind: "simple", column: "deleted_at", operator: "eq", value: null });
+    }
   }
 
   select(columns = "*", options: SelectOptions = {}) {
@@ -822,6 +821,14 @@ class PostgresQueryBuilder implements PromiseLike<QueryResponse> {
     const values: unknown[] = [];
     const where = whereSql(this.filters, values);
     const returning = this.hasReturning ? ` RETURNING ${this.returningSql()}` : "";
+
+    const softDeleteTables = ["users", "exams", "questions"];
+    if (softDeleteTables.includes(this.table)) {
+      const sql = `UPDATE ${quoteIdentifier(this.table)} SET "deleted_at" = NOW()${where}${returning}`;
+      const result = await pool.query(sql, values);
+      return this.mutationResponse(result.rows as Record<string, unknown>[]);
+    }
+
     const sql = `DELETE FROM ${quoteIdentifier(this.table)}${where}${returning}`;
     const result = await pool.query(sql, values);
     return this.mutationResponse(result.rows as Record<string, unknown>[]);
@@ -850,30 +857,6 @@ class PostgresQueryBuilder implements PromiseLike<QueryResponse> {
 
 const storageRoot = resolve(process.cwd(), process.env.FILE_STORAGE_DIR || "uploads");
 
-function safeStoragePath(bucket: string, key: string) {
-  assertIdentifier(bucket);
-  const bucketRoot = resolve(storageRoot, bucket);
-  const targetPath = resolve(bucketRoot, key.replaceAll("\\", "/"));
-  const relativePath = path.relative(bucketRoot, targetPath);
-  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
-    throw new Error("Invalid storage path");
-  }
-  return { bucketRoot, targetPath };
-}
-
-function publicStorageUrl(bucket: string, key: string) {
-  const base =
-    process.env.PUBLIC_STORAGE_URL ||
-    process.env.APP_URL ||
-    process.env.VITE_API_URL?.replace(/\/api\/?$/, "") ||
-    "";
-  const encodedKey = key
-    .split("/")
-    .map((part) => encodeURIComponent(part))
-    .join("/");
-  const relativeUrl = `/uploads/${bucket}/${encodedKey}`;
-  return base ? `${base.replace(/\/$/, "")}${relativeUrl}` : relativeUrl;
-}
 
 export const db = {
   from(table: string) {
@@ -882,30 +865,39 @@ export const db = {
   storage: {
     from(bucket: string) {
       return {
-        async upload(key: string, body: Buffer | Uint8Array | string, _options: { contentType?: string; upsert?: boolean } = {}) {
+        async upload(key: string, body: Buffer | Uint8Array | string, options: { contentType?: string; upsert?: boolean } = {}) {
           try {
-            const { targetPath } = safeStoragePath(bucket, key);
-            await fs.mkdir(path.dirname(targetPath), { recursive: true });
-            await fs.writeFile(targetPath, body);
+            let buffer: Buffer;
+            if (typeof body === "string") {
+              buffer = Buffer.from(body);
+            } else if (body instanceof Uint8Array) {
+              buffer = Buffer.from(body);
+            } else {
+              buffer = body;
+            }
+            const s3Key = `${bucket}/${key}`;
+            await uploadFile(s3Key, buffer, options.contentType || "application/octet-stream");
             return { data: { path: key }, error: null };
           } catch (error) {
             return { data: null, error: toQueryError(error) };
           }
         },
         getPublicUrl(key: string) {
-          return { data: { publicUrl: publicStorageUrl(bucket, key) } };
+          const bucketName = config.S3_BUCKET_NAME || "intellihire";
+          const isTest = config.NODE_ENV === "test";
+          const publicUrl = isTest 
+            ? `/dummy-storage/${bucketName}/${bucket}/${key}`
+            : `${config.S3_ENDPOINT}/${bucketName}/${bucket}/${key}`;
+          return { data: { publicUrl } };
         },
         async remove(keys: string[]) {
           const errors: Array<{ key: string; message: string }> = [];
           for (const key of keys) {
             try {
-              const { targetPath } = safeStoragePath(bucket, key);
-              await fs.unlink(targetPath);
+              const s3Key = `${bucket}/${key}`;
+              await deleteFile(s3Key);
             } catch (err: unknown) {
-              const code = (err as NodeJS.ErrnoException).code;
-              if (code !== "ENOENT") {
-                errors.push({ key, message: (err as Error).message });
-              }
+              errors.push({ key, message: (err as Error).message });
             }
           }
           return { data: null, error: errors.length ? { message: errors.map(e => `${e.key}: ${e.message}`).join("; ") } : null };

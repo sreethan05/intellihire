@@ -115,3 +115,18 @@ export async function getLeaderboardAttempts(examIds: string[]) {
   if (error) throw error;
   return data;
 }
+
+export const candidateRepository = {
+  findPublicPortfolio,
+  getCandidateAnswers,
+  getCompletedInterviews,
+  getCodingSubmissions,
+  getCandidateApplications,
+  getUserById,
+  getProfileByUserId,
+  updateProfile,
+  updateUser,
+  getExamAssignments,
+  getAttemptsByExamIds,
+  getLeaderboardAttempts,
+};

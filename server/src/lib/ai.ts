@@ -325,3 +325,9 @@ function parseJson(text: string) {
     return JSON.parse(match[0]);
   }
 }
+
+export const aiService = {
+  generateAiJson,
+  generateAiText,
+  hasAiKey,
+};

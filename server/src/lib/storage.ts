@@ -70,3 +70,8 @@ export async function deleteFile(key: string): Promise<void> {
     })
   );
 }
+
+export const storageService = {
+  uploadFile,
+  deleteFile,
+};
