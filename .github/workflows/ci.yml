@@ -82,7 +82,14 @@ jobs:
         run: npm --prefix server run migrate
 
       - name: Run Server Tests with Coverage
-        run: npm --prefix server run test:coverage
+        run: npm --prefix server run test:coverage > server/test_output.log 2>&1
+
+      - name: Upload Server Test Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-test-logs
+          path: server/test_output.log
 
   build:
     name: Build Frontend
