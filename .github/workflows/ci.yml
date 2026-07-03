@@ -1,5 +1,8 @@
 name: CI
 
+permissions:
+  contents: write
+
 on:
   push:
     branches: [main, master, develop]
@@ -87,6 +90,15 @@ jobs:
       - name: Print Server Test Logs
         if: always()
         run: cat server/test_output.log
+
+      - name: Commit and Push Test Logs
+        if: always()
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/test_output.log
+          git commit -m "ci: dump server test logs [skip ci]" || true
+          git push || true
 
       - name: Upload Server Test Logs
         if: always()
