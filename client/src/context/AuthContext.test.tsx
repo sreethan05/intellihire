@@ -61,7 +61,6 @@ describe("AuthContext", () => {
     fireEvent.click(screen.getByText("Login"));
     expect(screen.getByTestId("username")).toHaveTextContent("Test User");
     expect(screen.getByTestId("role")).toHaveTextContent("candidate");
-    expect(localStorage.getItem("token")).toBe("mock-token");
 
     // Click Update Name
     fireEvent.click(screen.getByText("Update Name"));

@@ -2,6 +2,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useCollege } from "@/context/CollegeContext";
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
+import api from "@/lib/api";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import { io } from "socket.io-client";
@@ -71,16 +72,10 @@ export default function Layout() {
 
   useEffect(() => {
     if (!user) return;
-    const token = localStorage.getItem("token");
-    fetch("/api/ai/profile-stats", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data && data.stats) {
-          setProfileStats(data);
+    api.get("/ai/profile-stats")
+      .then((res) => {
+        if (res.data && res.data.stats) {
+          setProfileStats(res.data);
         }
       })
       .catch((err) => console.error("Error fetching profile stats:", err));
@@ -89,11 +84,8 @@ export default function Layout() {
   // Connect to notifications WebSocket
   useEffect(() => {
     if (!user) return;
-    const token = localStorage.getItem("token");
-    if (!token) return;
 
     const socket = io(import.meta.env.VITE_API_URL?.replace("/api", "") || "http://localhost:5000", {
-      auth: { token },
       transports: ["websocket"],
     });
 
@@ -177,8 +169,8 @@ export default function Layout() {
   return (
     <div className="flex h-screen overflow-hidden bg-[#f8fafc] dark:bg-slate-950">
       {/* Sidebar - white background, slate borders, light violet accents */}
-      <aside className="flex h-full w-[260px] shrink-0 flex-col bg-white dark:bg-slate-900 border-r border-slate-200/60 dark:border-slate-800 shadow-[4px_0_24px_rgba(0,0,0,0.015)]">
-        <div className="flex items-center gap-3 px-5 py-5 border-b border-slate-100 dark:border-slate-800">
+      <aside className="flex h-full w-[260px] shrink-0 flex-col bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-r border-slate-200/60 dark:border-slate-800/60 shadow-[4px_0_24px_rgba(0,0,0,0.015)]">
+        <div className="flex items-center gap-3 px-5 py-5 border-b border-slate-100 dark:border-slate-800/60">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-sm font-extrabold text-lg select-none">
             I
           </div>
@@ -197,10 +189,10 @@ export default function Layout() {
                 <Link
                   key={`${link.path}-${link.label}`}
                   to={link.path}
-                  className={`flex h-10 items-center gap-3 rounded-lg px-3.5 text-[13px] font-bold transition-all ${
+                  className={`flex h-10 items-center gap-3 rounded-lg px-3.5 text-[13px] font-bold transition-all duration-200 hover:-translate-y-0.5 ${
                     isActive
-                      ? "bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-400 shadow-sm"
-                      : "text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-100"
+                      ? "bg-violet-50/90 dark:bg-violet-950/40 text-violet-700 dark:text-violet-400 shadow-sm border border-violet-100/50 dark:border-violet-900/20"
+                      : "text-slate-500 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-100"
                   }`}
                 >
                   <Icon className={`h-4 w-4 ${isActive ? "text-violet-600" : "text-slate-400"}`} />
@@ -212,36 +204,38 @@ export default function Layout() {
         </nav>
 
         {/* Bottom sidebar controls */}
-        <div className="p-4 border-t border-slate-100 space-y-1">
-            <button
-              type="button"
-              onClick={() => {
-                setEditName(user?.name || "");
-                setEditEmail(user?.email || "");
-                setShowEditProfileModal(true);
-              }}
-              className="flex h-9 w-full items-center gap-3 rounded-lg px-3 text-[13px] font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-            >
-              <Settings className="h-4 w-4 text-slate-400" />
-              Settings
-            </button>
-            <button type="button" onClick={logout} className="flex h-9 w-full items-center gap-3 rounded-lg px-3 text-[13px] font-semibold text-slate-500 hover:bg-rose-50 hover:text-rose-600">
-              <LogOut className="h-4 w-4 text-slate-400" />
-              Logout
-            </button>
-          </div>
+        <div className="p-4 border-t border-slate-100 dark:border-slate-800/60 space-y-1">
+          <button
+            type="button"
+            onClick={() => {
+              setEditName(user?.name || "");
+              setEditEmail(user?.email || "");
+              setShowEditProfileModal(true);
+            }}
+            className="flex h-9 w-full items-center gap-3 rounded-lg px-3 text-[13px] font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-all duration-200"
+          >
+            <Settings className="h-4 w-4 text-slate-400" />
+            Settings
+          </button>
+          <button type="button" onClick={logout} className="flex h-9 w-full items-center gap-3 rounded-lg px-3 text-[13px] font-semibold text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition-all duration-200">
+            <LogOut className="h-4 w-4 text-slate-400" />
+            Logout
+          </button>
+        </div>
       </aside>
 
-      <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden relative">
+        <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-violet-500/5 rounded-full blur-[100px] pointer-events-none -z-10" />
+
         {/* Header - White background, slate bottom border, Search bar */}
-        <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center justify-between border-b border-slate-200/60 dark:border-slate-800 bg-white dark:bg-slate-900 px-6 shadow-[0_2px_12px_rgba(0,0,0,0.01)]">
+        <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center justify-between border-b border-slate-200/60 dark:border-slate-800/60 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-6 shadow-[0_2px_12px_rgba(0,0,0,0.01)]">
           <div className="flex items-center gap-5 w-full max-w-[150px] sm:max-w-xs md:max-w-sm transition-all duration-200">
             <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 placeholder="Search global reports..."
-                className="h-9 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 pl-9 pr-4 text-xs font-semibold text-slate-900 dark:text-slate-100 outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:bg-white"
+                className="h-9 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 pl-9 pr-4 text-xs font-semibold text-slate-900 dark:text-slate-100 outline-none transition duration-200 placeholder:text-slate-400 focus:border-violet-500/80 focus:ring-2 focus:ring-violet-500/10 focus:bg-white"
               />
             </div>
           </div>
@@ -303,7 +297,7 @@ export default function Layout() {
                   {/* Backdrop Overlay to close */}
                   <div className="fixed inset-0 z-30 cursor-default" onClick={() => setShowProfileDropdown(false)} />
                   
-                  <div className="absolute right-0 mt-3 w-80 rounded-2xl border border-slate-200/70 bg-white p-5 shadow-2xl z-40 animate-in fade-in-50 slide-in-from-top-2 duration-150 flex flex-col items-stretch text-center">
+                  <div className="absolute right-0 mt-3 w-80 rounded-2xl border border-slate-200/70 dark:border-slate-800/80 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md p-5 shadow-2xl z-40 animate-in fade-in-50 slide-in-from-top-2 duration-150 flex flex-col items-stretch text-center">
                     {/* Upper User Circle */}
                     <div className="relative mx-auto mt-2">
                       <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-indigo-600 text-lg font-bold text-white shadow-md ring-4 ring-violet-50">
@@ -315,18 +309,18 @@ export default function Layout() {
                     </div>
 
                     <div className="mt-3">
-                      <div className="text-sm font-extrabold text-slate-800 leading-tight">{user?.name}</div>
+                      <div className="text-sm font-extrabold text-slate-800 dark:text-slate-100 leading-tight">{user?.name}</div>
                       <div className="text-xs font-medium text-slate-400 mt-0.5">{user?.email}</div>
-                      <div className="mt-2 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-violet-50 border border-violet-100 text-violet-700 uppercase tracking-wider">
+                      <div className="mt-2 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-violet-50 dark:bg-violet-950/40 border border-violet-100 dark:border-violet-900/20 text-violet-700 dark:text-violet-400 uppercase tracking-wider">
                         <UserCheck className="h-2.5 w-2.5" /> {user?.role} ACCOUNT
                       </div>
                     </div>
 
-                    <div className="h-px bg-slate-100 my-4" />
+                    <div className="h-px bg-slate-100 dark:bg-slate-800 my-4" />
 
                     {/* LeetCode / Study Style Statistics */}
                     {profileStats && (
-                      <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-3.5 text-left mb-4">
+                      <div className="bg-slate-50/80 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 rounded-xl p-3.5 text-left mb-4">
                         <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-2.5">
                           <Award className="h-3 w-3 text-amber-500" /> {profileStats.title}
                         </div>
@@ -334,7 +328,7 @@ export default function Layout() {
                           {profileStats.stats.map((stat, i) => (
                             <div key={i}>
                               <div className="text-[10px] text-slate-500 font-bold leading-tight truncate">{stat.label}</div>
-                              <div className="text-xs font-extrabold text-slate-800 mt-0.5 truncate">{stat.value}</div>
+                              <div className="text-xs font-extrabold text-slate-850 dark:text-slate-200 mt-0.5 truncate">{stat.value}</div>
                             </div>
                           ))}
                         </div>
@@ -350,21 +344,21 @@ export default function Layout() {
                           setShowEditProfileModal(true);
                           setShowProfileDropdown(false);
                         }}
-                        className="w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition"
+                        className="w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-850 transition"
                       >
                         <PenSquare className="h-4 w-4 text-slate-400" />
                         Edit Profile Details
                       </button>
                       <button
                         onClick={() => setShowProfileDropdown(false)}
-                        className="w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition"
+                        className="w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-850 transition"
                       >
                         <Settings className="h-4 w-4 text-slate-400" />
                         Account Settings
                       </button>
                     </div>
 
-                    <div className="h-px bg-slate-100 my-4" />
+                    <div className="h-px bg-slate-100 dark:bg-slate-800 my-4" />
 
                     {/* Prominent logout button at the bottom */}
                     <button
@@ -388,8 +382,8 @@ export default function Layout() {
 
       {/* Edit Profile Modal (similar to LeetCode account customization) */}
       {showEditProfileModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-xs">
-          <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-100 animate-in fade-in-50 zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-md">
+          <div className="relative w-full max-w-md rounded-2xl bg-white/95 dark:bg-slate-900/95 border border-white/20 dark:border-slate-800/40 p-6 shadow-2xl animate-in fade-in-50 zoom-in-95 duration-150">
             {/* Close Button */}
             <button
               onClick={() => setShowEditProfileModal(false)}
@@ -398,13 +392,13 @@ export default function Layout() {
               <X className="h-4 w-4" />
             </button>
 
-            <div className="mb-5 pb-3 border-b border-slate-100">
+            <div className="mb-5 pb-3 border-b border-slate-100 dark:border-slate-850">
               <div className="flex items-center gap-2.5">
                 <div className="rounded-lg bg-violet-50 p-2 text-violet-700">
                   <User className="h-5 w-5" />
                 </div>
                 <div>
-                  <h2 className="text-base font-extrabold text-slate-900 tracking-tight">Edit Profile Settings</h2>
+                  <h2 className="text-base font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">Edit Profile Settings</h2>
                 </div>
               </div>
             </div>
@@ -421,7 +415,7 @@ export default function Layout() {
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
                     placeholder="Enter your name"
-                    className="h-10 w-full rounded-lg border border-slate-200 pl-10 pr-4 text-xs font-semibold text-slate-900 outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500 bg-slate-50/50 focus:bg-white"
+                    className="h-10 w-full rounded-lg border border-slate-200 dark:border-slate-700 pl-10 pr-4 text-xs font-semibold text-slate-900 dark:text-slate-100 outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500 bg-slate-50/50 focus:bg-white dark:bg-slate-800"
                   />
                 </div>
               </div>
@@ -437,12 +431,12 @@ export default function Layout() {
                     value={editEmail}
                     onChange={(e) => setEditEmail(e.target.value)}
                     placeholder="Enter email address"
-                    className="h-10 w-full rounded-lg border border-slate-200 pl-10 pr-4 text-xs font-semibold text-slate-900 outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500 bg-slate-50/50 focus:bg-white"
+                    className="h-10 w-full rounded-lg border border-slate-200 dark:border-slate-700 pl-10 pr-4 text-xs font-semibold text-slate-900 dark:text-slate-100 outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500 bg-slate-50/50 focus:bg-white dark:bg-slate-800"
                   />
                 </div>
               </div>
 
-              <div className="h-px bg-slate-100 my-2" />
+              <div className="h-px bg-slate-100 dark:bg-slate-850 my-2" />
 
               <div>
                 <Label htmlFor="edit-profile-pass" className="text-xs font-bold text-slate-700">New Password (Optional)</Label>
@@ -454,7 +448,7 @@ export default function Layout() {
                     value={editPassword}
                     onChange={(e) => setEditPassword(e.target.value)}
                     placeholder="Leave blank to keep current"
-                    className="h-10 w-full rounded-lg border border-slate-200 pl-10 pr-4 text-xs font-semibold text-slate-900 outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500 bg-slate-50/50 focus:bg-white"
+                    className="h-10 w-full rounded-lg border border-slate-200 dark:border-slate-700 pl-10 pr-4 text-xs font-semibold text-slate-900 dark:text-slate-100 outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500 bg-slate-50/50 focus:bg-white dark:bg-slate-800"
                   />
                 </div>
               </div>
@@ -469,7 +463,7 @@ export default function Layout() {
                     value={editConfirm}
                     onChange={(e) => setEditConfirm(e.target.value)}
                     placeholder="Confirm new password"
-                    className="h-10 w-full rounded-lg border border-slate-200 pl-10 pr-4 text-xs font-semibold text-slate-900 outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500 bg-slate-50/50 focus:bg-white"
+                    className="h-10 w-full rounded-lg border border-slate-200 dark:border-slate-700 pl-10 pr-4 text-xs font-semibold text-slate-900 dark:text-slate-100 outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500 bg-slate-50/50 focus:bg-white dark:bg-slate-800"
                   />
                 </div>
               </div>
@@ -480,7 +474,7 @@ export default function Layout() {
                   type="button"
                   variant="outline"
                   onClick={() => setShowEditProfileModal(false)}
-                  className="h-9 text-xs font-bold border-slate-200 text-slate-600 rounded-lg"
+                  className="h-9 text-xs font-bold border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-lg"
                 >
                   Cancel
                 </Button>

@@ -61,11 +61,7 @@ export default function AdminExamActivity() {
       .finally(() => setLoading(false));
 
     // Connect to WebSocket
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
     const socket = io(WS_URL, {
-      auth: { token },
       transports: ["websocket"],
     });
 

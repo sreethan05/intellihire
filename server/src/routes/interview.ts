@@ -1,5 +1,8 @@
+import { z } from "zod";
 import { Router } from "express";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { validateBody } from "../middleware/validation.js";
+import { scheduleInterviewSchema, interviewAnswerBodySchema } from "../lib/schemas.js";
 import * as interviewService from "../services/interviewService.js";
 
 const router = Router();
@@ -41,7 +44,7 @@ router.get("/recruiter/pending", async (req: AuthRequest, res, next) => {
 });
 
 // POST /api/interview/start
-router.post("/start", async (req: AuthRequest, res, next) => {
+router.post("/start", validateBody(z.object({ job_id: z.string().uuid().optional(), exam_id: z.string().uuid().optional() })), async (req: AuthRequest, res, next) => {
   try {
     const { job_id, exam_id } = req.body;
     const interview = await interviewService.startInterview(req.user!.id, job_id, exam_id);
@@ -52,7 +55,7 @@ router.post("/start", async (req: AuthRequest, res, next) => {
 });
 
 // POST /api/interview/:interviewId/schedule
-router.post("/:interviewId/schedule", roleMiddleware(["recruiter"]), async (req: AuthRequest, res, next) => {
+router.post("/:interviewId/schedule", roleMiddleware(["recruiter"]), validateBody(scheduleInterviewSchema), async (req: AuthRequest, res, next) => {
   try {
     const { scheduled_start, scheduled_end } = req.body;
     const interview = await interviewService.scheduleInterview(req.params.interviewId as string, scheduled_start, scheduled_end);
@@ -73,7 +76,7 @@ router.get("/:interviewId/answers", async (req: AuthRequest, res, next) => {
 });
 
 // POST /api/interview/:interviewId/answer
-router.post("/:interviewId/answer", async (req: AuthRequest, res, next) => {
+router.post("/:interviewId/answer", validateBody(interviewAnswerBodySchema), async (req: AuthRequest, res, next) => {
   try {
     const { question, answer, stage } = req.body;
     const result = await interviewService.feedAnswer(

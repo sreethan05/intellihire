@@ -56,9 +56,8 @@ export function CollegeProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
     const userStr = localStorage.getItem("user");
-    if (token && userStr) {
+    if (userStr) {
       try {
         const user = JSON.parse(userStr);
         if (user.role === "recruiter") {

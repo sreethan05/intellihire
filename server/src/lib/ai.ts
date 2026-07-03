@@ -32,6 +32,25 @@ function getKeys() {
   };
 }
 
+async function fetchWithRetry(url: string, init?: RequestInit, retries = 3, delay = 100): Promise<Response> {
+  try {
+    const res = await fetch(url, init);
+    if (!res.ok && retries > 0) {
+      if (res.status >= 500 || res.status === 429) {
+        await new Promise((r) => setTimeout(r, delay));
+        return fetchWithRetry(url, init, retries - 1, delay * 5);
+      }
+    }
+    return res;
+  } catch (err) {
+    if (retries > 0) {
+      await new Promise((r) => setTimeout(r, delay));
+      return fetchWithRetry(url, init, retries - 1, delay * 5);
+    }
+    throw err;
+  }
+}
+
 const extractionPrompt = `
 You are extracting student account data from an Indian college semester grade report.
 Return only valid JSON. Do not wrap it in markdown.
@@ -92,7 +111,7 @@ export async function generateGroqText(prompt: string | { systemPrompt?: string;
   }
   messages.push({ role: "user", content: userPrompt });
 
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+  const response = await fetchWithRetry("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -133,7 +152,7 @@ export async function generateGroqJson<T>(prompt: string | { systemPrompt?: stri
   }
   messages.push({ role: "user", content: userPrompt });
 
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+  const response = await fetchWithRetry("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -264,7 +283,7 @@ Return ONLY valid JSON matching this schema:
 }
 `;
 
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+  const response = await fetchWithRetry("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

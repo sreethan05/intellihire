@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { db, storageRoot, recordPipelineStage } from "../lib/postgres.js";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { validateBody } from "../middleware/validation.js";
+import { updateProfileSchema, onboardingSchema, respondOfferSchema } from "../lib/schemas.js";
 import * as candidateService from "../services/candidateService.js";
 import { uploadFile } from "../lib/storage.js";
 import {
@@ -38,9 +40,10 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype === "application/pdf") {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (file.mimetype === "application/pdf" && ext === ".pdf") {
       cb(null, true);
     } else {
       cb(new Error("Only PDF format resumes are supported") as any, false);
@@ -71,7 +74,7 @@ router.get("/profile", async (req: AuthRequest, res, next) => {
   }
 });
 
-router.put("/profile", async (req: AuthRequest, res, next) => {
+router.put("/profile", validateBody(updateProfileSchema), async (req: AuthRequest, res, next) => {
   try {
     const profile = await candidateService.updateProfile(req.user!.id, req.body);
     res.json({ message: "Profile updated successfully", profile });
@@ -80,7 +83,7 @@ router.put("/profile", async (req: AuthRequest, res, next) => {
   }
 });
 
-router.post("/onboarding", async (req: AuthRequest, res, next) => {
+router.post("/onboarding", validateBody(onboardingSchema), async (req: AuthRequest, res, next) => {
   try {
     const profile = await candidateService.completeOnboarding(req.user!.id, req.body);
     res.json({ message: "Onboarding complete", profile });
@@ -1403,16 +1406,11 @@ router.get("/performance-radar", async (req: AuthRequest, res) => {
   }
 });
 
-router.post("/offers/:jobId/respond", async (req: AuthRequest, res) => {
+router.post("/offers/:jobId/respond", validateBody(respondOfferSchema), async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.id;
     const { jobId } = req.params;
     const { response, notes } = req.body; // 'accept', 'decline', 'negotiate'
-    
-    if (!["accept", "decline", "negotiate"].includes(response)) {
-      res.status(400).json({ error: "Invalid offer response type" });
-      return;
-    }
     
     const updateFields: any = {
       recruiter_notes: notes || ""

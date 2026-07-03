@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { db } from "../lib/postgres.js";
 import { authMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { validateBody } from "../middleware/validation.js";
+import { proctoringLogEventSchema } from "../lib/schemas.js";
 import { hasAiKey, verifyWebcamSnapshot } from "../lib/ai.js";
 import { logger } from "../lib/logger.js";
 
@@ -138,7 +140,7 @@ async function verifyAndLogSnapshotViolation(
   }
 }
 
-router.post("/events", async (req: AuthRequest, res) => {
+router.post("/events", validateBody(proctoringLogEventSchema), async (req: AuthRequest, res) => {
   try {
     const { attempt_id, exam_id, event_type, violation_count, message, snapshot_data } = req.body;
 

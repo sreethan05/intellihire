@@ -214,6 +214,7 @@ const poolConfig = databaseUrl()
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
+      query_timeout: 5000, // 5 seconds connection query timeout limit
     }
   : {
       host: process.env.PGHOST,
@@ -225,6 +226,7 @@ const poolConfig = databaseUrl()
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
+      query_timeout: 5000, // 5 seconds connection query timeout limit
     };
 
 export const pool = new Pool(poolConfig);
@@ -234,8 +236,24 @@ pool.query = async function (text: any, params: any) {
   const start = Date.now();
   const res = await originalQuery(text, params);
   const duration = Date.now() - start;
-  if (duration > 100) {
-    logger.warn({ sql: typeof text === "string" ? text : text?.text, durationMs: duration }, "Slow database query detected");
+
+  let sqlString = "";
+  if (typeof text === "string") {
+    sqlString = text;
+  } else if (text && typeof text === "object" && typeof text.text === "string") {
+    sqlString = text.text;
+  }
+
+  if (duration > 100 && sqlString && !sqlString.trim().toLowerCase().startsWith("explain")) {
+    try {
+      const explainRes = await originalQuery(`EXPLAIN ${sqlString}`, params || text.values);
+      const plan = explainRes.rows.map((row: any) => Object.values(row)[0]).join("\n");
+      logger.warn({ sql: sqlString, durationMs: duration, plan }, "Slow database query plan logged");
+    } catch (err: any) {
+      logger.warn({ sql: sqlString, durationMs: duration, explainError: err.message }, "Slow database query detected (EXPLAIN failed)");
+    }
+  } else if (duration > 100) {
+    logger.warn({ sql: sqlString || String(text), durationMs: duration }, "Slow database query detected");
   }
   return res;
 } as any;

@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { db } from "../lib/postgres.js";
 import { authMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { validateBody } from "../middleware/validation.js";
+import { submitMcqSchema, submitCodeSchema, updateCodeScoreSchema, submitExamSchema } from "../lib/schemas.js";
 import { gradingQueue } from "../lib/queue.js";
 import { runPlagiarismCheck } from "../lib/plagiarism.js";
 import { logger } from "../lib/logger.js";
@@ -10,7 +12,7 @@ const router = Router();
 router.use(authMiddleware);
 
 // Submit a single MCQ answer — upsert to allow re-answering
-router.post("/submit-mcq", async (req: AuthRequest, res) => {
+router.post("/submit-mcq", validateBody(submitMcqSchema), async (req: AuthRequest, res) => {
   try {
     const { attempt_id, question_id, selected_option } = req.body;
     if (!attempt_id || !question_id || !selected_option) {
@@ -83,7 +85,7 @@ router.post("/submit-mcq", async (req: AuthRequest, res) => {
 });
 
 // Submit code for a coding question — upsert to allow re-submissions
-router.post("/submit-code", async (req: AuthRequest, res) => {
+router.post("/submit-code", validateBody(submitCodeSchema), async (req: AuthRequest, res) => {
   try {
     const { attempt_id, coding_question_id, code, language } = req.body;
     if (!attempt_id || !coding_question_id || !code || !language) {
@@ -141,7 +143,7 @@ router.post("/submit-code", async (req: AuthRequest, res) => {
 });
 
 // Update coding submission score after test-case run
-router.post("/update-code-score", async (req: AuthRequest, res) => {
+router.post("/update-code-score", validateBody(updateCodeScoreSchema), async (req: AuthRequest, res) => {
   try {
     const { attempt_id, coding_question_id, score, code, language } = req.body;
     if (!attempt_id || !coding_question_id || score === undefined) {
@@ -199,7 +201,7 @@ router.post("/update-code-score", async (req: AuthRequest, res) => {
 });
 
 // Finalize the exam: tally scores, mark as completed, and queue for background grading
-router.post("/submit-exam", async (req: AuthRequest, res) => {
+router.post("/submit-exam", validateBody(submitExamSchema), async (req: AuthRequest, res) => {
   try {
     const { attempt_id } = req.body;
     if (!attempt_id) {

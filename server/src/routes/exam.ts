@@ -1,6 +1,20 @@
 import { Router } from "express";
 import { db } from "../lib/postgres.js";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { validateBody, validateQuery } from "../middleware/validation.js";
+import { invalidatePattern } from "../lib/cache.js";
+import {
+  createExamSchema,
+  startExamSchema,
+  paginationSchema,
+  linkBankMcqSchema,
+  linkBankCodingSchema,
+  addQuestionsSchema,
+  addCodingQuestionsSchema,
+  assignExamSchema,
+  addBankQuestionsSchema,
+  addBankCodingSchema,
+} from "../lib/schemas.js";
 import { getExamValidationError } from "../lib/validation.js";
 import { sendExamAssignedEmail } from "../lib/email.js";
 import { logger } from "../lib/logger.js";
@@ -12,7 +26,7 @@ router.use(authMiddleware);
  
 const recruiterOrAdmin = roleMiddleware(["recruiter", "admin"]);
 
-router.post("/create", recruiterOrAdmin, async (req: AuthRequest, res) => {
+router.post("/create", recruiterOrAdmin, validateBody(createExamSchema), async (req: AuthRequest, res) => {
   try {
     const {
       title,
@@ -59,6 +73,8 @@ router.post("/create", recruiterOrAdmin, async (req: AuthRequest, res) => {
 
     const { data, error } = await db.from("exams").insert(sanitizedPayload).select().single();
     if (error) { res.status(400).json({ error: error.message }); return; }
+    invalidatePattern("cache:api:*list*").catch((e) => logger.error({ err: e }, "Failed to invalidate exams cache"));
+    invalidatePattern("cache:api:*exams*").catch((e) => logger.error({ err: e }, "Failed to invalidate exams cache"));
     res.json({ message: "Exam created", exam: data });
   } catch (err) { logger.error({ err }, "Create exam error"); res.status(500).json({ error: "Server error" }); }
 });
@@ -90,12 +106,9 @@ router.get("/bank/coding", recruiterOrAdmin, async (req: AuthRequest, res) => {
 });
  
 // Link existing bank questions to exam (no re-insert)
-router.post("/bank/link-mcq", recruiterOrAdmin, async (req: AuthRequest, res) => {
+router.post("/bank/link-mcq", recruiterOrAdmin, validateBody(linkBankMcqSchema), async (req: AuthRequest, res) => {
   try {
     const { exam_id, question_ids } = req.body;
-    if (!exam_id || !Array.isArray(question_ids) || question_ids.length === 0) {
-      res.status(400).json({ error: "exam_id and question_ids required" }); return;
-    }
     const rows = question_ids.map((qid: string) => ({ exam_id, question_id: qid, marks: 1 }));
     const { error } = await db.from("exam_questions").upsert(rows, { onConflict: "exam_id,question_id", ignoreDuplicates: true });
     if (error) { res.status(400).json({ error: error.message }); return; }
@@ -103,12 +116,9 @@ router.post("/bank/link-mcq", recruiterOrAdmin, async (req: AuthRequest, res) =>
   } catch { res.status(500).json({ error: "Server error" }); }
 });
  
-router.post("/bank/link-coding", recruiterOrAdmin, async (req: AuthRequest, res) => {
+router.post("/bank/link-coding", recruiterOrAdmin, validateBody(linkBankCodingSchema), async (req: AuthRequest, res) => {
   try {
     const { exam_id, coding_question_ids } = req.body;
-    if (!exam_id || !Array.isArray(coding_question_ids) || coding_question_ids.length === 0) {
-      res.status(400).json({ error: "exam_id and coding_question_ids required" }); return;
-    }
     const rows = coding_question_ids.map((qid: string) => ({ exam_id, coding_question_id: qid, marks: 10 }));
     const { error } = await db.from("exam_coding_questions").upsert(rows, { onConflict: "exam_id,coding_question_id", ignoreDuplicates: true });
     if (error) { res.status(400).json({ error: error.message }); return; }
@@ -116,13 +126,9 @@ router.post("/bank/link-coding", recruiterOrAdmin, async (req: AuthRequest, res)
   } catch { res.status(500).json({ error: "Server error" }); }
 });
 
-router.post("/bank/add-mcqs", recruiterOrAdmin, async (req: AuthRequest, res) => {
+router.post("/bank/add-mcqs", recruiterOrAdmin, validateBody(addBankQuestionsSchema), async (req: AuthRequest, res) => {
   try {
     const { questions } = req.body;
-    if (!Array.isArray(questions) || questions.length === 0) {
-      res.status(400).json({ error: "Questions array required" });
-      return;
-    }
     const inserted: any[] = [];
     for (const q of questions) {
       const { data, error } = await db
@@ -148,13 +154,9 @@ router.post("/bank/add-mcqs", recruiterOrAdmin, async (req: AuthRequest, res) =>
   }
 });
 
-router.post("/bank/add-coding", recruiterOrAdmin, async (req: AuthRequest, res) => {
+router.post("/bank/add-coding", recruiterOrAdmin, validateBody(addBankCodingSchema), async (req: AuthRequest, res) => {
   try {
     const { question } = req.body;
-    if (!question) {
-      res.status(400).json({ error: "Question object required" });
-      return;
-    }
     const { data, error } = await db
       .from("coding_questions")
       .insert({
@@ -178,15 +180,10 @@ router.post("/bank/add-coding", recruiterOrAdmin, async (req: AuthRequest, res) 
     res.status(500).json({ error: "Server error" });
   }
 });
- 
-// ─────────────────────────────────────────────────────────────────────────────
- 
-router.post("/add-questions", recruiterOrAdmin, async (req: AuthRequest, res) => {
+
+router.post("/add-questions", recruiterOrAdmin, validateBody(addQuestionsSchema), async (req: AuthRequest, res) => {
   try {
     const { exam_id, questions } = req.body;
-    if (!exam_id || !Array.isArray(questions) || questions.length === 0) {
-      res.status(400).json({ error: "exam_id and questions array required" }); return;
-    }
     const insertedQuestions: any[] = [];
     for (const q of questions) {
       const { data: questionData, error: qErr } = await db.from("questions").insert({ question_text: q.question_text, option_a: q.option_a, option_b: q.option_b, option_c: q.option_c, option_d: q.option_d, correct_option: q.correct_option, marks: q.marks || 1, created_by: req.user!.id }).select().single();
@@ -198,12 +195,9 @@ router.post("/add-questions", recruiterOrAdmin, async (req: AuthRequest, res) =>
   } catch (err) { logger.error({ err }, "Add questions error"); res.status(500).json({ error: "Server error" }); }
 });
  
-router.post("/add-coding-questions", recruiterOrAdmin, async (req: AuthRequest, res) => {
+router.post("/add-coding-questions", recruiterOrAdmin, validateBody(addCodingQuestionsSchema), async (req: AuthRequest, res) => {
   try {
     const { exam_id, coding_questions } = req.body;
-    if (!exam_id || !Array.isArray(coding_questions) || coding_questions.length === 0) {
-      res.status(400).json({ error: "exam_id and coding_questions array required" }); return;
-    }
     const insertedQuestions: any[] = [];
     for (const q of coding_questions) {
       const { data: questionData, error: qErr } = await db.from("coding_questions").insert({ title: q.title, description: q.description, difficulty: q.difficulty || "medium", starter_code: q.starter_code || "", test_cases: q.test_cases || [], marks: q.marks || 10, created_by: req.user!.id }).select().single();
@@ -215,30 +209,27 @@ router.post("/add-coding-questions", recruiterOrAdmin, async (req: AuthRequest, 
   } catch (err) { logger.error({ err }, "Add coding questions error"); res.status(500).json({ error: "Server error" }); }
 });
  
-router.post("/assign", recruiterOrAdmin, async (req: AuthRequest, res) => {
+router.post("/assign", recruiterOrAdmin, validateBody(assignExamSchema), async (req: AuthRequest, res) => {
   try {
     const { exam_id, candidate_ids } = req.body;
-    if (!exam_id || !Array.isArray(candidate_ids) || candidate_ids.length === 0) {
-      res.status(400).json({ error: "exam_id and candidate_ids required" }); return;
-    }
     const assignments = candidate_ids.map((candidate_id) => ({ exam_id, candidate_id, assigned_by: req.user!.id }));
     const { data, error } = await db.from("exam_assignments").upsert(assignments, { onConflict: "exam_id,candidate_id", ignoreDuplicates: true }).select();
     if (error) { res.status(400).json({ error: error.message }); return; }
     const newCount = data?.length ?? 0;
     const skipped = assignments.length - newCount;
     const message = skipped > 0 ? `${newCount} candidate(s) assigned. ${skipped} already had this exam (skipped).` : "Exam assigned successfully.";
-
+ 
     // Send email notifications to newly assigned candidates (fire-and-forget)
     if (newCount > 0 && data) {
       const { data: examData } = await db.from("exams").select("title").eq("id", exam_id).single();
       const examTitle = examData?.title || "Untitled Exam";
-
+ 
       const candidateIds = data.map((a: any) => a.candidate_id);
       const { data: users } = await db
         .from("users")
         .select("id, name, email")
         .in("id", candidateIds);
-
+ 
       for (const user of users || []) {
         if (user.email) {
           sendExamAssignedEmail(user.email, user.name || "Candidate", examTitle, APP_URL)
@@ -246,27 +237,30 @@ router.post("/assign", recruiterOrAdmin, async (req: AuthRequest, res) => {
         }
       }
     }
-
+ 
     res.json({ message, assignments: data });
   } catch (err) { logger.error({ err }, "Assign exam error"); res.status(500).json({ error: "Server error" }); }
 });
  
-router.get("/list", async (req: AuthRequest, res) => {
+router.get("/list", validateQuery(paginationSchema), async (req: AuthRequest, res) => {
   try {
     const { role, id } = req.user!;
-    let query = db.from("exams").select("*");
+    const { page, limit } = req.query as any;
+    let query = db.from("exams").select("*", { count: "exact" });
     if (role === "recruiter") query = query.eq("created_by", id);
     if (!["admin", "recruiter"].includes(role)) {
       res.status(403).json({ error: "Forbidden" });
       return;
     }
-    const { data, error } = await query;
+    const { data, error, count } = await query
+      .order("created_at", { ascending: false })
+      .range((page - 1) * limit, page * limit - 1);
     if (error) { res.status(400).json({ error: error.message }); return; }
-    res.json({ exams: data || [] });
+    res.json({ exams: data || [], total: count || 0, page, limit });
   } catch (err) { logger.error({ err }, "List exams error"); res.status(500).json({ error: "Server error" }); }
 });
  
-router.post("/start", async (req: AuthRequest, res) => {
+router.post("/start", validateBody(startExamSchema), async (req: AuthRequest, res) => {
   try {
     const { exam_id } = req.body;
     if (!exam_id) { res.status(400).json({ error: "exam_id required" }); return; }

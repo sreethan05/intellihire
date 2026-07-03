@@ -4,6 +4,14 @@ import { db, transaction } from "../lib/postgres.js";
 import { scanMarksheetOCR } from "../lib/ocr.js";
 import { scanMarksheet, hasAiKey } from "../lib/ai.js";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { validateBody, validateQuery } from "../middleware/validation.js";
+import {
+  uploadStudentsSchema,
+  scanMarksheetsSchema,
+  studentVerificationSchema,
+  verifyStudentBatchSchema,
+  paginationSchema,
+} from "../lib/schemas.js";
 import { logger } from "../lib/logger.js";
 
 const router = Router();
@@ -191,16 +199,11 @@ router.get("/dashboard", async (req: AuthRequest, res) => {
   }
 });
 
-router.post("/upload-students", async (req: AuthRequest, res) => {
+router.post("/upload-students", validateBody(uploadStudentsSchema), async (req: AuthRequest, res) => {
   try {
-    const rows = req.body.rows as StudentRow[];
-    if (!Array.isArray(rows) || rows.length === 0) {
-      res.status(400).json({ error: "Student rows are required" });
-      return;
-    }
-
+    const { rows } = req.body;
     const tpo = await getTpoCollege(req.user!.id);
-    const { created, failed } = await provisionCandidateAccounts(rows, tpo, req.user!.id);
+    const { created, failed } = await provisionCandidateAccounts(rows as StudentRow[], tpo, req.user!.id);
 
     res.json({ message: `${created.length} student account(s) processed`, created, failed });
   } catch (err) {
@@ -209,24 +212,14 @@ router.post("/upload-students", async (req: AuthRequest, res) => {
   }
 });
 
-router.post("/scan-marksheets", async (req: AuthRequest, res) => {
+router.post("/scan-marksheets", validateBody(scanMarksheetsSchema), async (req: AuthRequest, res) => {
   try {
-    const files = req.body.files as Array<{ name: string; mimeType: string; data: string }>;
-    if (!Array.isArray(files) || files.length === 0) {
-      res.status(400).json({ error: "At least one marksheet file is required" });
-      return;
-    }
-
+    const { files } = req.body;
     const scanned: StudentRow[] = [];
     const failed: any[] = [];
 
     for (const file of files) {
       try {
-        if (!file.name || !file.mimeType || !file.data) {
-          failed.push({ file: file.name || "unknown", reason: "Missing file payload" });
-          continue;
-        }
-
         // ── Step 1: OCR + rule-based parser (no API, no limits) ──
         let student = await scanMarksheetOCR(file);
 
@@ -261,40 +254,42 @@ router.post("/scan-marksheets", async (req: AuthRequest, res) => {
   }
 });
 
-router.get("/students", async (req: AuthRequest, res) => {
+router.get("/students", validateQuery(paginationSchema), async (req: AuthRequest, res) => {
   try {
+    const { page, limit } = req.query as any;
     const { data: tpo } = await db.from("users").select("college_id").eq("id", req.user!.id).single();
     if (!tpo?.college_id) {
       res.status(400).json({ error: "TPO is not linked to a college" });
       return;
     }
 
-    const { data, error } = await db
+    const { data, error, count } = await db
       .from("candidate_profiles")
-      .select("*, user:user_id(id, name, email, roll_number, profile_complete, created_at)")
+      .select("*, user:user_id(id, name, email, roll_number, profile_complete, created_at)", { count: "exact" })
       .eq("college_id", tpo.college_id)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range((page - 1) * limit, page * limit - 1);
 
     if (error) {
       res.status(400).json({ error: error.message });
       return;
     }
 
-    res.json({ students: data || [] });
+    res.json({ students: data || [], total: count || 0, page, limit });
   } catch (err) {
     logger.error({ err }, "TPO students error");
     res.status(500).json({ error: "Server error" });
   }
 });
 
-router.patch("/students/:profileId/verification", async (req: AuthRequest, res) => {
+router.patch("/students/:profileId/verification", validateBody(studentVerificationSchema), async (req: AuthRequest, res) => {
   try {
     const { profileId } = req.params;
     const { documents_verified } = req.body;
     const { data: tpo } = await db.from("users").select("college_id").eq("id", req.user!.id).single();
     const { data, error } = await db
       .from("candidate_profiles")
-      .update({ documents_verified: Boolean(documents_verified) })
+      .update({ documents_verified })
       .eq("id", profileId)
       .eq("college_id", tpo?.college_id)
       .select()
@@ -384,13 +379,9 @@ router.get("/dashboard/summary", async (req: AuthRequest, res) => {
   }
 });
 
-router.post("/verify/batch", async (req: AuthRequest, res) => {
+router.post("/verify/batch", validateBody(verifyStudentBatchSchema), async (req: AuthRequest, res) => {
   try {
     const { studentIds, documents_verified } = req.body;
-    if (!Array.isArray(studentIds) || studentIds.length === 0) {
-      res.status(400).json({ error: "No student profile IDs provided for batch verification" });
-      return;
-    }
     
     const { data: tpo } = await db.from("users").select("college_id").eq("id", req.user!.id).single();
     if (!tpo?.college_id) {

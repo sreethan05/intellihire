@@ -17,11 +17,10 @@ export function useProctorSocket() {
   const [lastSnapshot, setLastSnapshot] = useState<ProctoringEvent | null>(null);
   const [lastViolation, setLastViolation] = useState<ProctoringEvent | null>(null);
 
-  const connect = useCallback((token: string) => {
+  const connect = useCallback((_token?: string | null) => {
     if (socketRef.current) return;
 
     const socket = io(WS_URL, {
-      auth: { token },
       transports: ["websocket"],
     });
 
@@ -68,7 +67,15 @@ export function useProctorSocket() {
     socketRef.current?.emit("proctor:monitor", { examId });
   }, []);
 
+  const lastSentSnapshotRef = useRef<number>(0);
+
   const sendSnapshot = useCallback((attemptId: string, examId: string, snapshotData: string) => {
+    const now = Date.now();
+    if (now - lastSentSnapshotRef.current < 2000) {
+      console.log("[ProctorSocket] Snapshot emission throttled client-side");
+      return;
+    }
+    lastSentSnapshotRef.current = now;
     socketRef.current?.emit("proctor:snapshot", {
       attemptId,
       examId,

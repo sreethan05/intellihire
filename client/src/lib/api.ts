@@ -8,27 +8,16 @@ const api = axios.create({
     "Content-Type": "application/json",
   },
   withCredentials: true,
-});
-
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
+  xsrfCookieName: "csrf_token",
+  xsrfHeaderName: "x-csrf-token",
 });
 
 api.interceptors.response.use(
   (response) => {
-    const refreshedToken = response.headers["x-refreshed-token"];
-    if (refreshedToken) {
-      localStorage.setItem("token", refreshedToken);
-    }
     return response;
   },
   (error) => {
     if (error.response?.status === 401 && !error.config?.url?.includes("/auth/login")) {
-      localStorage.removeItem("token");
       localStorage.removeItem("user");
       window.location.href = "/login";
     }

@@ -3,7 +3,7 @@ import type { User } from "@/types";
 
 interface AuthContextType {
   user: User | null;
-  login: (token: string, user: User) => void;
+  login: (token: string | null | undefined, user: User) => void;
   logout: () => void;
   loading: boolean;
   updateUser: (updatedUser: Partial<User>) => void;
@@ -16,27 +16,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
     const storedUser = localStorage.getItem("user");
-    if (token && storedUser) {
+    if (storedUser) {
       try {
         setUser(JSON.parse(storedUser));
       } catch {
-        localStorage.removeItem("token");
         localStorage.removeItem("user");
       }
     }
     setLoading(false);
   }, []);
 
-  const login = (token: string, user: User) => {
-    localStorage.setItem("token", token);
+  const login = (_token: string | null | undefined, user: User) => {
     localStorage.setItem("user", JSON.stringify(user));
     setUser(user);
   };
 
   const logout = () => {
-    localStorage.removeItem("token");
     localStorage.removeItem("user");
     setUser(null);
     window.location.href = "/login";

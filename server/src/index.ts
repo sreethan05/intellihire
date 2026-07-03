@@ -5,6 +5,7 @@ import { logger } from "./lib/logger.js";
 import { config } from "./config.js";
 import { pool } from "./lib/postgres.js";
 import { redisClient } from "./lib/cache.js";
+import { runDataRetentionCleanup } from "./lib/dataRetention.js";
 
 const PORT = Number(config.PORT) || 5000;
 const NODE_ENV = config.NODE_ENV;
@@ -22,6 +23,14 @@ const serverInstance = httpServer.listen(PORT, () => {
   console.log(`   API:      http://localhost:${PORT}/api/v1`);
   console.log(`   Health:   http://localhost:${PORT}/api/health`);
   console.log(`   WebSocket: ws://localhost:${PORT}`);
+
+  // Run data retention log cleanup on startup
+  runDataRetentionCleanup().catch((err) => logger.error({ err }, "Initial data retention cleanup failed"));
+
+  // Schedule to run every 24 hours
+  setInterval(() => {
+    runDataRetentionCleanup().catch((err) => logger.error({ err }, "Periodic data retention cleanup failed"));
+  }, 24 * 60 * 60 * 1000);
 });
 
 async function gracefulShutdown(signal: string) {

@@ -216,12 +216,12 @@ export default function CandidateDashboard() {
       {/* Title Header */}
       <div className="flex justify-between items-center flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900">Placement Command Center</h1>
+          <h1 className="text-2xl font-black bg-gradient-to-r from-violet-600 via-purple-500 to-indigo-600 bg-clip-text text-transparent tracking-tight">Placement Command Center</h1>
           <p className="text-sm text-slate-500">Track your verified profile, pipeline stage eligibility, and proctored exam performance.</p>
         </div>
         <Button 
           onClick={() => setShowEditModal(true)} 
-          className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg px-4 h-9 flex items-center gap-1.5 shadow-sm transition"
+          className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg px-4 h-9 flex items-center gap-1.5 shadow-sm transition-all duration-200 hover:-translate-y-0.5"
         >
           <Edit className="h-3.5 w-3.5" /> Edit Placement Passport
         </Button>
@@ -231,8 +231,9 @@ export default function CandidateDashboard() {
       {pendingInterview && (
         <Link
           to="/candidate/interview"
-          className="flex items-center gap-4 rounded-xl border border-blue-200 bg-blue-600 px-5 py-4 text-white shadow-md hover:bg-blue-700 transition"
+          className="flex items-center gap-4 rounded-xl border border-blue-400/30 bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-4 text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition duration-300 relative overflow-hidden"
         >
+          <div className="absolute top-0 right-0 w-[200px] h-[200px] bg-white/5 rounded-full blur-[40px] pointer-events-none -z-10" />
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20">
             <Bell className="h-5 w-5" />
           </div>
@@ -244,7 +245,7 @@ export default function CandidateDashboard() {
                 : "Your face-to-face AI placement interview session is active. Click to start."}
             </div>
           </div>
-          <div className="shrink-0 rounded-lg bg-white px-4 py-2 text-xs font-bold text-blue-700">
+          <div className="shrink-0 rounded-lg bg-white px-4 py-2 text-xs font-bold text-blue-700 shadow-sm transition hover:bg-slate-50">
             Start Interview
           </div>
         </Link>
@@ -260,7 +261,7 @@ export default function CandidateDashboard() {
             {offers.map((offer: any) => (
               <div 
                 key={offer.id} 
-                className="relative overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/40 to-white p-6 shadow-sm flex flex-col justify-between gap-4 transition-all duration-200 hover:shadow-md"
+                className="relative overflow-hidden rounded-2xl border border-emerald-200 dark:border-emerald-900/40 bg-gradient-to-br from-emerald-50/40 to-white dark:from-emerald-950/20 dark:to-slate-900 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] flex flex-col justify-between gap-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:border-emerald-300"
               >
                 <div className="absolute right-0 top-0 h-16 w-16 overflow-hidden">
                   <div className="absolute transform rotate-45 bg-emerald-500 text-white text-[9px] font-black text-center py-1 w-24 -right-6 top-3 uppercase tracking-wider">
@@ -271,7 +272,7 @@ export default function CandidateDashboard() {
                 <div>
                   <div className="flex items-center gap-2">
                     <Briefcase className="h-5 w-5 text-emerald-600" />
-                    <h3 className="text-base font-extrabold text-slate-900">{offer.job?.title}</h3>
+                    <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100">{offer.job?.title}</h3>
                   </div>
                   <p className="text-sm font-bold text-emerald-700 mt-1">{offer.job?.company_name}</p>
                   
@@ -285,7 +286,7 @@ export default function CandidateDashboard() {
                   )}
 
                   {offer.recruiter_notes && (
-                    <div className="mt-3 text-xs text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-3 italic">
+                    <div className="mt-3 text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 rounded-lg p-3 italic">
                       " {offer.recruiter_notes} "
                     </div>
                   )}
@@ -339,7 +340,7 @@ export default function CandidateDashboard() {
       <div className="grid gap-6 lg:grid-cols-3">
         
         {/* Placement Passport Card */}
-        <div className="lg:col-span-2 relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm flex flex-col justify-between">
+        <div className="lg:col-span-2 relative overflow-hidden rounded-2xl border border-white/20 dark:border-slate-800/40 bg-white/70 dark:bg-slate-900/60 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.03)] flex flex-col justify-between transition-all duration-300 hover:shadow-md hover:border-primary/20">
           <div className="h-2 bg-gradient-to-r from-blue-600 to-indigo-600"></div>
           
           <div className="p-6 flex-1 flex flex-col justify-between gap-6">
@@ -356,7 +357,7 @@ export default function CandidateDashboard() {
                 </div>
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="text-lg font-bold text-slate-900">{profile?.roll_number ? `Student ID: ${profile.roll_number}` : "Complete Onboarding"}</h2>
+                    <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">{profile?.roll_number ? `Student ID: ${profile.roll_number}` : "Complete Onboarding"}</h2>
                     {profile?.documents_verified ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-black text-emerald-600 border border-emerald-500/20 shadow-xs backdrop-blur-xs">
                         <CheckCircle className="h-3.5 w-3.5 fill-emerald-600/10" /> TPO VERIFIED
@@ -376,17 +377,17 @@ export default function CandidateDashboard() {
                   {(profile?.github_url || profile?.linkedin_url || profile?.portfolio_url) && (
                     <div className="flex items-center gap-2 mt-2">
                       {profile?.github_url && (
-                        <a href={profile.github_url} target="_blank" rel="noreferrer" className="rounded-full bg-slate-50 p-1.5 text-slate-600 hover:bg-slate-100 transition" title="GitHub">
+                        <a href={profile.github_url} target="_blank" rel="noreferrer" className="rounded-full bg-slate-50 dark:bg-slate-800 p-1.5 text-slate-600 dark:text-slate-350 hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="GitHub">
                           <Github className="h-3.5 w-3.5" />
                         </a>
                       )}
                       {profile?.linkedin_url && (
-                        <a href={profile.linkedin_url} target="_blank" rel="noreferrer" className="rounded-full bg-slate-50 p-1.5 text-slate-600 hover:bg-slate-100 transition" title="LinkedIn">
+                        <a href={profile.linkedin_url} target="_blank" rel="noreferrer" className="rounded-full bg-slate-50 dark:bg-slate-800 p-1.5 text-slate-600 dark:text-slate-350 hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="LinkedIn">
                           <Linkedin className="h-3.5 w-3.5" />
                         </a>
                       )}
                       {profile?.portfolio_url && (
-                        <a href={profile.portfolio_url} target="_blank" rel="noreferrer" className="rounded-full bg-slate-50 p-1.5 text-slate-600 hover:bg-slate-100 transition" title="Portfolio Website">
+                        <a href={profile.portfolio_url} target="_blank" rel="noreferrer" className="rounded-full bg-slate-50 dark:bg-slate-800 p-1.5 text-slate-600 dark:text-slate-350 hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Portfolio Website">
                           <Globe className="h-3.5 w-3.5" />
                         </a>
                       )}
@@ -396,7 +397,7 @@ export default function CandidateDashboard() {
               </div>
 
               {/* QR Code Container */}
-              <div className="flex flex-col items-center border border-slate-100 bg-slate-50 p-2 rounded-lg self-center sm:self-auto shrink-0">
+              <div className="flex flex-col items-center border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 p-2 rounded-lg self-center sm:self-auto shrink-0">
                 <QRCodeSVG value={publicPortfolioUrl} size={80} />
                 <span className="mt-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-0.5">
                   <QrCode className="h-2.5 w-2.5" /> Share Profile
@@ -406,20 +407,20 @@ export default function CandidateDashboard() {
 
             {/* Bio Display */}
             {profile?.bio && (
-              <div className="rounded-lg bg-slate-50/50 border border-slate-100 p-3 text-xs text-slate-600 italic">
+              <div className="rounded-lg bg-slate-50/50 dark:bg-slate-800/20 border border-slate-100 dark:border-slate-800 p-3 text-xs text-slate-650 italic">
                 "{profile.bio}"
               </div>
             )}
 
             {/* Academic stats */}
-            <div className="grid grid-cols-3 gap-4 border-y border-slate-100 py-3 text-center">
+            <div className="grid grid-cols-3 gap-4 border-y border-slate-100 dark:border-slate-800 py-3 text-center">
               <div>
                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">CGPA</div>
-                <div className="mt-0.5 text-md font-black text-slate-900">{profile?.cgpa || "N/A"}</div>
+                <div className="mt-0.5 text-md font-black text-slate-900 dark:text-slate-100">{profile?.cgpa || "N/A"}</div>
               </div>
-              <div className="border-x border-slate-100">
+              <div className="border-x border-slate-100 dark:border-slate-800">
                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Graduation</div>
-                <div className="mt-0.5 text-md font-black text-slate-900">{profile?.graduation_year || "N/A"}</div>
+                <div className="mt-0.5 text-md font-black text-slate-900 dark:text-slate-100">{profile?.graduation_year || "N/A"}</div>
               </div>
               <div>
                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Placement Status</div>
@@ -435,7 +436,7 @@ export default function CandidateDashboard() {
               <div className="flex flex-wrap gap-1.5">
                 {profile?.skills && Array.isArray(profile.skills) && profile.skills.length > 0 ? (
                   profile.skills.map((skill: string, index: number) => (
-                    <span key={index} className="inline-block rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                    <span key={index} className="inline-block rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs font-semibold text-slate-700 dark:text-slate-350">
                       {skill}
                     </span>
                   ))
@@ -446,7 +447,7 @@ export default function CandidateDashboard() {
             </div>
           </div>
 
-          <div className="bg-slate-50 border-t border-slate-100 p-4 flex flex-col sm:flex-row gap-3 justify-between items-center text-xs">
+          <div className="bg-slate-50 dark:bg-slate-800/40 border-t border-slate-100 dark:border-slate-800 p-4 flex flex-col sm:flex-row gap-3 justify-between items-center text-xs">
             <span className="text-slate-400 font-bold tracking-wider">SHAREABLE PORTFOLIO LINK:</span>
             <a 
               href={publicPortfolioUrl} 
@@ -460,9 +461,9 @@ export default function CandidateDashboard() {
         </div>
 
         {/* Radar Skills Evaluation */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between">
+        <div className="rounded-2xl border border-white/20 dark:border-slate-800/40 bg-white/70 dark:bg-slate-900/60 backdrop-blur-md p-6 shadow-[0_8px_30px_rgb(0,0,0,0.03)] flex flex-col justify-between transition-all duration-300 hover:shadow-md hover:border-primary/20">
           <div>
-            <h2 className="text-sm font-extrabold text-slate-950 flex items-center gap-2 mb-4 border-b border-slate-100 pb-2">
+            <h2 className="text-sm font-extrabold text-slate-950 dark:text-slate-100 flex items-center gap-2 mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">
               <BarChart3 className="h-4 w-4 text-blue-600" /> Skill Radar Profile
             </h2>
             <div className="h-56">
@@ -489,9 +490,9 @@ export default function CandidateDashboard() {
       {/* Grid: Academic Timeline & Subject Mastery Insights */}
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Academic Timeline Card */}
-        <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between">
+        <div className="lg:col-span-2 rounded-2xl border border-white/20 dark:border-slate-800/40 bg-white/70 dark:bg-slate-900/60 backdrop-blur-md p-6 shadow-[0_8px_30px_rgb(0,0,0,0.03)] flex flex-col justify-between transition-all duration-300 hover:shadow-md hover:border-primary/20">
           <div>
-            <h2 className="text-sm font-extrabold text-slate-950 flex items-center gap-2 mb-4 border-b border-slate-100 pb-2">
+            <h2 className="text-sm font-extrabold text-slate-950 dark:text-slate-100 flex items-center gap-2 mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">
               <BarChart3 className="h-4 w-4 text-blue-600" /> Academic Timeline (SGPA &amp; CGPA Progression)
             </h2>
             <div className="h-64">
@@ -518,7 +519,7 @@ export default function CandidateDashboard() {
                     variant="outline" 
                     size="sm"
                     onClick={() => setShowEditModal(true)} 
-                    className="text-[10px] h-7 border-slate-200 text-slate-600 hover:bg-slate-50 font-bold animate-pulse"
+                    className="text-[10px] h-7 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold animate-pulse"
                   >
                     Edit Profile to Add Semesters
                   </Button>
@@ -530,9 +531,9 @@ export default function CandidateDashboard() {
         </div>
 
         {/* AI Performance Insights Card */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between">
+        <div className="rounded-2xl border border-white/20 dark:border-slate-800/40 bg-white/70 dark:bg-slate-900/60 backdrop-blur-md p-6 shadow-[0_8px_30px_rgb(0,0,0,0.03)] flex flex-col justify-between transition-all duration-300 hover:shadow-md hover:border-primary/20">
           <div>
-            <h2 className="text-sm font-extrabold text-slate-950 flex items-center gap-2 mb-4 border-b border-slate-100 pb-2">
+            <h2 className="text-sm font-extrabold text-slate-950 dark:text-slate-100 flex items-center gap-2 mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">
               <Trophy className="h-4 w-4 text-indigo-600" /> Subject Mastery Insights
             </h2>
             
@@ -545,7 +546,7 @@ export default function CandidateDashboard() {
                 <div className="space-y-2">
                   {strengths.length > 0 ? (
                     strengths.map((str, idx) => (
-                      <div key={idx} className="flex gap-2 items-start text-xs text-slate-700 bg-emerald-50/50 border border-emerald-100/50 rounded-lg p-2.5">
+                      <div key={idx} className="flex gap-2 items-start text-xs text-slate-700 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100/50 dark:border-emerald-900/20 rounded-lg p-2.5">
                         <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
                         <span>{str}</span>
                       </div>
@@ -564,7 +565,7 @@ export default function CandidateDashboard() {
                 <div className="space-y-2">
                   {weaknesses.length > 0 ? (
                     weaknesses.map((wk, idx) => (
-                      <div key={idx} className="flex gap-2 items-start text-xs text-slate-700 bg-amber-50/50 border border-amber-100/50 rounded-lg p-2.5">
+                      <div key={idx} className="flex gap-2 items-start text-xs text-slate-700 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-100/50 dark:border-amber-900/20 rounded-lg p-2.5">
                         <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
                         <span>{wk}</span>
                       </div>
@@ -584,26 +585,26 @@ export default function CandidateDashboard() {
       <div className="grid gap-6 md:grid-cols-3">
         
         {/* Action Items List */}
-        <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-sm font-extrabold text-slate-950 flex items-center gap-2 mb-4 border-b border-slate-100 pb-2">
+        <div className="md:col-span-2 rounded-2xl border border-white/20 dark:border-slate-800/40 bg-white/70 dark:bg-slate-900/60 backdrop-blur-md p-6 shadow-[0_8px_30px_rgb(0,0,0,0.03)]">
+          <h2 className="text-sm font-extrabold text-slate-950 dark:text-slate-100 flex items-center gap-2 mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">
             <AlertCircle className="h-4 w-4 text-red-500" /> High-Priority Actions
           </h2>
           
           <div className="space-y-3">
             {actionItems.length > 0 ? (
               actionItems.map((item, idx) => (
-                <div key={idx} className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center rounded-lg border border-slate-100 p-3 bg-slate-50/50 hover:bg-slate-50 transition">
+                <div key={idx} className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center rounded-lg border border-slate-100 dark:border-slate-800 p-3 bg-slate-50/50 dark:bg-slate-800/30 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition duration-200">
                   <div>
                     <div className="flex items-center gap-2">
                       <span className={`h-2 w-2 rounded-full ${item.priority === 'urgent' ? 'bg-red-500' : 'bg-amber-500'}`}></span>
-                      <h4 className="font-bold text-sm text-slate-900">{item.title}</h4>
+                      <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100">{item.title}</h4>
                     </div>
                     <p className="text-xs text-slate-500 mt-1">{item.description}</p>
                   </div>
                   {item.action_url && (
                     <Link
                       to={item.action_url}
-                      className="rounded-md bg-slate-900 hover:bg-slate-800 px-3 py-1.5 text-xs font-bold text-white shadow shrink-0 self-end sm:self-auto"
+                      className="rounded-md bg-slate-900 hover:bg-slate-800 text-white hover:shadow-md px-3 py-1.5 text-xs font-bold shadow shrink-0 self-end sm:self-auto transition duration-200"
                     >
                       Resolve Action
                     </Link>
@@ -619,16 +620,16 @@ export default function CandidateDashboard() {
         </div>
 
         {/* Peer Percentile & Trend */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between">
+        <div className="rounded-2xl border border-white/20 dark:border-slate-800/40 bg-white/70 dark:bg-slate-900/60 backdrop-blur-md p-6 shadow-[0_8px_30px_rgb(0,0,0,0.03)] flex flex-col justify-between transition-all duration-300 hover:shadow-md hover:border-primary/20">
           <div className="space-y-4">
-            <h2 className="text-sm font-extrabold text-slate-950 flex items-center gap-2 border-b border-slate-100 pb-2">
+            <h2 className="text-sm font-extrabold text-slate-950 dark:text-slate-100 flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
               <Trophy className="h-4 w-4 text-amber-500" /> Rank &amp; Percentile
             </h2>
             
-            <div className="bg-gradient-to-br from-amber-50 to-orange-50/50 rounded-xl p-4 border border-amber-100 text-center">
-              <div className="text-xs font-bold text-amber-800 uppercase tracking-wide">College Percentile</div>
-              <div className="text-3xl font-black text-amber-900 mt-1">{peerPercentile}%</div>
-              <p className="text-[10px] text-amber-700 mt-1 font-semibold">You are scoring higher than {peerPercentile}% of peers in your batch.</p>
+            <div className="bg-gradient-to-br from-amber-50 to-orange-50/50 dark:from-amber-950/20 dark:to-orange-950/10 rounded-xl p-4 border border-amber-100 dark:border-amber-900/30 text-center">
+              <div className="text-xs font-bold text-amber-800 dark:text-amber-400 uppercase tracking-wide">College Percentile</div>
+              <div className="text-3xl font-black text-amber-900 dark:text-amber-200 mt-1">{peerPercentile}%</div>
+              <p className="text-[10px] text-amber-700 dark:text-amber-350 mt-1 font-semibold">You are scoring higher than {peerPercentile}% of peers in your batch.</p>
             </div>
 
             <div>
@@ -656,14 +657,14 @@ export default function CandidateDashboard() {
       </div>
 
       {/* Activity Feed */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-sm font-extrabold text-slate-950 flex items-center gap-2 mb-4 border-b border-slate-100 pb-2">
+      <div className="rounded-2xl border border-white/20 dark:border-slate-800/40 bg-white/70 dark:bg-slate-900/60 backdrop-blur-md p-6 shadow-[0_8px_30px_rgb(0,0,0,0.03)]">
+        <h2 className="text-sm font-extrabold text-slate-950 dark:text-slate-100 flex items-center gap-2 mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">
           <Bell className="h-4 w-4 text-blue-600" /> Recent Activity
         </h2>
         <div className="space-y-3">
           {activityFeed.length > 0 ? (
             activityFeed.map((item: any, idx: number) => (
-              <div key={idx} className="flex items-start gap-3 rounded-lg border border-slate-100 p-3 bg-slate-50/50 hover:bg-slate-50 transition">
+              <div key={idx} className="flex items-start gap-3 rounded-lg border border-slate-100 dark:border-slate-800 p-3 bg-slate-50/50 dark:bg-slate-800/30 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition duration-200">
                 <span className={`mt-0.5 h-2 w-2 rounded-full shrink-0 ${
                   item.type?.includes('offer') ? 'bg-emerald-500' :
                   item.type?.includes('exam') ? 'bg-blue-500' :
@@ -671,7 +672,7 @@ export default function CandidateDashboard() {
                   'bg-slate-400'
                 }`} />
                 <div className="min-w-0">
-                  <h4 className="font-bold text-sm text-slate-900">{item.title}</h4>
+                  <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100">{item.title}</h4>
                   <p className="text-xs text-slate-500 mt-0.5">{item.description}</p>
                   <p className="text-[10px] text-slate-400 mt-1">
                     {item.actorName ? `By ${item.actorName} • ` : ''}
@@ -691,7 +692,7 @@ export default function CandidateDashboard() {
       {/* Visual Journey Pipeline trackers */}
       {trackers.length > 0 && (
         <div className="space-y-5">
-          <h2 className="text-sm font-extrabold text-slate-950 flex items-center gap-2 border-b border-slate-100 pb-2">
+          <h2 className="text-sm font-extrabold text-slate-950 dark:text-slate-100 flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
             <Briefcase className="h-4 w-4 text-blue-600" /> Active Placement Pipelines
           </h2>
 

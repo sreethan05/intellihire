@@ -5,7 +5,7 @@ import { Redis } from "ioredis";
 import { logger } from "./lib/logger.js";
 import { db } from "./lib/postgres.js";
 import { config } from "./config.js";
-import { verifyToken } from "./middleware/auth.js";
+import { verifyToken, getCookie, ACCESS_TOKEN_COOKIE } from "./middleware/auth.js";
 
 let ioInstance: Server | null = null;
 
@@ -34,6 +34,7 @@ export function setupWebSocket(httpServer: HTTPServer) {
   subClient.on("error", (err) => logger.warn({ err: err.message }, "WebSocket SubClient Redis error"));
 
   const io = new Server(httpServer, {
+    maxHttpBufferSize: 1e6, // 1MB payload limit
     cors: {
       origin: (origin, callback) => {
         const allowedOrigins =
@@ -64,8 +65,19 @@ export function setupWebSocket(httpServer: HTTPServer) {
   ioInstance = io;
 
   // Authentication middleware for socket connections
-  io.use((socket, next) => {
-    const token = socket.handshake.auth.token as string;
+  io.use(async (socket, next) => {
+    const ip = socket.handshake.address || "unknown";
+    const connLimitKey = `ratelimit:ws:conn:${ip}`;
+    const connOk = await checkRateLimit(pubClient, connLimitKey, 30, 60);
+    if (!connOk) {
+      logger.warn({ ip }, "WebSocket connection rate limit exceeded");
+      return next(new Error("Connection rate limit exceeded"));
+    }
+
+    const cookieToken = getCookie(socket.handshake.headers.cookie, ACCESS_TOKEN_COOKIE);
+    const authToken = socket.handshake.auth.token as string;
+    const token = cookieToken || authToken;
+
     if (!token) {
       return next(new Error("Authentication required"));
     }
@@ -84,20 +96,68 @@ export function setupWebSocket(httpServer: HTTPServer) {
 
     // Candidate/User joins their personal notification room
     socket.on("notifications:join", (data: { userId: string }) => {
+      const authUser = (socket as any).user;
+      if (!authUser || authUser.id !== data.userId) {
+        logger.warn({ socketId: socket.id, userId: data.userId, authUserId: authUser?.id }, "Unauthorized notifications join attempt");
+        socket.emit("error", { message: "Unauthorized notifications room join" });
+        return;
+      }
       const room = `user:${data.userId}`;
       socket.join(room);
       logger.info({ socketId: socket.id, room }, "Joined personal notifications room");
     });
 
     // Candidate joins their exam attempt room
-    socket.on("proctor:join", (data: { attemptId: string; role: string }) => {
+    socket.on("proctor:join", async (data: { attemptId: string; role: string }) => {
+      const authUser = (socket as any).user;
+      if (!authUser) {
+        socket.emit("error", { message: "Authentication required" });
+        return;
+      }
+      if (authUser.role === "candidate") {
+        const { data: attempt, error } = await db
+          .from("attempts")
+          .select("candidate_id")
+          .eq("id", data.attemptId)
+          .single();
+        if (error || !attempt || attempt.candidate_id !== authUser.id) {
+          logger.warn({ socketId: socket.id, attemptId: data.attemptId, authUserId: authUser.id }, "Unauthorized attempt room join");
+          socket.emit("error", { message: "Unauthorized attempt room join" });
+          return;
+        }
+      } else if (authUser.role !== "recruiter" && authUser.role !== "admin") {
+        logger.warn({ socketId: socket.id, role: authUser.role }, "Unauthorized attempt room join role");
+        socket.emit("error", { message: "Unauthorized attempt room join" });
+        return;
+      }
       const room = `attempt:${data.attemptId}`;
       socket.join(room);
       logger.info({ socketId: socket.id, room, role: data.role }, "Joined proctoring room");
     });
 
     // Recruiter joins monitoring room for an exam
-    socket.on("proctor:monitor", (data: { examId: string }) => {
+    socket.on("proctor:monitor", async (data: { examId: string }) => {
+      const authUser = (socket as any).user;
+      if (!authUser) {
+        socket.emit("error", { message: "Authentication required" });
+        return;
+      }
+      if (authUser.role === "recruiter") {
+        const { data: exam, error } = await db
+          .from("exams")
+          .select("created_by")
+          .eq("id", data.examId)
+          .single();
+        if (error || !exam || exam.created_by !== authUser.id) {
+          logger.warn({ socketId: socket.id, examId: data.examId, authUserId: authUser.id }, "Unauthorized monitor room join");
+          socket.emit("error", { message: "Unauthorized monitor room join" });
+          return;
+        }
+      } else if (authUser.role !== "admin") {
+        logger.warn({ socketId: socket.id, role: authUser.role }, "Unauthorized monitor room join role");
+        socket.emit("error", { message: "Unauthorized monitor room join" });
+        return;
+      }
       const room = `monitor:${data.examId}`;
       socket.join(room);
       logger.info({ socketId: socket.id, room }, "Joined monitoring room");
@@ -105,6 +165,12 @@ export function setupWebSocket(httpServer: HTTPServer) {
 
     // Admin joins the global admin monitoring room
     socket.on("admin:join", () => {
+      const authUser = (socket as any).user;
+      if (!authUser || authUser.role !== "admin") {
+        logger.warn({ socketId: socket.id, role: authUser?.role }, "Unauthorized admin room join");
+        socket.emit("error", { message: "Unauthorized admin room join" });
+        return;
+      }
       socket.join("admin");
       logger.info({ socketId: socket.id }, "Admin joined admin room");
     });
@@ -112,7 +178,28 @@ export function setupWebSocket(httpServer: HTTPServer) {
     // Candidate sends a snapshot event (broadcast to monitoring room)
     socket.on("proctor:snapshot", async (data: { attemptId: string; examId: string; snapshotData: string; timestamp: string }) => {
       const user = (socket as any).user;
-      const userId = user?.id || "anonymous";
+      if (!user) {
+        socket.emit("error", { message: "Authentication required" });
+        return;
+      }
+      if (user.role === "candidate") {
+        const { data: attempt, error } = await db
+          .from("attempts")
+          .select("candidate_id")
+          .eq("id", data.attemptId)
+          .single();
+        if (error || !attempt || attempt.candidate_id !== user.id) {
+          logger.warn({ socketId: socket.id, attemptId: data.attemptId, authUserId: user.id }, "Unauthorized snapshot transmission");
+          socket.emit("error", { message: "Unauthorized attempt" });
+          return;
+        }
+      } else if (user.role !== "recruiter" && user.role !== "admin") {
+        logger.warn({ socketId: socket.id, role: user.role }, "Unauthorized snapshot sender role");
+        socket.emit("error", { message: "Unauthorized role" });
+        return;
+      }
+
+      const userId = user.id;
       const limitKey = `ratelimit:ws:${userId}:snapshot`;
       const ok = await checkRateLimit(pubClient, limitKey, 10, 10);
       if (!ok) {
@@ -132,7 +219,28 @@ export function setupWebSocket(httpServer: HTTPServer) {
     // Candidate sends a violation event (broadcast to monitoring room with urgency)
     socket.on("proctor:violation", async (data: { attemptId: string; examId: string; violationCount: number; message: string; timestamp: string }) => {
       const user = (socket as any).user;
-      const userId = user?.id || "anonymous";
+      if (!user) {
+        socket.emit("error", { message: "Authentication required" });
+        return;
+      }
+      if (user.role === "candidate") {
+        const { data: attempt, error } = await db
+          .from("attempts")
+          .select("candidate_id")
+          .eq("id", data.attemptId)
+          .single();
+        if (error || !attempt || attempt.candidate_id !== user.id) {
+          logger.warn({ socketId: socket.id, attemptId: data.attemptId, authUserId: user.id }, "Unauthorized violation transmission");
+          socket.emit("error", { message: "Unauthorized attempt" });
+          return;
+        }
+      } else if (user.role !== "recruiter" && user.role !== "admin") {
+        logger.warn({ socketId: socket.id, role: user.role }, "Unauthorized violation sender role");
+        socket.emit("error", { message: "Unauthorized role" });
+        return;
+      }
+
+      const userId = user.id;
       const limitKey = `ratelimit:ws:${userId}:violation`;
       const ok = await checkRateLimit(pubClient, limitKey, 5, 10);
       if (!ok) {

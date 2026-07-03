@@ -11,18 +11,12 @@ describe("api network client", () => {
     vi.restoreAllMocks();
   });
 
-  it("injects Authorization header if token is in localStorage", async () => {
-    localStorage.setItem("token", "my-test-token");
-    
-    const config = { headers: {} as any } as any;
-    const interceptor = (api.interceptors.request as any).handlers[0].fulfilled;
-    const result = interceptor(config);
-
-    expect(result.headers.Authorization).toBe("Bearer my-test-token");
+  it("has xsrf cookie and header configurations set", () => {
+    expect(api.defaults.xsrfCookieName).toBe("csrf_token");
+    expect(api.defaults.xsrfHeaderName).toBe("x-csrf-token");
   });
 
-  it("clears localStorage and redirects on 401 response status", async () => {
-    localStorage.setItem("token", "my-test-token");
+  it("clears localStorage user and redirects on 401 response status", async () => {
     localStorage.setItem("user", "test-user");
 
     const error = {
@@ -34,7 +28,6 @@ describe("api network client", () => {
     
     await expect(interceptor(error)).rejects.toEqual(error);
 
-    expect(localStorage.getItem("token")).toBeNull();
     expect(localStorage.getItem("user")).toBeNull();
     expect(window.location.href).toBe("/login");
   });

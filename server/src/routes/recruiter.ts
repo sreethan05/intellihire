@@ -1,8 +1,16 @@
 import { Router } from "express";
 import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/auth.js";
-import { validateBody } from "../middleware/validation.js";
+import { validateBody, validateQuery } from "../middleware/validation.js";
 import * as recruiterService from "../services/recruiterService.js";
-import { createCandidateSchema } from "../lib/schemas.js";
+import {
+  createCandidateSchema,
+  createJobSchema,
+  assignDriveExamSchema,
+  saveDriveAiConfigSchema,
+  testDriveAiConfigSchema,
+  aiShortlistSchema,
+  paginationSchema,
+} from "../lib/schemas.js";
 import { logger } from "../lib/logger.js";
 import multer from "multer";
 import path from "path";
@@ -32,7 +40,8 @@ const uploadOffer = multer({
   storage: offerStorage,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype === "application/pdf") {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (file.mimetype === "application/pdf" && ext === ".pdf") {
       cb(null, true);
     } else {
       cb(new Error("Only PDF files are allowed for offer letters"));
@@ -49,10 +58,9 @@ router.post("/create-candidate", validateBody(createCandidateSchema), async (req
   }
 });
 
-router.get("/candidates", async (req: AuthRequest, res, next) => {
+router.get("/candidates", validateQuery(paginationSchema), async (req: AuthRequest, res, next) => {
   try {
-    const page = Number(req.query.page || 1);
-    const limit = Number(req.query.limit || 10);
+    const { page, limit } = req.query as any;
     const { candidates, total } = await recruiterService.getCandidatesList(page, limit);
     res.json({ candidates, total, page, limit });
   } catch (err) {
@@ -78,7 +86,7 @@ router.get("/colleges-summary", async (req: AuthRequest, res, next) => {
   }
 });
 
-router.post("/drives", async (req: AuthRequest, res, next) => {
+router.post("/drives", validateBody(createJobSchema), async (req: AuthRequest, res, next) => {
   try {
     const result = await recruiterService.createDrive(req.body, req.user!.id);
     res.json({ message: "Drive created", drive: result.drive, eligibleCount: result.eligibleCount });
@@ -105,7 +113,7 @@ router.get("/drives/:driveId/eligible-candidates", async (req: AuthRequest, res,
   }
 });
 
-router.post("/drives/:driveId/assign-exam", async (req: AuthRequest, res, next) => {
+router.post("/drives/:driveId/assign-exam", validateBody(assignDriveExamSchema), async (req: AuthRequest, res, next) => {
   try {
     const { exam_id } = req.body;
     const result = await recruiterService.assignExam(req.params.driveId as string, exam_id, req.user!.id);
@@ -134,7 +142,7 @@ router.get("/drives/:driveId/ai-config", async (req: AuthRequest, res, next) => 
   }
 });
 
-router.post("/drives/:driveId/ai-config", async (req: AuthRequest, res, next) => {
+router.post("/drives/:driveId/ai-config", validateBody(saveDriveAiConfigSchema), async (req: AuthRequest, res, next) => {
   try {
     const { aiConfig } = req.body;
     const { drive } = await recruiterService.saveAiConfig(req.params.driveId as string, aiConfig, req.user!.id);
@@ -144,13 +152,9 @@ router.post("/drives/:driveId/ai-config", async (req: AuthRequest, res, next) =>
   }
 });
 
-router.post("/drives/:driveId/test-evaluation", async (req: AuthRequest, res, next) => {
+router.post("/drives/:driveId/test-evaluation", validateBody(testDriveAiConfigSchema), async (req: AuthRequest, res, next) => {
   try {
     const { question, answer, aiConfig } = req.body;
-    if (!question || !answer || !aiConfig) {
-      res.status(400).json({ error: "question, answer, and aiConfig are required" });
-      return;
-    }
 
     const persona = aiConfig.persona || "";
     const customRubric = aiConfig.rubric || "";
@@ -217,13 +221,9 @@ router.get("/candidates/compare", async (req: AuthRequest, res, next) => {
   }
 });
 
-router.post("/ai/shortlist", async (req: AuthRequest, res, next) => {
+router.post("/ai/shortlist", validateBody(aiShortlistSchema), async (req: AuthRequest, res, next) => {
   try {
     const { criteria } = req.body;
-    if (!criteria) {
-      res.status(400).json({ error: "Shortlist criteria is required" });
-      return;
-    }
     const result = await recruiterService.generateAiShortlist(criteria);
     res.json(result);
   } catch (err) {

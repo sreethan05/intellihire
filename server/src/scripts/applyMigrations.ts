@@ -48,6 +48,9 @@ async function applyMigrations() {
       "10_indexes.sql",
       "11_audit_logs.sql",
       "12_soft_deletes.sql",
+      "13_refresh_tokens.sql",
+      "14_data_retention.sql",
+      "15_slug_index.sql",
     ];
 
     for (const file of filesToApply) {

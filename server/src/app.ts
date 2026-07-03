@@ -14,6 +14,7 @@ import { errorHandler } from "./middleware/errorHandler.js";
 import { requestLogger } from "./middleware/logger.js";
 import { logger } from "./lib/logger.js";
 import { requestIdMiddleware } from "./middleware/requestId.js";
+import { csrfProtection } from "./middleware/csrf.js";
 
 import authRoutes from "./routes/auth.js";
 import adminRoutes from "./routes/admin.js";
@@ -42,24 +43,45 @@ const API_PREFIXES = ["/api/v1", "/api"];
 
 export function createApp() {
   const app = express();
+  app.set("trust proxy", 1);
 
   // ─── Request Correlation ───
   app.use(requestIdMiddleware);
+
+  if (NODE_ENV === "production") {
+    app.use((req, res, next) => {
+      const forwardedProto = req.get("x-forwarded-proto");
+      if (req.secure || forwardedProto === "https") {
+        next();
+        return;
+      }
+      res.redirect(308, `https://${req.get("host")}${req.originalUrl}`);
+    });
+  }
 
   app.use(
     helmet({
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+          scriptSrc: NODE_ENV === "production" ? ["'self'"] : ["'self'", "'unsafe-eval'"],
           styleSrc: ["'self'", "'unsafe-inline'"],
           imgSrc: ["'self'", "data:", "https://*.s3.amazonaws.com", "https://*.amazonaws.com"],
           connectSrc: ["'self'", "ws:", "wss:"],
           frameAncestors: ["'none'"],
         },
       },
+      hsts: NODE_ENV === "production"
+        ? { maxAge: 31536000, includeSubDomains: true, preload: true }
+        : false,
+      referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+      xContentTypeOptions: true,
     })
   );
+  app.use((_req, res, next) => {
+    res.setHeader("Permissions-Policy", "camera=(self), microphone=(self), geolocation=()");
+    next();
+  });
 
   // ─── CORS (environment-aware) ───
   const allowedOrigins = getAllowedOrigins();
@@ -147,6 +169,7 @@ export function createApp() {
   // ─── Request Logging ───
   app.use(requestLogger);
   app.use(auditMiddleware);
+  app.use(csrfProtection);
 
   // ─── API Routes ───
   for (const prefix of API_PREFIXES) {

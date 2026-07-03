@@ -65,7 +65,7 @@ export default function CandidateOnboarding() {
       });
       if (user) {
         const updatedUser = { ...user, profile_complete: true, must_change_password: false };
-        login(localStorage.getItem("token") || "", updatedUser);
+        login(null, updatedUser);
       }
       toast.success("Profile completed. Your assigned exams are now available.");
       navigate("/candidate/overview");

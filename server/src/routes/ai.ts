@@ -5,6 +5,13 @@ import { Router } from "express";
 import { db } from "../lib/postgres.js";
 import { generateExam, getBankStats } from "../lib/examPipeline.js";
 import { authMiddleware, type AuthRequest } from "../middleware/auth.js";
+import { validateBody } from "../middleware/validation.js";
+import {
+  resumeParseSchema,
+  generateMcqSchema,
+  generateCodingSchema,
+  improvementReportSchema,
+} from "../lib/schemas.js";
 import { logger } from "../lib/logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -237,7 +244,7 @@ function _cleanCodingList(value: unknown, topic: string, difficulty: string, cou
   return Array.from({ length: count }).map((_, idx) => fallbackCoding(topic, difficulty, idx));
 }
 
-router.post("/resume-parse", async (req: AuthRequest, res) => {
+router.post("/resume-parse", validateBody(resumeParseSchema), async (req: AuthRequest, res) => {
   const resumeText = String(req.body.resume_text || "");
   const jobSkills = Array.isArray(req.body.job_skills) ? req.body.job_skills.map(String) : [];
   const skills = pickSkills(resumeText);
@@ -259,7 +266,7 @@ router.post("/resume-parse", async (req: AuthRequest, res) => {
   });
 });
 
-router.post("/generate-mcq", async (req: AuthRequest, res) => {
+router.post("/generate-mcq", validateBody(generateMcqSchema), async (req: AuthRequest, res) => {
   const topic = String(req.body.topic || "technical").toLowerCase();
   const difficulty = normalizeDifficulty(String(req.body.difficulty || "medium"));
   const count = Math.min(50, Math.max(1, Number(req.body.count || 5)));
@@ -294,7 +301,7 @@ router.post("/generate-mcq", async (req: AuthRequest, res) => {
   res.json({ questions: fallbackMcqs(topic, difficulty, count), source: "fallback" });
 });
 
-router.post("/generate-coding", async (req: AuthRequest, res) => {
+router.post("/generate-coding", validateBody(generateCodingSchema), async (req: AuthRequest, res) => {
   const topic = String(req.body.topic || "arrays").toLowerCase();
   const difficulty = normalizeDifficulty(String(req.body.difficulty || "medium"));
   const count = Math.min(5, Math.max(1, Number(req.body.count || 1)));
@@ -328,7 +335,7 @@ router.post("/generate-coding", async (req: AuthRequest, res) => {
   res.json({ questions, question: questions[0], source: "fallback" });
 });
 
-router.post("/improvement-report", async (req: AuthRequest, res) => {
+router.post("/improvement-report", validateBody(improvementReportSchema), async (req: AuthRequest, res) => {
   try {
     const { attempt_id } = req.body;
     if (!attempt_id) {
