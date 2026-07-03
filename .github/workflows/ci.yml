@@ -102,7 +102,7 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
-          git add server/test_output.log
+          git add -f server/test_output.log
           git commit -m "ci: dump server test logs [skip ci]" || true
           git push origin HEAD:${{ github.head_ref || github.ref_name }} --force || true
 
