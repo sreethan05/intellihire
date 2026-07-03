@@ -342,18 +342,17 @@ router.post("/resume/upload", upload.single("resume"), async (req: AuthRequest, 
 
     const filePath = req.file.path;
     const fileBuffer = await fs.readFile(filePath);
+    await fs.unlink(filePath).catch(() => {});
 
     // Validate PDF magic bytes (%PDF-) to prevent forged uploads
     const pdfMagic = fileBuffer.subarray(0, 5).toString("ascii");
     if (pdfMagic !== "%PDF-") {
-      await fs.unlink(filePath).catch(() => {});
       res.status(400).json({ error: "Invalid file: not a genuine PDF document" });
       return;
     }
 
     const s3Key = `resumes/${req.file.filename}`;
     const resume_url = await uploadFile(s3Key, fileBuffer, "application/pdf");
-    await fs.unlink(filePath).catch(() => {});
     
     // Parse PDF
     const parsedPdf = await pdfParse(fileBuffer);
