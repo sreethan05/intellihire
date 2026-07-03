@@ -25,6 +25,7 @@ export default defineConfig({
     timeout: 120 * 1000,
     env: {
       DISABLE_RATE_LIMITS: "true",
+      NODE_ENV: "test",
     },
   },
 });
