@@ -84,6 +84,10 @@ jobs:
       - name: Run Server Tests with Coverage
         run: npm --prefix server run test:coverage > server/test_output.log 2>&1
 
+      - name: Print Server Test Logs
+        if: always()
+        run: cat server/test_output.log
+
       - name: Upload Server Test Logs
         if: always()
         uses: actions/upload-artifact@v4
