@@ -1,0 +1,1477 @@
+
+> intellihire-server@1.0.0 test:coverage
+> c8 --reporter=html --reporter=text --lines=10 --functions=10 --branches=10 --statements=10 tsx --test "tests/**/*.test.ts" "src/lib/**/*.test.ts"
+
+TAP version 13
+# Subtest: validates email format
+ok 1 - validates email format
+  ---
+  duration_ms: 1.530222
+  type: 'test'
+  ...
+# Subtest: validates password strength
+ok 2 - validates password strength
+  ---
+  duration_ms: 0.306122
+  type: 'test'
+  ...
+# Subtest: validates exam settings
+ok 3 - validates exam settings
+  ---
+  duration_ms: 0.354593
+  type: 'test'
+  ...
+# ◇ injected env (0) from ../.env // tip: ◈ secrets for agents [www.dotenvx.com]
+# ◇ injected env (0) from ../.env // tip: ◈ encrypted .env [www.dotenvx.com]
+# ◇ injected env (0) from ../.env // tip: ⌁ auth for agents [www.vestauth.com]
+# Sentry not configured. Set SENTRY_DSN in .env to enable error tracking.
+# Subtest: POST /api/auth/login
+    # Subtest: returns 400 for empty body
+    ok 1 - returns 400 for empty body
+      ---
+      duration_ms: 52.71598
+      type: 'test'
+      ...
+    # Subtest: returns 400 for missing password
+    ok 2 - returns 400 for missing password
+      ---
+      duration_ms: 13.737666
+      type: 'test'
+      ...
+    # Subtest: returns 400 for invalid email format
+    ok 3 - returns 400 for invalid email format
+      ---
+      duration_ms: 6.509506
+      type: 'test'
+      ...
+    # Subtest: returns 401 for non-existent user
+    ok 4 - returns 401 for non-existent user
+      ---
+      duration_ms: 20.948328
+      type: 'test'
+      ...
+# [2026-07-03 09:54:45.687] [33mWARN[39m: [36mEmail service not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS in .env[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+# [2026-07-03 09:54:45.764] [33mWARN[39m: [36mUsing public Judge0 CE endpoint. For production, set JUDGE0_API_URL to a private instance.[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mendpoint[39m: "https://ce.judge0.com"
+# [2026-07-03 09:54:46.117] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "POST"
+#     [35murl[39m: "/api/auth/login"
+#     [35mstatusCode[39m: 400
+#     [35mdurationMs[39m: 5
+# [2026-07-03 09:54:46.139] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "POST"
+#     [35murl[39m: "/api/auth/login"
+#     [35mstatusCode[39m: 400
+#     [35mdurationMs[39m: 1
+# [2026-07-03 09:54:46.146] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "POST"
+#     [35murl[39m: "/api/auth/login"
+#     [35mstatusCode[39m: 400
+#     [35mdurationMs[39m: 1
+# [2026-07-03 09:54:46.168] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "POST"
+#     [35murl[39m: "/api/auth/login"
+#     [35mstatusCode[39m: 401
+#     [35mdurationMs[39m: 16
+    # Subtest: returns 400 for password too long
+# [2026-07-03 09:54:46.172] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "POST"
+#     [35murl[39m: "/api/auth/login"
+#     [35mstatusCode[39m: 400
+#     [35mdurationMs[39m: 1
+    ok 5 - returns 400 for password too long
+      ---
+      duration_ms: 3.671929
+      type: 'test'
+      ...
+    1..5
+ok 4 - POST /api/auth/login
+  ---
+  duration_ms: 99.501857
+  type: 'suite'
+  ...
+# [2026-07-03 09:54:46.207] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "POST"
+#     [35murl[39m: "/api/auth/login"
+#     [35mstatusCode[39m: 401
+#     [35mdurationMs[39m: 23
+# [2026-07-03 09:54:46.208] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "POST"
+#     [35murl[39m: "/api/auth/login"
+#     [35mstatusCode[39m: 401
+#     [35mdurationMs[39m: 23
+# [2026-07-03 09:54:46.209] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "POST"
+#     [35murl[39m: "/api/auth/login"
+#     [35mstatusCode[39m: 401
+#     [35mdurationMs[39m: 23
+# [2026-07-03 09:54:46.210] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "POST"
+#     [35murl[39m: "/api/auth/login"
+#     [35mstatusCode[39m: 401
+#     [35mdurationMs[39m: 23
+# [2026-07-03 09:54:46.218] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "POST"
+#     [35murl[39m: "/api/auth/login"
+#     [35mstatusCode[39m: 401
+#     [35mdurationMs[39m: 30
+# Subtest: POST /api/auth/login - rate limiting
+    # Subtest: eventually returns 429 after too many login attempts
+    ok 1 - eventually returns 429 after too many login attempts
+      ---
+      duration_ms: 45.574099
+      type: 'test'
+      ...
+    1..1
+ok 5 - POST /api/auth/login - rate limiting
+  ---
+  duration_ms: 45.781377
+  type: 'suite'
+  ...
+# ◇ injected env (0) from ../.env // tip: ⌁ auth for agents [www.vestauth.com]
+# ◇ injected env (0) from ../.env // tip: ⌘ override existing { override: true }
+# Subtest: candidateService
+    # Subtest: buildPublicPortfolio compiles portfolio and handles cache hit/miss successfully
+    ok 1 - buildPublicPortfolio compiles portfolio and handles cache hit/miss successfully
+      ---
+      duration_ms: 6.194658
+      type: 'test'
+      ...
+    # Subtest: updateProfile invalidates candidate portfolio cache pattern
+    ok 2 - updateProfile invalidates candidate portfolio cache pattern
+      ---
+      duration_ms: 0.516957
+      type: 'test'
+      ...
+    # Subtest: completeOnboarding validates credentials and invalidates caches
+    ok 3 - completeOnboarding validates credentials and invalidates caches
+      ---
+      duration_ms: 237.026531
+      type: 'test'
+      ...
+    1..3
+ok 6 - candidateService
+  ---
+  duration_ms: 245.659831
+  type: 'suite'
+  ...
+# ◇ injected env (0) from ../.env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+# ◇ injected env (0) from ../.env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+# ◇ injected env (0) from ../.env // tip: ⌘ enable debugging { debug: true }
+# Sentry not configured. Set SENTRY_DSN in .env to enable error tracking.
+# Subtest: GET /api/candidate/activity
+    # Subtest: returns 401 when no auth token is provided
+    ok 1 - returns 401 when no auth token is provided
+      ---
+      duration_ms: 32.504332
+      type: 'test'
+      ...
+    # Subtest: returns 401 when an invalid auth token is provided
+    ok 2 - returns 401 when an invalid auth token is provided
+      ---
+      duration_ms: 6.474421
+      type: 'test'
+      ...
+    1..2
+ok 7 - GET /api/candidate/activity
+  ---
+  duration_ms: 40.731873
+  type: 'suite'
+  ...
+# Subtest: GET /api/candidate/offers
+    # Subtest: returns 401 when no auth token is provided
+    ok 1 - returns 401 when no auth token is provided
+      ---
+      duration_ms: 5.986037
+      type: 'test'
+      ...
+    # Subtest: returns 401 when an invalid auth token is provided
+    ok 2 - returns 401 when an invalid auth token is provided
+      ---
+      duration_ms: 4.151936
+      type: 'test'
+      ...
+    1..2
+ok 8 - GET /api/candidate/offers
+  ---
+  duration_ms: 10.395525
+  type: 'suite'
+  ...
+# Subtest: POST /api/candidate/offers/:jobId/respond
+    # Subtest: returns 401 when no auth token is provided
+    ok 1 - returns 401 when no auth token is provided
+      ---
+      duration_ms: 16.910573
+      type: 'test'
+      ...
+    # Subtest: returns 401 when an invalid auth token is provided
+    ok 2 - returns 401 when an invalid auth token is provided
+      ---
+      duration_ms: 7.086145
+      type: 'test'
+      ...
+    1..2
+ok 9 - POST /api/candidate/offers/:jobId/respond
+  ---
+  duration_ms: 24.257967
+  type: 'suite'
+  ...
+# Subtest: GET /api/candidate/journey-tracker
+    # Subtest: returns 401 when no auth token is provided
+    ok 1 - returns 401 when no auth token is provided
+      ---
+      duration_ms: 8.784452
+      type: 'test'
+      ...
+    # Subtest: returns 401 when an invalid auth token is provided
+    ok 2 - returns 401 when an invalid auth token is provided
+      ---
+      duration_ms: 4.188395
+      type: 'test'
+      ...
+    1..2
+ok 10 - GET /api/candidate/journey-tracker
+  ---
+  duration_ms: 13.173833
+  type: 'suite'
+  ...
+# [2026-07-03 09:54:45.672] [33mWARN[39m: [36mEmail service not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS in .env[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+# [2026-07-03 09:54:45.723] [33mWARN[39m: [36mUsing public Judge0 CE endpoint. For production, set JUDGE0_API_URL to a private instance.[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mendpoint[39m: "https://ce.judge0.com"
+# [2026-07-03 09:54:46.055] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "GET"
+#     [35murl[39m: "/api/candidate/activity"
+#     [35mstatusCode[39m: 401
+#     [35mdurationMs[39m: 4
+# [2026-07-03 09:54:46.066] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "GET"
+#     [35murl[39m: "/api/candidate/activity"
+#     [35mstatusCode[39m: 401
+#     [35mdurationMs[39m: 1
+# [2026-07-03 09:54:46.073] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "GET"
+#     [35murl[39m: "/api/candidate/offers"
+#     [35mstatusCode[39m: 401
+#     [35mdurationMs[39m: 1
+# [2026-07-03 09:54:46.077] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "GET"
+#     [35murl[39m: "/api/candidate/offers"
+#     [35mstatusCode[39m: 401
+#     [35mdurationMs[39m: 0
+# [2026-07-03 09:54:46.092] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "POST"
+#     [35murl[39m: "/api/candidate/offers/00000000-0000-0000-0000-000000000000/respond"
+#     [35mstatusCode[39m: 401
+#     [35mdurationMs[39m: 1
+# [2026-07-03 09:54:46.099] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "POST"
+#     [35murl[39m: "/api/candidate/offers/00000000-0000-0000-0000-000000000000/respond"
+#     [35mstatusCode[39m: 401
+#     [35mdurationMs[39m: 0
+# [2026-07-03 09:54:46.109] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "GET"
+#     [35murl[39m: "/api/candidate/journey-tracker"
+#     [35mstatusCode[39m: 401
+#     [35mdurationMs[39m: 0
+# [2026-07-03 09:54:46.115] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "GET"
+#     [35murl[39m: "/api/candidate/journey-tracker"
+#     [35mstatusCode[39m: 401
+#     [35mdurationMs[39m: 1
+# Subtest: date utility functions
+    # Subtest: formatDate
+        # Subtest: formats a valid ISO date string correctly
+        ok 1 - formats a valid ISO date string correctly
+          ---
+          duration_ms: 76.092153
+          type: 'test'
+          ...
+        # Subtest: returns empty string for null or undefined
+        ok 2 - returns empty string for null or undefined
+          ---
+          duration_ms: 0.306523
+          type: 'test'
+          ...
+        1..2
+    ok 1 - formatDate
+      ---
+      duration_ms: 83.387308
+      type: 'suite'
+      ...
+    # Subtest: monthsBack
+        # Subtest: returns correct count of month objects
+        ok 1 - returns correct count of month objects
+          ---
+          duration_ms: 5.899976
+          type: 'test'
+          ...
+        # Subtest: orders month items ascending chronologically
+        ok 2 - orders month items ascending chronologically
+          ---
+          duration_ms: 0.653572
+          type: 'test'
+          ...
+        1..2
+    ok 2 - monthsBack
+      ---
+      duration_ms: 6.877505
+      type: 'suite'
+      ...
+    1..2
+ok 11 - date utility functions
+  ---
+  duration_ms: 91.167162
+  type: 'suite'
+  ...
+# Subtest: error classes
+    # Subtest: initializes AppError with correct properties
+    ok 1 - initializes AppError with correct properties
+      ---
+      duration_ms: 2.654064
+      type: 'test'
+      ...
+    # Subtest: initializes NotFoundError with status 404
+    ok 2 - initializes NotFoundError with status 404
+      ---
+      duration_ms: 0.327021
+      type: 'test'
+      ...
+    # Subtest: initializes ValidationError with status 400
+    ok 3 - initializes ValidationError with status 400
+      ---
+      duration_ms: 0.270365
+      type: 'test'
+      ...
+    # Subtest: initializes UnauthorizedError with status 401
+    ok 4 - initializes UnauthorizedError with status 401
+      ---
+      duration_ms: 0.251711
+      type: 'test'
+      ...
+    # Subtest: initializes ForbiddenError with status 403
+    ok 5 - initializes ForbiddenError with status 403
+      ---
+      duration_ms: 0.255698
+      type: 'test'
+      ...
+    1..5
+ok 12 - error classes
+  ---
+  duration_ms: 5.658164
+  type: 'suite'
+  ...
+# ◇ injected env (0) from ../.env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+# ◇ injected env (0) from ../.env // tip: ⌘ override existing { override: true }
+# ◇ injected env (0) from ../.env // tip: ⌁ auth for agents [www.vestauth.com]
+# Sentry not configured. Set SENTRY_DSN in .env to enable error tracking.
+# Subtest: GET /api/health
+    # Subtest: returns 200 with service status
+    ok 1 - returns 200 with service status
+      ---
+      duration_ms: 48.785994
+      type: 'test'
+      ...
+    1..1
+ok 13 - GET /api/health
+  ---
+  duration_ms: 50.000977
+  type: 'suite'
+  ...
+# Subtest: GET /{*splat} (SPA fallback)
+    # Subtest: returns 200 or 404 for unknown routes
+    ok 1 - returns 200 or 404 for unknown routes
+      ---
+      duration_ms: 6.405092
+      type: 'test'
+      ...
+    1..1
+ok 14 - GET /{*splat} (SPA fallback)
+  ---
+  duration_ms: 6.595898
+  type: 'suite'
+  ...
+# [2026-07-03 09:54:46.417] [33mWARN[39m: [36mEmail service not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS in .env[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+# [2026-07-03 09:54:46.454] [33mWARN[39m: [36mUsing public Judge0 CE endpoint. For production, set JUDGE0_API_URL to a private instance.[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mendpoint[39m: "https://ce.judge0.com"
+# [2026-07-03 09:54:46.725] [32mINFO[39m: [36mRequest completed[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "GET"
+#     [35murl[39m: "/api/health"
+#     [35mstatusCode[39m: 200
+#     [35mdurationMs[39m: 27
+# [2026-07-03 09:54:46.736] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "GET"
+#     [35murl[39m: "/some-random-page"
+#     [35mstatusCode[39m: 404
+#     [35mdurationMs[39m: 2
+# ◇ injected env (0) from ../.env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+# ◇ injected env (0) from ../.env // tip: ⌘ suppress logs { quiet: true }
+# ◇ injected env (0) from ../.env // tip: ⌘ suppress logs { quiet: true }
+# Sentry not configured. Set SENTRY_DSN in .env to enable error tracking.
+# Subtest: GET /api/hub/overview
+    # Subtest: returns 401 when no auth token is provided
+    ok 1 - returns 401 when no auth token is provided
+      ---
+      duration_ms: 37.983452
+      type: 'test'
+      ...
+    # Subtest: returns 401 when an invalid auth token is provided
+    ok 2 - returns 401 when an invalid auth token is provided
+      ---
+      duration_ms: 8.078662
+      type: 'test'
+      ...
+    # Subtest: returns 401 when authorization header format is wrong
+    ok 3 - returns 401 when authorization header format is wrong
+      ---
+      duration_ms: 4.393198
+      type: 'test'
+      ...
+    # Subtest: rejects requests without Bearer prefix
+    ok 4 - rejects requests without Bearer prefix
+      ---
+      duration_ms: 4.055486
+      type: 'test'
+      ...
+    1..4
+ok 15 - GET /api/hub/overview
+  ---
+  duration_ms: 56.575732
+  type: 'suite'
+  ...
+# Subtest: Hub overview response structure
+    # Subtest: does not expose stack traces on error
+    ok 1 - does not expose stack traces on error
+      ---
+      duration_ms: 13.921722
+      type: 'test'
+      ...
+    1..1
+ok 16 - Hub overview response structure
+  ---
+  duration_ms: 14.271045
+  type: 'suite'
+  ...
+# [2026-07-03 09:55:19.771] [33mWARN[39m: [36mEmail service not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS in .env[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+# [2026-07-03 09:55:19.828] [33mWARN[39m: [36mUsing public Judge0 CE endpoint. For production, set JUDGE0_API_URL to a private instance.[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mendpoint[39m: "https://ce.judge0.com"
+# [2026-07-03 09:55:20.138] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "GET"
+#     [35murl[39m: "/api/hub/overview"
+#     [35mstatusCode[39m: 401
+#     [35mdurationMs[39m: 5
+# [2026-07-03 09:55:20.153] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "GET"
+#     [35murl[39m: "/api/hub/overview"
+#     [35mstatusCode[39m: 401
+#     [35mdurationMs[39m: 2
+# [2026-07-03 09:55:20.157] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "GET"
+#     [35murl[39m: "/api/hub/overview"
+#     [35mstatusCode[39m: 401
+#     [35mdurationMs[39m: 0
+# [2026-07-03 09:55:20.162] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "GET"
+#     [35murl[39m: "/api/hub/overview"
+#     [35mstatusCode[39m: 401
+#     [35mdurationMs[39m: 1
+# [2026-07-03 09:55:20.176] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "GET"
+#     [35murl[39m: "/api/hub/overview"
+#     [35mstatusCode[39m: 401
+#     [35mdurationMs[39m: 1
+# Subtest: insights engine
+    # Subtest: initializes empty topic score accumulator structure
+    ok 1 - initializes empty topic score accumulator structure
+      ---
+      duration_ms: 2.461985
+      type: 'test'
+      ...
+    # Subtest: calculates mcq answer accuracy correctly with case insensitivity
+    ok 2 - calculates mcq answer accuracy correctly with case insensitivity
+      ---
+      duration_ms: 0.655577
+      type: 'test'
+      ...
+    # Subtest: calculates coding submission percentage correctly
+    ok 3 - calculates coding submission percentage correctly
+      ---
+      duration_ms: 0.316432
+      type: 'test'
+      ...
+    # Subtest: calculates communication score properly
+    ok 4 - calculates communication score properly
+      ---
+      duration_ms: 0.278091
+      type: 'test'
+      ...
+    # Subtest: generates correct strengths and weaknesses based on score cutoffs
+    ok 5 - generates correct strengths and weaknesses based on score cutoffs
+      ---
+      duration_ms: 0.384379
+      type: 'test'
+      ...
+    # Subtest: supplies default fallback messages when no test data has been fed
+    ok 6 - supplies default fallback messages when no test data has been fed
+      ---
+      duration_ms: 0.234208
+      type: 'test'
+      ...
+    1..6
+ok 17 - insights engine
+  ---
+  duration_ms: 12.368287
+  type: 'suite'
+  ...
+# ◇ injected env (0) from ../.env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+# ◇ injected env (0) from ../.env // tip: ⌁ auth for agents [www.vestauth.com]
+# ◇ injected env (0) from ../.env // tip: ⌘ override existing { override: true }
+# Subtest: interviewService
+    # Subtest: checkEligibility returns false if candidate has not passed any exams
+    ok 1 - checkEligibility returns false if candidate has not passed any exams
+      ---
+      duration_ms: 1.067978
+      type: 'test'
+      ...
+    # Subtest: checkEligibility returns true and list of passed attempts if score >= pass_marks
+    ok 2 - checkEligibility returns true and list of passed attempts if score >= pass_marks
+      ---
+      duration_ms: 0.539078
+      type: 'test'
+      ...
+    # Subtest: evaluateInterview gathers answers, grades, and marks complete
+    ok 3 - evaluateInterview gathers answers, grades, and marks complete
+      ---
+      duration_ms: 1.225222
+      type: 'test'
+      ...
+    1..3
+ok 18 - interviewService
+  ---
+  duration_ms: 4.951262
+  type: 'suite'
+  ...
+# [2026-07-03 09:55:19.746] [33mWARN[39m: [36mEmail service not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS in .env[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+# [2026-07-03 09:55:19.799] [33mWARN[39m: [36mUsing public Judge0 CE endpoint. For production, set JUDGE0_API_URL to a private instance.[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mendpoint[39m: "https://ce.judge0.com"
+# Subtest: Judge0 compiler interface
+    # Subtest: b64encode & b64decode
+        # Subtest: encodes and decodes string data cleanly
+        ok 1 - encodes and decodes string data cleanly
+          ---
+          duration_ms: 1.296415
+          type: 'test'
+          ...
+        # Subtest: returns empty string when decoding undefined/empty
+        ok 2 - returns empty string when decoding undefined/empty
+          ---
+          duration_ms: 0.177682
+          type: 'test'
+          ...
+        1..2
+    ok 1 - b64encode & b64decode
+      ---
+      duration_ms: 2.759933
+      type: 'suite'
+      ...
+    # Subtest: getJudge0Status
+        # Subtest: returns active status configuration details
+        ok 1 - returns active status configuration details
+          ---
+          duration_ms: 0.306975
+          type: 'test'
+          ...
+        1..1
+    ok 2 - getJudge0Status
+      ---
+      duration_ms: 0.473786
+      type: 'suite'
+      ...
+    # Subtest: runWithJudge0
+        # Subtest: throws for unsupported programming languages
+        ok 1 - throws for unsupported programming languages
+          ---
+          duration_ms: 0.971938
+          type: 'test'
+          ...
+        # Subtest: invokes post requests to Judge0 submissions endpoint
+        ok 2 - invokes post requests to Judge0 submissions endpoint
+          ---
+          duration_ms: 4.083589
+          type: 'test'
+          ...
+        1..2
+    ok 3 - runWithJudge0
+      ---
+      duration_ms: 5.267644
+      type: 'suite'
+      ...
+    1..3
+ok 19 - Judge0 compiler interface
+  ---
+  duration_ms: 15.486209
+  type: 'suite'
+  ...
+# [2026-07-03 09:55:18.374] [33mWARN[39m: [36mUsing public Judge0 CE endpoint. For production, set JUDGE0_API_URL to a private instance.[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mendpoint[39m: "https://ce.judge0.com"
+# Subtest: formatDate
+    # Subtest: formats ISO date to en-IN
+    ok 1 - formats ISO date to en-IN
+      ---
+      duration_ms: 23.54814
+      type: 'test'
+      ...
+    # Subtest: returns empty string for null/undefined
+    ok 2 - returns empty string for null/undefined
+      ---
+      duration_ms: 0.254066
+      type: 'test'
+      ...
+    1..2
+ok 20 - formatDate
+  ---
+  duration_ms: 25.373684
+  type: 'suite'
+  ...
+# Subtest: monthsBack
+    # Subtest: returns correct number of months
+    ok 1 - returns correct number of months
+      ---
+      duration_ms: 1.473056
+      type: 'test'
+      ...
+    # Subtest: returns objects with key and label
+    ok 2 - returns objects with key and label
+      ---
+      duration_ms: 0.348372
+      type: 'test'
+      ...
+    1..2
+ok 21 - monthsBack
+  ---
+  duration_ms: 2.059032
+  type: 'suite'
+  ...
+# Subtest: loginSchema
+    # Subtest: accepts valid login
+    ok 1 - accepts valid login
+      ---
+      duration_ms: 2.755975
+      type: 'test'
+      ...
+    # Subtest: rejects empty email
+    ok 2 - rejects empty email
+      ---
+      duration_ms: 0.686274
+      type: 'test'
+      ...
+    1..2
+ok 22 - loginSchema
+  ---
+  duration_ms: 4.884016
+  type: 'suite'
+  ...
+# Subtest: createExamSchema
+    # Subtest: accepts valid exam
+    ok 1 - accepts valid exam
+      ---
+      duration_ms: 1.316122
+      type: 'test'
+      ...
+    # Subtest: rejects pass_marks > total_marks
+    ok 2 - rejects pass_marks > total_marks
+      ---
+      duration_ms: 0.342541
+      type: 'test'
+      ...
+    1..2
+ok 23 - createExamSchema
+  ---
+  duration_ms: 1.839662
+  type: 'suite'
+  ...
+# Subtest: isValidEmail
+    # Subtest: accepts valid emails
+    ok 1 - accepts valid emails
+      ---
+      duration_ms: 1.675274
+      type: 'test'
+      ...
+    # Subtest: rejects invalid emails
+    ok 2 - rejects invalid emails
+      ---
+      duration_ms: 0.204172
+      type: 'test'
+      ...
+    1..2
+ok 24 - isValidEmail
+  ---
+  duration_ms: 4.057871
+  type: 'suite'
+  ...
+# Subtest: getPasswordValidationError
+    # Subtest: accepts strong passwords
+    ok 1 - accepts strong passwords
+      ---
+      duration_ms: 0.472413
+      type: 'test'
+      ...
+    # Subtest: rejects short passwords
+    ok 2 - rejects short passwords
+      ---
+      duration_ms: 0.184354
+      type: 'test'
+      ...
+    # Subtest: requires uppercase
+    ok 3 - requires uppercase
+      ---
+      duration_ms: 0.252822
+      type: 'test'
+      ...
+    # Subtest: requires number
+    ok 4 - requires number
+      ---
+      duration_ms: 0.232325
+      type: 'test'
+      ...
+    1..4
+ok 25 - getPasswordValidationError
+  ---
+  duration_ms: 1.518611
+  type: 'suite'
+  ...
+# Subtest: getExamValidationError
+    # Subtest: validates exam input correctly
+    ok 1 - validates exam input correctly
+      ---
+      duration_ms: 0.509844
+      type: 'test'
+      ...
+    1..1
+ok 26 - getExamValidationError
+  ---
+  duration_ms: 0.679691
+  type: 'suite'
+  ...
+# ◇ injected env (0) from ../.env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+# Subtest: JWT token lifecycle
+    # Subtest: generates and verifies token
+    ok 1 - generates and verifies token
+      ---
+      duration_ms: 4.672621
+      type: 'test'
+      ...
+    # Subtest: refreshToken returns new token
+    ok 2 - refreshToken returns new token
+      ---
+      duration_ms: 0.889354
+      type: 'test'
+      ...
+    # Subtest: refreshToken rejects invalid token
+    ok 3 - refreshToken rejects invalid token
+      ---
+      duration_ms: 0.175528
+      type: 'test'
+      ...
+    1..3
+ok 27 - JWT token lifecycle
+  ---
+  duration_ms: 6.931967
+  type: 'suite'
+  ...
+# Subtest: ocr parsing rules
+    # Subtest: extracts JNTU-style roll numbers and student names
+    ok 1 - extracts JNTU-style roll numbers and student names
+      ---
+      duration_ms: 2.894153
+      type: 'test'
+      ...
+    # Subtest: handles fallback name detection and various labels
+    ok 2 - handles fallback name detection and various labels
+      ---
+      duration_ms: 1.361026
+      type: 'test'
+      ...
+    1..2
+ok 28 - ocr parsing rules
+  ---
+  duration_ms: 5.75829
+  type: 'suite'
+  ...
+# ◇ injected env (0) from ../.env // tip: ⌘ enable debugging { debug: true }
+# ◇ injected env (0) from ../.env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+# Subtest: plagiarism detection algorithms
+    # Subtest: normalizeCode
+        # Subtest: removes single-line and multi-line comments
+        ok 1 - removes single-line and multi-line comments
+          ---
+          duration_ms: 1.535432
+          type: 'test'
+          ...
+        # Subtest: normalizes multiple whitespace characters to single spaces
+        ok 2 - normalizes multiple whitespace characters to single spaces
+          ---
+          duration_ms: 0.415518
+          type: 'test'
+          ...
+        1..2
+    ok 1 - normalizeCode
+      ---
+      duration_ms: 5.488145
+      type: 'suite'
+      ...
+    # Subtest: calculateCosineSimilarity
+        # Subtest: returns 1.0 for identical pieces of code
+        ok 1 - returns 1.0 for identical pieces of code
+          ---
+          duration_ms: 0.657951
+          type: 'test'
+          ...
+        # Subtest: returns 0.0 for completely disjoint tokens
+        ok 2 - returns 0.0 for completely disjoint tokens
+          ---
+          duration_ms: 0.258643
+          type: 'test'
+          ...
+        # Subtest: calculates structural similarity when keywordOnly is true
+        ok 3 - calculates structural similarity when keywordOnly is true
+          ---
+          duration_ms: 0.335237
+          type: 'test'
+          ...
+        1..3
+    ok 2 - calculateCosineSimilarity
+      ---
+      duration_ms: 1.624629
+      type: 'suite'
+      ...
+    # Subtest: calculateLevenshteinSimilarity
+        # Subtest: returns 1.0 for matching code strings
+        ok 1 - returns 1.0 for matching code strings
+          ---
+          duration_ms: 0.453288
+          type: 'test'
+          ...
+        # Subtest: returns normalized distance similarity for slight variations
+        ok 2 - returns normalized distance similarity for slight variations
+          ---
+          duration_ms: 0.242884
+          type: 'test'
+          ...
+        1..2
+    ok 3 - calculateLevenshteinSimilarity
+      ---
+      duration_ms: 0.88743
+      type: 'suite'
+      ...
+    # Subtest: getSimilarityScore
+        # Subtest: generates score between 0 and 100
+        ok 1 - generates score between 0 and 100
+          ---
+          duration_ms: 0.635268
+          type: 'test'
+          ...
+        1..1
+    ok 4 - getSimilarityScore
+      ---
+      duration_ms: 0.772876
+      type: 'suite'
+      ...
+    1..4
+ok 29 - plagiarism detection algorithms
+  ---
+  duration_ms: 9.731341
+  type: 'suite'
+  ...
+# ◇ injected env (0) from ../.env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+# ◇ injected env (0) from ../.env // tip: ⌘ override existing { override: true }
+# ◇ injected env (0) from ../.env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+# Sentry not configured. Set SENTRY_DSN in .env to enable error tracking.
+# Subtest: GET /api/candidate/portfolio/:slug (public)
+    # Subtest: returns 404 for a non-existent portfolio slug
+    ok 1 - returns 404 for a non-existent portfolio slug
+      ---
+      duration_ms: 59.116189
+      type: 'test'
+      ...
+    # Subtest: returns 404 for a non-existent UUID slug
+    ok 2 - returns 404 for a non-existent UUID slug
+      ---
+      duration_ms: 6.555621
+      type: 'test'
+      ...
+    # Subtest: does not require authentication (public endpoint)
+    ok 3 - does not require authentication (public endpoint)
+      ---
+      duration_ms: 4.368861
+      type: 'test'
+      ...
+    # Subtest: does not expose internal error details
+    ok 4 - does not expose internal error details
+      ---
+      duration_ms: 4.166432
+      type: 'test'
+      ...
+    1..4
+ok 30 - GET /api/candidate/portfolio/:slug (public)
+  ---
+  duration_ms: 76.016247
+  type: 'suite'
+  ...
+# [2026-07-03 09:55:24.809] [33mWARN[39m: [36mEmail service not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS in .env[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+# [2026-07-03 09:55:24.856] [33mWARN[39m: [36mUsing public Judge0 CE endpoint. For production, set JUDGE0_API_URL to a private instance.[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mendpoint[39m: "https://ce.judge0.com"
+# [2026-07-03 09:55:25.188] [31mERROR[39m (Error): [36mUnhandled error[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mstack[39m: "Error: Portfolio not found\\n    at Module.buildPublicPortfolio (/home/runner/work/intellihire/intellihire/server/src/services/candidateService.ts:24:11)\\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)\\n    at async <anonymous> (/home/runner/work/intellihire/intellihire/server/src/routes/candidate.ts:55:18)"
+#     [35mrequestId[39m: "c3b5d1f6-28e1-4ef9-ae11-3f45ea91673e"
+#     err: "Portfolio not found"
+# [2026-07-03 09:55:25.192] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "GET"
+#     [35murl[39m: "/api/candidate/portfolio/non-existent-slug-12345"
+#     [35mstatusCode[39m: 404
+#     [35mdurationMs[39m: 33
+# [2026-07-03 09:55:25.204] [31mERROR[39m (Error): [36mUnhandled error[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mstack[39m: "Error: Portfolio not found\\n    at Module.buildPublicPortfolio (/home/runner/work/intellihire/intellihire/server/src/services/candidateService.ts:24:11)\\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)\\n    at async <anonymous> (/home/runner/work/intellihire/intellihire/server/src/routes/candidate.ts:55:18)"
+#     [35mrequestId[39m: "e528781e-e6ea-49b0-ad0b-266b691541b9"
+#     err: "Portfolio not found"
+# [2026-07-03 09:55:25.205] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "GET"
+#     [35murl[39m: "/api/candidate/portfolio/00000000-0000-0000-0000-000000000000"
+#     [35mstatusCode[39m: 404
+#     [35mdurationMs[39m: 3
+# [2026-07-03 09:55:25.209] [31mERROR[39m (Error): [36mUnhandled error[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mstack[39m: "Error: Portfolio not found\\n    at Module.buildPublicPortfolio (/home/runner/work/intellihire/intellihire/server/src/services/candidateService.ts:24:11)\\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)\\n    at async <anonymous> (/home/runner/work/intellihire/intellihire/server/src/routes/candidate.ts:55:18)"
+#     [35mrequestId[39m: "1de87dbe-c09b-4faa-aa64-0e39b85c9a7b"
+#     err: "Portfolio not found"
+# [2026-07-03 09:55:25.209] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "GET"
+#     [35murl[39m: "/api/candidate/portfolio/any-slug"
+#     [35mstatusCode[39m: 404
+#     [35mdurationMs[39m: 1
+# [2026-07-03 09:55:25.213] [31mERROR[39m (Error): [36mUnhandled error[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mstack[39m: "Error: Portfolio not found\\n    at Module.buildPublicPortfolio (/home/runner/work/intellihire/intellihire/server/src/services/candidateService.ts:24:11)\\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)\\n    at async <anonymous> (/home/runner/work/intellihire/intellihire/server/src/routes/candidate.ts:55:18)"
+#     [35mrequestId[39m: "8b36d88f-addf-4858-aba8-b72e2fe59a9d"
+#     err: "Portfolio not found"
+# [2026-07-03 09:55:25.213] [33mWARN[39m: [36mClient error response[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+#     [35mmethod[39m: "GET"
+#     [35murl[39m: "/api/candidate/portfolio/test-slug"
+#     [35mstatusCode[39m: 404
+#     [35mdurationMs[39m: 1
+# ◇ injected env (0) from ../.env // tip: ◈ encrypted .env [www.dotenvx.com]
+# ◇ injected env (0) from ../.env // tip: ⌘ enable debugging { debug: true }
+# ◇ injected env (0) from ../.env // tip: ◈ encrypted .env [www.dotenvx.com]
+# Subtest: recruiterService
+    # Subtest: getEligibleCandidates filters and compiles eligible candidates list
+    ok 1 - getEligibleCandidates filters and compiles eligible candidates list
+      ---
+      duration_ms: 1.999259
+      type: 'test'
+      ...
+    # Subtest: generateAiShortlist triggers AI evaluator and ranks candidates
+    not ok 2 - generateAiShortlist triggers AI evaluator and ranks candidates
+      ---
+      duration_ms: 22.611921
+      type: 'test'
+      location: '/home/runner/work/intellihire/intellihire/server/tests/recruiterService.test.ts:1:1530'
+      failureType: 'testCodeFailure'
+      error: |-
+        Expected values to be strictly equal:
+        
+        0 !== 1
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: 1
+      actual: 0
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (/home/runner/work/intellihire/intellihire/server/tests/recruiterService.test.ts:62:12)
+        process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:744:7)
+      ...
+    1..2
+not ok 31 - recruiterService
+  ---
+  duration_ms: 27.58377
+  type: 'suite'
+  location: '/home/runner/work/intellihire/intellihire/server/tests/recruiterService.test.ts:1:355'
+  failureType: 'subtestsFailed'
+  error: '1 subtest failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# [2026-07-03 09:55:23.833] [33mWARN[39m: [36mEmail service not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS in .env[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+# Subtest: Zod schema schemas validation
+    # Subtest: loginSchema
+        # Subtest: passes for valid login data
+        ok 1 - passes for valid login data
+          ---
+          duration_ms: 3.76901
+          type: 'test'
+          ...
+        # Subtest: fails for missing email or password
+        ok 2 - fails for missing email or password
+          ---
+          duration_ms: 3.301695
+          type: 'test'
+          ...
+        1..2
+    ok 1 - loginSchema
+      ---
+      duration_ms: 8.341922
+      type: 'suite'
+      ...
+    # Subtest: createUserSchema
+        # Subtest: passes for valid user data
+        ok 1 - passes for valid user data
+          ---
+          duration_ms: 0.970635
+          type: 'test'
+          ...
+        # Subtest: fails for invalid role
+        ok 2 - fails for invalid role
+          ---
+          duration_ms: 0.521485
+          type: 'test'
+          ...
+        1..2
+    ok 2 - createUserSchema
+      ---
+      duration_ms: 1.71624
+      type: 'suite'
+      ...
+    # Subtest: createExamSchema
+        # Subtest: passes for valid exam config
+        ok 1 - passes for valid exam config
+          ---
+          duration_ms: 4.210856
+          type: 'test'
+          ...
+        # Subtest: fails if pass marks exceed total marks
+        ok 2 - fails if pass marks exceed total marks
+          ---
+          duration_ms: 0.41178
+          type: 'test'
+          ...
+        1..2
+    ok 3 - createExamSchema
+      ---
+      duration_ms: 4.809575
+      type: 'suite'
+      ...
+    # Subtest: proctoringEventSchema
+        # Subtest: passes for valid proctoring events
+        ok 1 - passes for valid proctoring events
+          ---
+          duration_ms: 4.424054
+          type: 'test'
+          ...
+        # Subtest: fails for invalid event type
+        ok 2 - fails for invalid event type
+          ---
+          duration_ms: 0.561691
+          type: 'test'
+          ...
+        1..2
+    ok 4 - proctoringEventSchema
+      ---
+      duration_ms: 9.455576
+      type: 'suite'
+      ...
+    1..4
+ok 32 - Zod schema schemas validation
+  ---
+  duration_ms: 25.393955
+  type: 'suite'
+  ...
+# Sentry not configured. Set SENTRY_DSN in .env to enable error tracking.
+# Subtest: Sentry error tracking integration
+    # Subtest: returns false if SENTRY_DSN env var is missing
+    ok 1 - returns false if SENTRY_DSN env var is missing
+      ---
+      duration_ms: 1.753229
+      type: 'test'
+      ...
+    1..1
+ok 33 - Sentry error tracking integration
+  ---
+  duration_ms: 2.919691
+  type: 'suite'
+  ...
+# ◇ injected env (0) from ../.env // tip: ⌘ suppress logs { quiet: true }
+# ◇ injected env (0) from ../.env // tip: ⌘ override existing { override: true }
+# ◇ injected env (0) from ../.env // tip: ⌘ override existing { override: true }
+# Subtest: recruiterService - serializeDriveColleges
+    # Subtest: roundtrips description and metadata
+    ok 1 - roundtrips description and metadata
+      ---
+      duration_ms: 1.57767
+      type: 'test'
+      ...
+    # Subtest: handles empty description gracefully
+    ok 2 - handles empty description gracefully
+      ---
+      duration_ms: 0.156052
+      type: 'test'
+      ...
+    1..2
+ok 34 - recruiterService - serializeDriveColleges
+  ---
+  duration_ms: 2.853708
+  type: 'suite'
+  ...
+# Subtest: recruiterService - createCandidate
+    # Subtest: validates password and creates user via repo
+    ok 1 - validates password and creates user via repo
+      ---
+      duration_ms: 142.995526
+      type: 'test'
+      ...
+    # Subtest: rejects weak password
+    ok 2 - rejects weak password
+      ---
+      duration_ms: 0.662419
+      type: 'test'
+      ...
+    1..2
+ok 35 - recruiterService - createCandidate
+  ---
+  duration_ms: 143.817854
+  type: 'suite'
+  ...
+# Subtest: recruiterService - getCandidatesList
+    # Subtest: returns paginated candidates with total
+    ok 1 - returns paginated candidates with total
+      ---
+      duration_ms: 0.340758
+      type: 'test'
+      ...
+    1..1
+ok 36 - recruiterService - getCandidatesList
+  ---
+  duration_ms: 0.429604
+  type: 'suite'
+  ...
+# Subtest: recruiterService - getDashboardData
+    # Subtest: computes stats correctly with empty data
+    ok 1 - computes stats correctly with empty data
+      ---
+      duration_ms: 13.903995
+      type: 'test'
+      ...
+    # Subtest: calculates pass rate correctly
+    ok 2 - calculates pass rate correctly
+      ---
+      duration_ms: 1.873203
+      type: 'test'
+      ...
+    1..2
+ok 37 - recruiterService - getDashboardData
+  ---
+  duration_ms: 15.908263
+  type: 'suite'
+  ...
+# Subtest: recruiterService - getCompareCandidates
+    # Subtest: compares candidates with scores
+    ok 1 - compares candidates with scores
+      ---
+      duration_ms: 0.640097
+      type: 'test'
+      ...
+    1..1
+ok 38 - recruiterService - getCompareCandidates
+  ---
+  duration_ms: 0.729204
+  type: 'suite'
+  ...
+# Subtest: recruiterService - getAiConfig / saveAiConfig
+    # Subtest: roundtrips AI config through drive description
+    ok 1 - roundtrips AI config through drive description
+      ---
+      duration_ms: 0.274754
+      type: 'test'
+      ...
+    1..1
+ok 39 - recruiterService - getAiConfig / saveAiConfig
+  ---
+  duration_ms: 0.362198
+  type: 'suite'
+  ...
+# [2026-07-03 09:55:25.521] [33mWARN[39m: [36mEmail service not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS in .env[39m
+#     [35mservice[39m: "intellihire-server"
+#     [35mversion[39m: "1.0.0"
+# Subtest: validation helpers
+    # Subtest: isValidEmail
+        # Subtest: returns true for correct formats
+        ok 1 - returns true for correct formats
+          ---
+          duration_ms: 1.030357
+          type: 'test'
+          ...
+        # Subtest: returns false for incorrect formats
+        ok 2 - returns false for incorrect formats
+          ---
+          duration_ms: 0.18206
+          type: 'test'
+          ...
+        1..2
+    ok 1 - isValidEmail
+      ---
+      duration_ms: 2.097423
+      type: 'suite'
+      ...
+    # Subtest: getPasswordValidationError
+        # Subtest: returns error for short password
+        ok 1 - returns error for short password
+          ---
+          duration_ms: 0.268993
+          type: 'test'
+          ...
+        # Subtest: returns error for missing uppercase letter
+        ok 2 - returns error for missing uppercase letter
+          ---
+          duration_ms: 0.141224
+          type: 'test'
+          ...
+        # Subtest: returns error for missing lowercase letter
+        ok 3 - returns error for missing lowercase letter
+          ---
+          duration_ms: 0.158857
+          type: 'test'
+          ...
+        # Subtest: returns error for missing number
+        ok 4 - returns error for missing number
+          ---
+          duration_ms: 0.204993
+          type: 'test'
+          ...
+        # Subtest: returns empty string for valid passwords
+        ok 5 - returns empty string for valid passwords
+          ---
+          duration_ms: 0.154699
+          type: 'test'
+          ...
+        1..5
+    ok 2 - getPasswordValidationError
+      ---
+      duration_ms: 1.175768
+      type: 'suite'
+      ...
+    # Subtest: getExamValidationError
+        # Subtest: returns error for empty title
+        ok 1 - returns error for empty title
+          ---
+          duration_ms: 0.388396
+          type: 'test'
+          ...
+        # Subtest: returns error for short duration
+        ok 2 - returns error for short duration
+          ---
+          duration_ms: 0.199032
+          type: 'test'
+          ...
+        # Subtest: returns error for invalid total marks
+        ok 3 - returns error for invalid total marks
+          ---
+          duration_ms: 0.137046
+          type: 'test'
+          ...
+        # Subtest: returns error for negative pass marks
+        ok 4 - returns error for negative pass marks
+          ---
+          duration_ms: 0.126366
+          type: 'test'
+          ...
+        # Subtest: returns error for pass marks exceeding total marks
+        ok 5 - returns error for pass marks exceeding total marks
+          ---
+          duration_ms: 0.123832
+          type: 'test'
+          ...
+        # Subtest: returns error for available_until before available_from
+        ok 6 - returns error for available_until before available_from
+          ---
+          duration_ms: 0.270195
+          type: 'test'
+          ...
+        # Subtest: returns empty string for a valid exam config
+        ok 7 - returns empty string for a valid exam config
+          ---
+          duration_ms: 0.173454
+          type: 'test'
+          ...
+        1..7
+    ok 3 - getExamValidationError
+      ---
+      duration_ms: 1.717793
+      type: 'suite'
+      ...
+    1..3
+ok 40 - validation helpers
+  ---
+  duration_ms: 5.796371
+  type: 'suite'
+  ...
+1..40
+# tests 116
+# suites 53
+# pass 115
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 74858.55772
+-------------------------|---------|----------|---------|---------|---------------------------------
+File                     | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s               
+-------------------------|---------|----------|---------|---------|---------------------------------
+All files                |   30.36 |    64.28 |   43.49 |   30.36 |                                 
+ src                     |   58.25 |    32.35 |      60 |   58.25 |                                 
+  app.ts                 |   97.08 |    30.43 |     100 |   97.08 | 73-75,194-195,203,228           
+  config.ts              |   65.34 |       30 |      75 |   65.34 | ...6-49,53-55,58-70,78-85,90-92 
+  websocket.ts           |    7.57 |      100 |      25 |    7.57 | 12-24,27-188,191-198            
+ src/lib                 |   52.77 |    73.01 |   56.12 |   52.77 |                                 
+  ai.ts                  |   25.82 |      100 |    7.69 |   25.82 | ...-227,237-308,310-316,318-327 
+  cache.ts               |   28.94 |       50 |   42.85 |   28.94 | ...1,53-60,62-73,77-100,104-105 
+  dateUtils.ts           |     100 |      100 |     100 |     100 |                                 
+  email.ts               |   16.31 |    33.33 |      20 |   16.31 | ...4,29-54,56-79,81-106,108-139 
+  errors.ts              |     100 |      100 |     100 |     100 |                                 
+  examPipeline.ts        |   37.03 |       50 |   16.66 |   37.03 | ...-456,459-626,629-722,725-781 
+  insights.ts            |     100 |    88.46 |     100 |     100 | 69,86,100                       
+  judge0.ts              |   98.41 |       80 |     100 |   98.41 | 60                              
+  logger.ts              |   95.55 |    57.14 |     100 |   95.55 | 16,39                           
+  ocr.ts                 |   81.05 |    47.82 |   57.14 |   81.05 | ...-194,248-251,253-256,260-285 
+  plagiarism.ts          |   62.66 |    63.33 |   83.33 |   62.66 | 147-233                         
+  postgres.ts            |   66.42 |    73.13 |   59.01 |   66.42 | ...-854,867-906,915-928,936-966 
+  queue.ts               |   16.88 |       50 |   44.44 |   16.88 | ...-109,115-126,132-149,156-375 
+  schemas.ts             |   97.95 |      100 |     100 |   97.95 | 63-64                           
+  sentry.ts              |      70 |       40 |   66.66 |      70 | 12-13,17-23                     
+  storage.ts             |   22.07 |       50 |      25 |   22.07 | 10-24,26-40,42-60,62-72         
+  validation.ts          |     100 |      100 |     100 |     100 |                                 
+ src/middleware          |   85.48 |    75.51 |     100 |   85.48 |                                 
+  auditLogger.ts         |   95.83 |    68.75 |     100 |   95.83 | 43-44                           
+  auth.ts                |   73.73 |     87.5 |     100 |   73.73 | 42,66-80,89-98                  
+  errorHandler.ts        |   83.33 |    33.33 |     100 |   83.33 | 15-16,41-46                     
+  logger.ts              |     100 |       75 |     100 |     100 | 12                              
+  requestId.ts           |     100 |      100 |     100 |     100 |                                 
+  validation.ts          |     100 |      100 |     100 |     100 |                                 
+ src/repositories        |   21.54 |       70 |    8.33 |   21.54 |                                 
+  candidateRepository.ts |   33.33 |       80 |   15.38 |   33.33 | ...,82-90,92-98,100-108,110-117 
+  interviewRepository.ts |   15.45 |      100 |    6.66 |   15.45 | ...-116,118-127,129-137,139-190 
+  recruiterRepository.ts |   20.68 |       50 |    6.25 |   20.68 | ...-281,283-290,299-309,311-314 
+ src/routes              |    13.6 |       85 |   26.31 |    13.6 |                                 
+  admin.ts               |    8.86 |      100 |     100 |    8.86 | ...-105,109-131,135-157,161-392 
+  adminAnalytics.ts      |    6.68 |      100 |      25 |    6.68 | ...26-33,36-162,166-232,236-341 
+  ai.ts                  |   13.53 |      100 |    9.09 |   13.53 | ...-294,298-328,332-374,378-514 
+  auth.ts                |   59.35 |    85.71 |       0 |   59.35 | 89-125,143-174,178-184          
+  candidate.ts           |    8.53 |    66.66 |   16.66 |    8.53 | ...407-1460,1464-1488,1492-1508 
+  candidateAnalytics.ts  |     7.4 |      100 |     100 |     7.4 | ...-358,363-442,447-495,500-578 
+  candidateAssets.ts     |   15.78 |      100 |     100 |   15.78 | 10-43,47-92                     
+  compiler.ts            |   23.07 |      100 |     100 |   23.07 | 10-26,30-62                     
+  docs.ts                |   98.07 |      100 |     100 |   98.07 | 100-101                         
+  exam.ts                |   18.26 |        0 |     100 |   18.26 | ...-251,255-266,270-309,313-320 
+  hub.ts                 |    13.9 |      100 |      20 |    13.9 | ...-388,391-551,554-687,690-753 
+  interview.ts           |    42.1 |      100 |     100 |    42.1 | ...4-99,104-109,114-120,125-130 
+  proctoring.ts          |    5.92 |      100 |      50 |    5.92 | ...-422,426-474,478-526,530-554 
+  recruiter.ts           |   31.07 |      100 |     100 |   31.07 | ...-203,207-217,221-231,235-248 
+  recruiterAnalytics.ts  |    8.81 |      100 |      50 |    8.81 | ...-314,319-356,361-398,403-496 
+  result.ts              |   10.22 |      100 |     100 |   10.22 | ...-398,404-418,423-480,485-525 
+  tpo.ts                 |   12.11 |      100 |   33.33 |   12.11 | ...-287,291-312,316-384,388-418 
+  tpoAnalytics.ts        |    5.59 |      100 |      50 |    5.59 | ...-152,156-284,288-367,371-426 
+ src/services            |   43.55 |     47.5 |   48.88 |   43.55 |                                 
+  candidateService.ts    |   37.35 |    52.63 |   66.66 |   37.35 | ...1-78,118-119,123-124,151-356 
+  interviewService.ts    |   42.39 |     41.3 |      30 |   42.39 | ...,418,424,440,447-451,490-492 
+  recruiterService.ts    |   47.55 |    49.47 |   63.15 |   47.55 | ...,567,571,575,600-643,647-682 
+-------------------------|---------|----------|---------|---------|---------------------------------
