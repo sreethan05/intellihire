@@ -54,7 +54,7 @@ describe("recruiterService", () => {
     const mockProfiles = [
       createMockProfile({ user_id: "cand-1", cgpa: 8.5 })
     ];
-    const getProfilesMock = mock.method(recruiterRepo, "getCandidateProfiles", async () => mockProfiles);
+    const getProfilesMock = mock.method(recruiterRepo, "getCandidateProfilesForShortlist", async () => mockProfiles);
     const getAttemptsMock = mock.method(recruiterRepo, "getAttemptsByCandidateId", async () => []);
     const getInterviewsMock = mock.method(recruiterRepo, "getInterviewsByCandidateId", async () => []);
 
