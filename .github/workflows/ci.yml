@@ -68,6 +68,9 @@ jobs:
       DATABASE_URL: postgres://postgres:password@127.0.0.1:5433/intellihire_test
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -99,10 +102,9 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
-          git checkout -b test-logs || git checkout test-logs
           git add server/test_output.log
           git commit -m "ci: dump server test logs [skip ci]" || true
-          git push origin test-logs --force || true
+          git push origin HEAD:${{ github.head_ref || github.ref_name }} --force || true
 
       - name: Upload Server Test Logs
         if: always()
