@@ -26,7 +26,7 @@ async function checkRateLimit(redis: Redis, key: string, limit: number, windowSe
 export function setupWebSocket(httpServer: HTTPServer) {
   const pubClient = new Redis(config.REDIS_URL || "redis://localhost:6379", {
     maxRetriesPerRequest: 1,
-    enableOfflineQueue: false,
+    enableOfflineQueue: true, // Enabled to allow Socket.IO adapter to queue subscription commands during connection handshake
   });
   const subClient = pubClient.duplicate();
 
