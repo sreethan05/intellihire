@@ -9,8 +9,9 @@ import { verifyToken, getCookie, ACCESS_TOKEN_COOKIE } from "./middleware/auth.j
 
 let ioInstance: Server | null = null;
 
-async function checkRateLimit(redis: Redis, key: string, limit: number, windowSeconds: number): Promise<boolean> {
+async function checkRateLimit(redis: Redis | null, key: string, limit: number, windowSeconds: number): Promise<boolean> {
   if (config.NODE_ENV === "test") return true;
+  if (!redis) return true;
   try {
     const current = await redis.incr(key);
     if (current === 1) {
