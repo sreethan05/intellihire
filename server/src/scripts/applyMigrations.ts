@@ -51,6 +51,7 @@ async function applyMigrations() {
       "13_refresh_tokens.sql",
       "14_data_retention.sql",
       "15_slug_index.sql",
+      "16_add_unique_exam_questions.sql",
     ];
 
     for (const file of filesToApply) {

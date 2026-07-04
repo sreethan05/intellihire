@@ -49,8 +49,14 @@ test.describe("Recruiter Drive & Exam Flow", () => {
     // Click MCQ tab in Step 2
     await page.click('button[role="tab"]:has-text("MCQ")');
 
-    // Click Add MCQ Question button
-    await page.click('button:has-text("Add MCQ Question")');
+    // Click Pick from Bank tab trigger
+    await page.click('button[role="tab"]:has-text("Pick from Bank")');
+
+    // Wait for question bank to load
+    await page.waitForSelector('text=Select questions to add to this exam:');
+
+    // Click the first question in the list to select it
+    await page.getByRole('tabpanel', { name: /Pick from Bank/ }).locator('.cursor-pointer').first().click();
 
     // Click Save Questions to go to Step 3
     await page.click('button:has-text("Save Questions")');

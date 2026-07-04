@@ -24,16 +24,40 @@ async function checkRateLimit(redis: Redis, key: string, limit: number, windowSe
 }
 
 export function setupWebSocket(httpServer: HTTPServer) {
-  const pubClient = new Redis(config.REDIS_URL || "redis://localhost:6379", {
-    maxRetriesPerRequest: 1,
-    enableOfflineQueue: true, // Enabled to allow Socket.IO adapter to queue subscription commands during connection handshake
-  });
-  const subClient = pubClient.duplicate();
+  // Socket.IO should still function when Redis is unavailable.
+  // If Redis is down, we skip the redis adapter and fall back to single-process rooms.
+  const redisUrl = config.REDIS_URL || "redis://localhost:6379";
 
-  pubClient.on("error", (err) => logger.warn({ err: err.message }, "WebSocket PubClient Redis error"));
-  subClient.on("error", (err) => logger.warn({ err: err.message }, "WebSocket SubClient Redis error"));
+  let pubClient: Redis | null = null;
+  let subClient: Redis | null = null;
+  let redisReady = false;
+
+  try {
+    const redisOpts = { enableOfflineQueue: false, connectTimeout: 1500, maxRetriesPerRequest: 1, retryStrategy(times: number) { return times > 2 ? null : Math.min(times * 500, 1500); } };
+    pubClient = new Redis(redisUrl, redisOpts);
+    subClient = pubClient.duplicate();
+
+    pubClient.on("error", (err) => logger.warn({ err: err.message }, "WebSocket PubClient Redis error"));
+    subClient.on("error", (err) => logger.warn({ err: err.message }, "WebSocket SubClient Redis error"));
+    pubClient.on("close", () => { redisReady = false; });
+    subClient.on("close", () => { redisReady = false; });
+  } catch (err: any) {
+    logger.warn({ err: err?.message ?? err }, "Redis clients init failed for WebSocket");
+  }
+
+  // If we can’t connect quickly, we’ll run without the redis adapter.
+  void (async () => {
+    if (!pubClient) return;
+    try {
+      await pubClient.ping();
+      redisReady = true;
+    } catch {
+      redisReady = false;
+    }
+  })();
 
   const io = new Server(httpServer, {
+
     maxHttpBufferSize: 1e6, // 1MB payload limit
     cors: {
       origin: (origin, callback) => {
@@ -58,17 +82,41 @@ export function setupWebSocket(httpServer: HTTPServer) {
     },
   });
 
-  if (config.NODE_ENV !== "test") {
-    io.adapter(createAdapter(pubClient, subClient));
+  if (config.NODE_ENV !== "test" && pubClient && subClient) {
+    // Adapter only when Redis is confirmed reachable.
+    if (redisReady) {
+      io.adapter(createAdapter(pubClient, subClient));
+    }
   }
 
   ioInstance = io;
 
   // Authentication middleware for socket connections
   io.use(async (socket, next) => {
+    // If Redis isn’t ready, allow the connection (rate limiting becomes a no-op).
+    if (!pubClient || !redisReady) {
+      const cookieToken = getCookie(socket.handshake.headers.cookie, ACCESS_TOKEN_COOKIE);
+      const authToken = socket.handshake.auth.token as string;
+      const token = cookieToken || authToken;
+
+      if (!token) {
+        return next(new Error("Authentication required"));
+      }
+      try {
+        const decoded = verifyToken(token);
+        (socket as any).authToken = token;
+        (socket as any).user = decoded;
+        next();
+      } catch {
+        return next(new Error("Invalid token"));
+      }
+      return;
+    }
+
     const ip = socket.handshake.address || "unknown";
     const connLimitKey = `ratelimit:ws:conn:${ip}`;
     const connOk = await checkRateLimit(pubClient, connLimitKey, 30, 60);
+
     if (!connOk) {
       logger.warn({ ip }, "WebSocket connection rate limit exceeded");
       return next(new Error("Connection rate limit exceeded"));

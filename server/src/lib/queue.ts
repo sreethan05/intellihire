@@ -20,44 +20,74 @@ class BackgroundGradingQueue {
   constructor() {
     const isTest = config.NODE_ENV === "test";
     if (!isTest) {
-      try {
-        this.bullQueue = new Queue("grading-queue", config.REDIS_URL || "redis://localhost:6379");
-        this.interviewQueue = new Queue("interview-queue", config.REDIS_URL || "redis://localhost:6379");
-        
-        void this.bullQueue.process(async (job) => {
-          const { attemptId } = job.data;
-          logger.info({ attemptId, jobId: job.id }, "Starting background grading job");
-          await this.gradeAttempt(attemptId);
-        });
-
-        void this.interviewQueue.process(async (job) => {
-          const { interviewId } = job.data;
-          logger.info({ interviewId, jobId: job.id }, "Starting background interview evaluation job");
-          const { evaluateInterview } = await import("../services/interviewService.js");
-          await evaluateInterview(interviewId);
-        });
-
-        this.bullQueue.on("error", (error) => {
-          logger.error({ error: error.message }, "Bull queue error");
-        });
-
-        this.interviewQueue.on("error", (error) => {
-          logger.error({ error: error.message }, "Interview Bull queue error");
-        });
-
-        this.bullQueue.on("failed", (job, error) => {
-          logger.error({ jobId: job?.id, attemptId: job?.data?.attemptId, error: error.message }, "Bull grading job failed");
-        });
-
-        logger.info("Bull queues initialized successfully");
-      } catch (err: any) {
-        logger.warn({ err: err.message }, "Failed to initialize Bull queues, falling back to local queue");
-        void this.initLocalQueue();
-      }
+      // NOTE: We must never crash the whole server when Redis is down.
+      // Bull/ioredis can enter a retry loop and throw MaxRetriesPerRequestError.
+      // We preflight-check Redis with a short timeout; if it fails, we use the local/disk queue.
+      void this.tryInitBullOrFallback();
     } else {
       void this.initLocalQueue();
     }
   }
+
+  private async tryInitBullOrFallback() {
+    try {
+      const redisUrl = config.REDIS_URL || "redis://localhost:6379";
+
+      // Fast probe with a very short timeout
+      const { Redis } = await import("ioredis");
+      const probe = new Redis(redisUrl, { connectTimeout: 1500, maxRetriesPerRequest: 1 });
+      try {
+        await probe.ping();
+      } finally {
+        try {
+          await probe.quit();
+        } catch {
+          // ignore
+        }
+      }
+
+      const redisOpts = {
+        // Do not allow ioredis to keep retrying forever during initial server startup.
+        // If the broker dies later, jobs will fail and can be re-queued via local logic.
+        maxRetriesPerRequest: 3,
+        enableOfflineQueue: false,
+      };
+
+      this.bullQueue = new Queue("grading-queue", config.REDIS_URL || "redis://localhost:6379", { redis: redisOpts });
+      this.interviewQueue = new Queue("interview-queue", config.REDIS_URL || "redis://localhost:6379", { redis: redisOpts });
+
+      void this.bullQueue.process(async (job) => {
+        const { attemptId } = job.data;
+        logger.info({ attemptId, jobId: job.id }, "Starting background grading job");
+        await this.gradeAttempt(attemptId);
+      });
+
+      void this.interviewQueue.process(async (job) => {
+        const { interviewId } = job.data;
+        logger.info({ interviewId, jobId: job.id }, "Starting background interview evaluation job");
+        const { evaluateInterview } = await import("../services/interviewService.js");
+        await evaluateInterview(interviewId);
+      });
+
+      this.bullQueue.on("error", (error) => {
+        logger.error({ error: error.message }, "Bull queue error");
+      });
+
+      this.interviewQueue.on("error", (error) => {
+        logger.error({ error: error.message }, "Interview Bull queue error");
+      });
+
+      this.bullQueue.on("failed", (job, error) => {
+        logger.error({ jobId: job?.id, attemptId: job?.data?.attemptId, error: error.message }, "Bull grading job failed");
+      });
+
+      logger.info("Bull queues initialized successfully");
+    } catch (err: any) {
+      logger.warn({ err: err?.message ?? err }, "Redis unavailable — using local/disk queue for background grading");
+      await this.initLocalQueue();
+    }
+  }
+
 
   private async initLocalQueue() {
     try {

@@ -10,8 +10,13 @@ let isConnected = false;
 if (!isTest) {
   try {
     redisClient = new Redis(config.REDIS_URL || "redis://localhost:6379", {
-      maxRetriesPerRequest: 1,
       enableOfflineQueue: false,
+      connectTimeout: 2000,
+      maxRetriesPerRequest: 1,
+      retryStrategy(times) {
+        if (times > 3) return null; // stop retrying
+        return Math.min(times * 500, 2000);
+      },
     });
 
     redisClient.on("connect", () => {
@@ -19,9 +24,16 @@ if (!isTest) {
       logger.info("Redis cache client connected successfully");
     });
 
+    // Prevent the ioredis "error" event from becoming an unhandled error
+    // that crashes the process when Redis is unavailable.
     redisClient.on("error", (err) => {
       isConnected = false;
       logger.warn({ err: err.message }, "Redis cache client connection error");
+    });
+    // Same for the close event — just log, don't throw.
+    redisClient.on("close", () => {
+      isConnected = false;
+      logger.warn("Redis cache client connection closed");
     });
   } catch (err: any) {
     logger.warn({ err: err.message }, "Failed to initialize Redis client");
