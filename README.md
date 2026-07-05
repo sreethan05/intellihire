@@ -1,189 +1,192 @@
 # IntelliHire Platform
 
-**IntelliHire** is a full‑stack recruitment and assessment platform supporting Admin, TPO (Training & Placement Officer), Recruiter, and Candidate workflows. It provides exam creation, coding assessments with sandboxed execution, AI‑powered voice interviews, real‑time proctoring, and candidate performance analytics.
+**IntelliHire** is a state-of-the-art, full‑stack recruitment, assessment, and proctoring platform. Designed to streamline campus placements and hiring workflows, the platform provides seamless orchestration across four distinct user roles: **Admin**, **TPO (Training & Placement Officer)**, **Recruiter**, and **Candidate**. 
+
+It features automated AI voice interviews, real-time proctoring analytics with vision model inspection, coding assessments using Monaco Editor and Judge0 sandboxed execution, batch marksheet parsing (OCR), and robust system resilience including Redis-free degradation.
 
 ---
 
-## Table of Contents
+## 🌟 Key Capabilities
 
-- [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
-- [Setup & Installation](#setup--installation)
-- [Database Schema & Migrations](#database-schema--migrations)
-- [Environment Variables](#environment-variables)
-- [Running the Application](#running-the-application)
-- [Manual Testing & Verification](#manual-testing--verification)
-- [Testing](#testing)
-- [Docker](#docker)
-- [License](#license)
+### 1. Multi-Tenant Role Workflows
+*   **Candidate Portal**: Completes profile onboarding, takes MCQs/coding/voice exams, runs code in a sandboxed IDE, participates in AI-powered voice interviews, and reviews performance analytics.
+*   **Recruiter Portal**: Schedules AI voice interviews, designs MCQ and coding tests, creates hiring drives, monitors exams live via webcam snapshots, and reviews detailed candidate plagiarism & voice metrics.
+*   **Training & Placement Officer (TPO) Portal**: Manages student databases, imports batches of student profiles via grade-sheet OCR, monitors placement activity, and exports college-wide analytics.
+*   **Admin Portal**: Exercises global system control, manages database instances, creates Recruiter & TPO accounts, audits system logs, and inspects API consumption metrics.
 
----
-
-## Tech Stack
-
-- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS, shadcn/ui
-- **Backend**: Express 5 with TypeScript (`tsx`), PostgreSQL, Socket.IO
-- **AI Integrations**: Groq SDK (Llama 3.3 70B & Whisper) for audio evaluation & proctoring logs
-- **Code Execution**: Monaco Editor + Judge0 CE sandboxed API
-- **Email**: Nodemailer (SMTP)
+### 2. Advanced Technical Features
+*   **AI-Powered Voice Interviews**: Conducts automated conversational assessments using the **Groq SDK** (Llama 3.3 70B & Whisper). Transcribes spoken responses and evaluates candidates dynamically on accuracy, clarity, and communication depth.
+*   **Visual & Event-Driven Proctoring**: Real-time webcam snapshots are processed by **Llama 3.2 11B Vision** to detect violations (e.g., looking away, multiple people in frame, mobile devices). Built-in browser event listeners track tab switching and full-screen exits.
+*   **Smart Marksheet OCR Parsing**: Batch uploads of student marksheets are parsed via **Tesseract.js** (images) and **pdf-parse** (PDFs), with data extraction corrected via Groq JSON mode to extract student names, roll numbers, CGPAs, branches, and graduation years.
+*   **Algorithmic Plagiarism Detection**: Features a custom cosine-similarity engine to analyze code submissions. Normalizes syntax (stripping comments/whitespaces) and compares tokenized structures to flag copy-paste behavior.
+*   **Redis-Free Degradation & Resilience**: The backend is engineered to gracefully degrade. If Redis goes offline, websocket rooms and job queues seamlessly fall back to single-process in-memory queues without crashing the server.
 
 ---
 
-## Project Structure
+## ⚙️ Tech Stack
+
+*   **Frontend**: React 19, TypeScript, Vite, Tailwind CSS, shadcn/ui, Monaco Editor
+*   **Backend**: Express 5 (TypeScript with `tsx`), Socket.IO (WebSockets), Node.js v20
+*   **Database**: PostgreSQL
+*   **Storage & Caching**: Redis (Queue/Websocket adapter), MinIO / S3‑compatible object storage
+*   **AI Models**: Groq APIs (Llama 3.3 70B, Llama 3.2 11B Vision, Whisper)
+*   **Execution Sandbox**: Judge0 CE API
+
+---
+
+## 📁 Project Structure
 
 ```text
 intellihire/
-├── client/                    # React frontend (Vite SPA)
-│   ├── src/                   # Components, contexts, pages, hooks
-│   └── public/                # Static public assets
-├── server/                    # Express backend API
-│   ├── src/                   # Routing, core libraries, DB scripts
-│   └── tests/                 # Jest backend unit & integration tests
-├── database/                  # SQL schema & seed scripts
-│   ├── 01_users_colleges.sql  # Users and colleges schema
-│   ├── 02_questions.sql       # Questions tables schema
-│   ├── 03_exams.sql           # Exams tables schema
-│   ├── ...                    # Migrations 04 through 08
-│   ├── 09_seed_data.sql       # Default MCQ and coding questions seed data
-│   ├── 10_indexes.sql         # Primary database optimization indexes
-│   └── 11_audit_logs.sql      # System audit logging schema
-├── e2e/                       # Playwright E2E integration test suites
-└── .github/workflows/ci.yml   # CI/CD pipeline configuration
+├── client/                     # React frontend (Vite SPA)
+│   ├── src/
+│   │   ├── components/         # Reusable UI elements (shadcn/ui layout)
+│   │   ├── context/            # Auth and global application states
+│   │   ├── hooks/              # Custom React hooks (WebSockets, media, etc.)
+│   │   └── pages/              # Portal pages (admin/, candidate/, recruiter/, tpo/)
+│   └── public/                 # Static assets
+├── server/                     # Express backend API
+│   ├── src/
+│   │   ├── lib/                # Core engines: AI, OCR, storage, plagiarism, queue
+│   │   ├── middleware/         # JWT Auth, rate limiting, and request validation
+│   │   ├── repositories/       # Database access layers
+│   │   └── routes/             # REST Endpoints (auth, AI, exams, proctoring)
+│   └── tests/                  # Jest unit & integration tests
+├── database/                   # SQL schemas and seed scripts
+│   ├── 01_users_colleges.sql   # User profile tables
+│   ├── 02_questions.sql        # MCQ, Coding, and Voice question schema
+│   ├── ...                     # Database migrations 03 through 08
+│   ├── 09_seed_data.sql        # Default exam question seeds
+│   └── 11_audit_logs.sql       # Audit trail for admin logs
+├── e2e/                        # Playwright E2E integration test suites
+└── docker-compose.yml          # Postgres, Redis, and MinIO container definitions
 ```
 
 ---
 
-## Setup & Installation
+## 🚀 Setup & Installation
 
 ### Prerequisites
-- Node.js (v18+ recommended)
-- Docker & Docker Compose (for running DB & Redis services locally)
+*   **Node.js** (v20+ recommended)
+*   **Docker & Docker Compose** (for local backing services)
 
 ### Step 1: Install Dependencies
-Run the following commands to install dependencies for the workspace, client, and server:
+Install all package dependencies in the workspace, client, and server:
 ```bash
 npm install
 npm --prefix client install
 npm --prefix server install
 ```
 
-### Step 2: Configure Environment
-Copy the example environment file to `.env` in the root directory:
+### Step 2: Set Environment Variables
+Create a `.env` file in the root directory by copying the example:
 ```bash
 cp .env.example .env
-# Edit .env with your local credentials
+# Edit .env and supply your API credentials and secrets
 ```
 
-### Step 3: Run Database & Cache via Docker Compose (Recommended)
-You can start a local PostgreSQL database, Redis instance, and MinIO storage server in one command:
+Ensure the following variables are configured (use placeholders for actual keys):
+```env
+PORT=5000
+NODE_ENV=development
+VITE_API_URL=http://localhost:5000/api
+
+# PostgreSQL Configuration
+DATABASE_URL=postgresql://dev:devpass@localhost:5432/intellihire
+
+# Cache & Storage
+REDIS_URL=redis://localhost:6379
+S3_ENDPOINT=http://localhost:9000
+S3_REGION=us-east-1
+S3_ACCESS_KEY_ID=minioadmin
+S3_SECRET_ACCESS_KEY=minioadmin
+S3_BUCKET_NAME=intellihire
+
+# Security & Authentication
+JWT_SECRET=xxxx-your-secret-key-xxxx
+
+# AI Credentials (Required for voice grading & webcam proctoring)
+GROQ_API_KEY=xxxx-your-groq-api-key-xxxx
+GROQ_MODEL=llama-3.3-70b-versatile
+
+# Judge0 Sandboxed Compiler Config
+JUDGE0_API_URL=https://ce.judge0.com
+
+# SMTP Mail Settings (Optional)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=YOUR_EMAIL@gmail.com
+SMTP_PASS=xxxx-your-app-password-xxxx
+```
+
+### Step 3: Run Infrastructure Container Suite
+Start PostgreSQL, Redis, and MinIO locally via Docker:
 ```bash
 docker compose up -d
 ```
-This starts:
-- **PostgreSQL** on port `5432` (database: `intellihire`, user: `dev`, password: `devpass`)
-- **Redis** on port `6379`
-- **MinIO** console on [http://localhost:9001](http://localhost:9001) (credentials: `minioadmin` / `minioadminpass`)
+*   **PostgreSQL** runs on port `5432`.
+*   **Redis** runs on port `6379`.
+*   **MinIO Console** is available at [http://localhost:9001](http://localhost:9001) (`minioadmin` / `minioadminpass`).
 
-
----
-
-## Database Schema & Migrations
-
-To apply all database schemas, table setups, and seed data automatically to your PostgreSQL database, run:
+### Step 4: Apply Database Migrations & Seeds
+Initialize database tables, schemas, and default questions:
 ```bash
 npm --prefix server run migrate
 ```
 
-This runs the migration script which sequentially applies the SQL migration files located in the `database/` folder (from `01_users_colleges.sql` through `11_audit_logs.sql`).
-
-To seed additional test roles (Recruiter, Candidate) for E2E tests or manual verification:
+To seed mock recruiters, colleges, and candidate accounts for manual testing:
 ```bash
 npx tsx server/src/seed_e2e_users.ts
 ```
 
 ---
 
-## Environment Variables
+## 🏃 Running the Application
 
-Configure these keys in the `.env` file in the project root:
-
-```env
-# Server Config
-PORT=5000
-NODE_ENV=development
-VITE_API_URL=http://localhost:5000/api
-
-# PostgreSQL Connection
-DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@127.0.0.1:5432/intellihire
-
-# Authentication
-JWT_SECRET=xxxx-your-secret-key-xxxx
-
-# Optional AI Services (Required for voice grading & visual proctoring)
-GROQ_API_KEY=xxxx-your-groq-key-xxxx
-GROQ_MODEL=llama-3.3-70b-versatile
-
-# Judge0 Sandboxed Execution (defaults to public CE instance)
-JUDGE0_API_URL=https://ce.judge0.com
-
-# SMTP Mailer Configurations (Optional)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=YOUR_EMAIL@gmail.com
-SMTP_PASS=xxxx-your-app-password-xxxx
-SMTP_FROM="IntelliHire <noreply@intellihire.com>"
-```
-
----
-
-## Running the Application
-
-### Development (client + server concurrently)
+### Development Mode
+Runs both the client and server concurrently with hot‑reloading:
 ```bash
 npm run dev
 ```
-* **Frontend**: [http://localhost:3000](http://localhost:3000)
-* **Backend**: [http://localhost:5000](http://localhost:5000)
+*   **Frontend**: [http://localhost:3000](http://localhost:3000)
+*   **Backend**: [http://localhost:5000](http://localhost:5000)
 
-### Production Build & Start
+### Production Build & Serve
+Compile frontend assets and launch the backend in production mode:
 ```bash
-npm run build   # Compiles frontend assets
-npm run start   # Starts production backend serving the client
+npm run build
+npm run start
 ```
 
 ---
 
-## Manual Testing & Verification
+## 🧪 Testing & Verification
 
-Once your development server is running:
-* **Pre-seeded Accounts**: To inspect or modify the pre-seeded credentials for **Admin**, **Recruiter**, or **Candidate** portal flows, please refer to the source configuration files directly:
-  - Base Admin: [postgres-schema.sql](file:///database/postgres-schema.sql)
-  - Recruiter & Candidate: [seed_e2e_users.ts](file:///server/src/seed_e2e_users.ts)
-
----
-
-## Testing
-
+### Unit & Integration Tests
+Execute backend logic and helper function tests using Jest:
 ```bash
-# Run backend Jest tests
 npm run test
+```
 
-# Run Playwright E2E browser tests
+### End-to-End Tests
+Launch the Playwright automated testing suite to verify multi-portal workflows:
+```bash
 npm run test:e2e
 ```
 
 ---
 
-## Docker
-
-To build and run the application in a Docker container:
+## 🐋 Dockerization
+To bundle and run the entire application inside a single production-ready container:
 ```bash
+# Build the image
 docker build -t intellihire .
+
+# Run the container using environment configurations
 docker run -p 5000:5000 --env-file .env intellihire
 ```
 
 ---
 
-## License
-
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+## 📄 License
+This repository is licensed under the MIT License. See the `LICENSE` file for more details.
