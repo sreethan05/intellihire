@@ -47,14 +47,33 @@ class BackgroundGradingQueue {
       }
 
       const redisOpts = {
-        // Do not allow ioredis to keep retrying forever during initial server startup.
-        // If the broker dies later, jobs will fail and can be re-queued via local logic.
-        maxRetriesPerRequest: 3,
-        enableOfflineQueue: false,
+        maxRetriesPerRequest: null as unknown as number, // null = retry forever (Bull best practice)
+        enableOfflineQueue: true,                       // buffer commands until connection ready
+        retryStrategy: (times: number) => Math.min(times * 200, 5000),
       };
 
       this.bullQueue = new Queue("grading-queue", config.REDIS_URL || "redis://localhost:6379", { redis: redisOpts });
       this.interviewQueue = new Queue("interview-queue", config.REDIS_URL || "redis://localhost:6379", { redis: redisOpts });
+
+      // Guard against unhandled errors on Bull's internal Redis clients
+      // (Bull creates a 3rd subscriber client that can emit errors asynchronously)
+      const safeGuardQueue = (q: Queue.Queue, name: string) => {
+        q.on("error", (error) => {
+          logger.warn({ error: error.message }, `${name} queue connection error (non-fatal)`);
+        });
+        q.on("failed", (job, error) => {
+          logger.error({ jobId: job?.id, error: error.message }, `${name} job failed`);
+        });
+        // Intercept client errors on the underlying ioredis clients used internally by Bull
+        const clients = [(q as any).client, (q as any).bclient, (q as any).eclient];
+        for (const client of clients) {
+          if (client && typeof client.on === "function") {
+            client.on("error", (err: Error) => {
+              logger.warn({ err: err.message }, `${name} internal Redis client error (non-fatal)`);
+            });
+          }
+        }
+      };
 
       void this.bullQueue.process(async (job) => {
         const { attemptId } = job.data;
@@ -69,17 +88,10 @@ class BackgroundGradingQueue {
         await evaluateInterview(interviewId);
       });
 
-      this.bullQueue.on("error", (error) => {
-        logger.error({ error: error.message }, "Bull queue error");
-      });
-
-      this.interviewQueue.on("error", (error) => {
-        logger.error({ error: error.message }, "Interview Bull queue error");
-      });
-
-      this.bullQueue.on("failed", (job, error) => {
-        logger.error({ jobId: job?.id, attemptId: job?.data?.attemptId, error: error.message }, "Bull grading job failed");
-      });
+      // Wait a tick so Bull's internal clients have been created
+      await new Promise((r) => setTimeout(r, 50));
+      safeGuardQueue(this.bullQueue, "grading");
+      safeGuardQueue(this.interviewQueue, "interview");
 
       logger.info("Bull queues initialized successfully");
     } catch (err: any) {

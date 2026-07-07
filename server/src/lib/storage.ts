@@ -12,14 +12,14 @@ if (!isTest) {
     region: config.S3_REGION,
     credentials: {
       accessKeyId: config.S3_ACCESS_KEY_ID || "minioadmin",
-      secretAccessKey: config.S3_SECRET_ACCESS_KEY || "minioadmin",
+      secretAccessKey: config.S3_SECRET_ACCESS_KEY || "minioadminpass",
     },
     forcePathStyle: true,
   });
 
   // Ensure bucket exists in MinIO asynchronously
   ensureBucketExists().catch((err) => {
-    logger.warn({ err: err.message }, "MinIO bucket check failed. Ensure services are running.");
+    logger.warn({ err: err.name ?? err.message }, "MinIO bucket check failed. Ensure services are running.");
   });
 }
 
