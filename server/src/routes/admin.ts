@@ -5,6 +5,7 @@ import { authMiddleware, roleMiddleware, type AuthRequest } from "../middleware/
 import { validateBody } from "../middleware/validation.js";
 import { getPasswordValidationError } from "../lib/validation.js";
 import { logger } from "../lib/logger.js";
+import { PASSWORD_SALT_ROUNDS } from "../lib/constants.js";
 
 import { createRecruiterSchema, createTpoSchema } from "../lib/schemas.js";
 
@@ -36,7 +37,7 @@ router.post("/create-recruiter", validateBody(createRecruiterSchema), async (req
       return;
     }
 
-    const password_hash = await bcrypt.hash(password, 10);
+    const password_hash = await bcrypt.hash(password, PASSWORD_SALT_ROUNDS);
     const { data, error } = await db
       .from("users")
       .insert({
@@ -71,7 +72,7 @@ router.post("/create-tpo", validateBody(createTpoSchema), async (req: AuthReques
       return;
     }
 
-    const password_hash = await bcrypt.hash(password, 10);
+    const password_hash = await bcrypt.hash(password, PASSWORD_SALT_ROUNDS);
 
     const { college, tpo } = await transaction(async (client) => {
       // Upsert college inside transaction

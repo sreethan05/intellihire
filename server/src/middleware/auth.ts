@@ -20,7 +20,7 @@ export interface AuthRequest extends Request {
   user?: AuthUser;
 }
 
-const isProduction = () => config.NODE_ENV === "production";
+const isProduction = () => config.NODE_ENV === "production" || process.env.NODE_ENV === "production";
 
 export const generateToken = (user: AuthUser) => {
   return jwt.sign(user, JWT_SECRET, { expiresIn: ACCESS_TOKEN_TTL_SECONDS });

@@ -6,6 +6,7 @@ import { sendDriveRegisteredEmail } from "../lib/email.js";
 import { logger } from "../lib/logger.js";
 import bcrypt from "bcryptjs";
 import { getPasswordValidationError } from "../lib/validation.js";
+import { PASSWORD_SALT_ROUNDS } from "../lib/constants.js";
 
 const APP_URL = process.env.VITE_API_URL?.replace("/api", "") || "http://localhost:3000";
 
@@ -78,7 +79,7 @@ export async function createCandidate(candidateData: any, recruiterId: string) {
     throw new Error(passwordError);
   }
 
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await bcrypt.hash(password, PASSWORD_SALT_ROUNDS);
   return recruiterRepo.createUser({
     name,
     email,

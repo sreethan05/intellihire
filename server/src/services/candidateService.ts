@@ -9,6 +9,7 @@ import {
 } from "../lib/insights.js";
 import { formatDate, monthsBack } from "../lib/dateUtils.js";
 import { getPasswordValidationError } from "../lib/validation.js";
+import { PASSWORD_SALT_ROUNDS } from "../lib/constants.js";
 import { NotFoundError, ValidationError } from "../lib/errors.js";
 import { cache } from "../lib/cache.js";
 
@@ -123,7 +124,7 @@ export async function completeOnboarding(userId: string, body: any) {
     throw new ValidationError(passwordError);
   }
 
-  const password_hash = await bcrypt.hash(password, 10);
+  const password_hash = await bcrypt.hash(password, PASSWORD_SALT_ROUNDS);
 
   const [, profile] = await Promise.all([
     candidateRepo.updateUser(userId, {

@@ -16,7 +16,7 @@ export const auditMiddleware = (req: Request, res: Response, next: NextFunction)
     const ip = req.ip || req.socket.remoteAddress || null;
     const userAgent = req.headers["user-agent"] || null;
     const action = `${method} ${path.split("?")[0]}`;
-    const resource = path.split("/")[3] || "unknown";
+    const resource = path.split("/")[2] || "unknown";
 
     let payload: unknown = null;
     if (req.body && typeof req.body === "object") {

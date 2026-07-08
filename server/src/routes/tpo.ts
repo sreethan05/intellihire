@@ -13,6 +13,7 @@ import {
   paginationSchema,
 } from "../lib/schemas.js";
 import { logger } from "../lib/logger.js";
+import { PASSWORD_SALT_ROUNDS } from "../lib/constants.js";
 
 const router = Router();
 
@@ -66,7 +67,7 @@ async function provisionCandidateAccounts(rows: StudentRow[], tpo: TpoCollege, t
     }
 
     const email = row.email || `${rollNumber.toLowerCase()}@${String(collegeCode).toLowerCase()}.student.local`;
-    const password_hash = await bcrypt.hash(rollNumber, 10);
+    const password_hash = await bcrypt.hash(rollNumber, PASSWORD_SALT_ROUNDS);
     try {
       const user = await transaction(async (client) => {
         const userResult = await client.query(
