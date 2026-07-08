@@ -27,13 +27,19 @@ export const errorHandler = (
     "Unhandled error"
   );
 
-  if (err instanceof AppError) {
-    return res.status(err.statusCode).json({
+  const isAppError = err instanceof AppError || (
+    typeof (err as any).statusCode === "number" &&
+    typeof (err as any).code === "string"
+  );
+
+  if (isAppError) {
+    const statusCode = (err as any).statusCode;
+    return res.status(statusCode).json({
       success: false,
       error: err.message,
-      code: err.code,
+      code: (err as any).code,
       requestId,
-      details: err.details || []
+      details: (err as any).details || []
     });
   }
 
