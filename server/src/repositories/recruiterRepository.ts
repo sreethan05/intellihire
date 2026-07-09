@@ -130,14 +130,20 @@ export async function getCollegesByIds(collegeIds: string[]) {
   return data || [];
 }
 
-export async function getJobsByRecruiter(recruiterId: string) {
-  const { data, error } = await db
+export async function getJobsByRecruiter(recruiterId: string, page?: number, limit?: number) {
+  let query = db
     .from("jobs")
-    .select("*, college:college_id(id, name, code), exam:exam_id(id, title)")
+    .select("*, college:college_id(id, name, code), exam:exam_id(id, title)", { count: "exact" })
     .eq("created_by", recruiterId)
     .order("created_at", { ascending: false });
+
+  if (page !== undefined && limit !== undefined) {
+    query = query.range((page - 1) * limit, page * limit - 1);
+  }
+
+  const { data, error, count } = await query;
   if (error) throw error;
-  return data || [];
+  return { jobs: data || [], total: count || 0 };
 }
 
 export async function getJobsForDashboard(recruiterId: string) {

@@ -95,10 +95,11 @@ router.post("/drives", validateBody(createJobSchema), async (req: AuthRequest, r
   }
 });
 
-router.get("/drives", async (req: AuthRequest, res, next) => {
+router.get("/drives", validateQuery(paginationSchema), async (req: AuthRequest, res, next) => {
   try {
-    const { drives } = await recruiterService.getDrivesList(req.user!.id);
-    res.json({ drives });
+    const { page, limit } = req.query as any;
+    const { drives, total } = await recruiterService.getDrivesList(req.user!.id, page, limit);
+    res.json({ drives, total, page, limit });
   } catch (err) {
     next(err);
   }

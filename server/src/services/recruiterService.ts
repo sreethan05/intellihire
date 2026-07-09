@@ -263,8 +263,8 @@ export async function createDrive(driveData: any, recruiterId: string) {
   };
 }
 
-export async function getDrivesList(recruiterId: string) {
-  const drives = await recruiterRepo.getJobsByRecruiter(recruiterId);
+export async function getDrivesList(recruiterId: string, page?: number, limit?: number) {
+  const { jobs: drives, total } = await recruiterRepo.getJobsByRecruiter(recruiterId, page, limit);
   const allCollegeIdsSet = new Set<string>();
   drives.forEach((drive: any) => {
     const ids = getDriveCollegeIds(drive);
@@ -293,7 +293,7 @@ export async function getDrivesList(recruiterId: string) {
     };
   });
 
-  return { drives: enrichedDrives };
+  return { drives: enrichedDrives, total };
 }
 
 export async function getEligibleCandidates(driveId: string, recruiterId: string) {

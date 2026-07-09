@@ -81,21 +81,6 @@ export function hasAiKey() {
   return Boolean(GROQ_API_KEY);
 }
 
-/**
- * Check if local Ollama is available for exam generation.
- * This is the preferred provider for exams to avoid API costs.
- */
-export async function hasLocalModel(): Promise<boolean> {
-  return false;
-}
-
-/**
- * Get the active Ollama status for health checks and diagnostics.
- */
-export async function getOllamaStatus() {
-  return { available: false, model: "", models: [], error: "Ollama integration disabled" };
-}
-
 export async function generateGroqText(prompt: string | { systemPrompt?: string; userPrompt: string }): Promise<string> {
   const { GROQ_API_KEY, GROQ_MODEL } = getKeys();
   if (!GROQ_API_KEY) {
