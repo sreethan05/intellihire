@@ -11,6 +11,7 @@
     "lint": "eslint .",
     "check": "tsc --noEmit",
     "migrate": "tsx src/scripts/applyMigrations.ts",
+    "seed:e2e": "tsx src/seed_e2e_users.ts",
     "seed-offline-60": "tsx src/scripts/generateOffline60.ts"
   },
   "dependencies": {

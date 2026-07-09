@@ -46,17 +46,6 @@ export function setupWebSocket(httpServer: HTTPServer) {
     logger.warn({ err: err?.message ?? err }, "Redis clients init failed for WebSocket");
   }
 
-  // If we can’t connect quickly, we’ll run without the redis adapter.
-  void (async () => {
-    if (!pubClient) return;
-    try {
-      await pubClient.ping();
-      redisReady = true;
-    } catch {
-      redisReady = false;
-    }
-  })();
-
   const io = new Server(httpServer, {
 
     maxHttpBufferSize: 1e6, // 1MB payload limit
@@ -83,14 +72,23 @@ export function setupWebSocket(httpServer: HTTPServer) {
     },
   });
 
-  if (config.NODE_ENV !== "test" && pubClient && subClient) {
-    // Adapter only when Redis is confirmed reachable.
-    if (redisReady) {
-      io.adapter(createAdapter(pubClient, subClient));
-    }
-  }
-
   ioInstance = io;
+
+  // If we can’t connect quickly, we’ll run without the redis adapter.
+  void (async () => {
+    if (!pubClient || !subClient) return;
+    try {
+      await pubClient.ping();
+      redisReady = true;
+      if (config.NODE_ENV !== "test") {
+        io.adapter(createAdapter(pubClient, subClient));
+        logger.info("WebSocket Redis adapter attached successfully");
+      }
+    } catch {
+      redisReady = false;
+      logger.warn("WebSocket Redis ping failed, running without Redis adapter");
+    }
+  })();
 
   // Authentication middleware for socket connections
   io.use(async (socket, next) => {
