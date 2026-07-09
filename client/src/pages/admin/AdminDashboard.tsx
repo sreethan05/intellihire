@@ -14,6 +14,7 @@ import {
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<"growth" | "health">("growth");
   const [loading, setLoading] = useState(true);
+  const [growthTimeframe, setGrowthTimeframe] = useState<"weekly" | "monthly">("monthly");
 
   // States
   const [stats, setStats] = useState<DashboardStats>({});
@@ -163,21 +164,36 @@ export default function AdminDashboard() {
                 <CardTitle className="text-base font-extrabold text-slate-900">
                   Platform Growth Analytics
                 </CardTitle>
-                <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-bold text-slate-600 uppercase">
-                  Monthly Aggregation
+                <div className="flex border border-slate-200 bg-slate-100/50 p-0.5 rounded-lg">
+                  <button
+                    onClick={() => setGrowthTimeframe("weekly")}
+                    className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition ${
+                      growthTimeframe === "weekly" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"
+                    }`}
+                  >
+                    Weekly
+                  </button>
+                  <button
+                    onClick={() => setGrowthTimeframe("monthly")}
+                    className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition ${
+                      growthTimeframe === "monthly" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"
+                    }`}
+                  >
+                    Monthly
+                  </button>
                 </div>
               </CardHeader>
               <CardContent>
-                {growthData.monthly?.length === 0 ? (
+                {(!growthData[growthTimeframe] || growthData[growthTimeframe].length === 0) ? (
                   <div className="py-24 text-center text-xs text-slate-400 font-semibold bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
                     No placement metrics available.
                   </div>
                 ) : (
                   <div className="h-[280px] w-full mt-4">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={growthData.monthly} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <LineChart data={growthData[growthTimeframe]} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                        <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#94a3b8", fontWeight: 700 }} axisLine={false} tickLine={false} />
+                        <XAxis dataKey={growthTimeframe === "weekly" ? "week" : "month"} tick={{ fontSize: 10, fill: "#94a3b8", fontWeight: 700 }} axisLine={false} tickLine={false} />
                         <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
                         <Tooltip />
                         <Legend wrapperStyle={{ fontSize: 11, fontWeight: 700 }} />

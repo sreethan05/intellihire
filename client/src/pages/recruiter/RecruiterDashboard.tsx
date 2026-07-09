@@ -43,6 +43,10 @@ export default function RecruiterDashboard() {
   const [fetchingComparison, setFetchingComparison] = useState(false);
   const [showComparisonModal, setShowComparisonModal] = useState(false);
 
+  // Search and Filter States for Top Performers
+  const [candidateSearchQuery, setCandidateSearchQuery] = useState("");
+  const [scoreThreshold, setScoreThreshold] = useState<number>(0);
+
   useEffect(() => {
     setLoading(true);
     recruiterApi.getDashboard(selectedCollegeId)
@@ -110,7 +114,15 @@ export default function RecruiterDashboard() {
   const dashboardStats = stats.stats || {};
   const funnelData = stats.funnel || [];
   const driveAnalytics = stats.driveAnalytics || [];
-  const candidatePerformance = stats.candidatePerformance || [];
+  
+  // Local Filtering for Top Performers
+  const candidatePerformance = (stats.candidatePerformance || []).filter((cand: any) => {
+    const matchesSearch = 
+      cand.name.toLowerCase().includes(candidateSearchQuery.toLowerCase()) ||
+      cand.email.toLowerCase().includes(candidateSearchQuery.toLowerCase());
+    const matchesScore = cand.averageScore >= scoreThreshold;
+    return matchesSearch && matchesScore;
+  });
 
   return (
     <div className="space-y-6 pb-12">
@@ -296,6 +308,34 @@ export default function RecruiterDashboard() {
               {fetchingComparison ? "Loading comparison..." : `Compare Selected (${selectedCandidates.length})`}
             </Button>
           )}
+        </div>
+
+        {/* Search and Score Threshold Filters */}
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between pb-1">
+          <div className="flex-1 relative">
+            <input
+              type="text"
+              value={candidateSearchQuery}
+              onChange={(e) => setCandidateSearchQuery(e.target.value)}
+              placeholder="Search top performers by name or email..."
+              className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold outline-none focus:border-violet-500 bg-slate-50/50 focus:bg-white"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-bold text-slate-500 shrink-0">Min Avg Score:</label>
+            <select
+              value={scoreThreshold}
+              onChange={(e) => setScoreThreshold(Number(e.target.value))}
+              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold outline-none focus:border-violet-500 bg-slate-50/50 focus:bg-white"
+            >
+              <option value={0}>All Scores</option>
+              <option value={50}>&ge; 50%</option>
+              <option value={60}>&ge; 60%</option>
+              <option value={70}>&ge; 70%</option>
+              <option value={80}>&ge; 80%</option>
+              <option value={90}>&ge; 90%</option>
+            </select>
+          </div>
         </div>
 
         <div className="overflow-hidden rounded-xl border border-slate-100">

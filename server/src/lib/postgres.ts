@@ -244,7 +244,7 @@ pool.query = async function (text: any, params: any) {
     sqlString = text.text;
   }
 
-  if (duration > 100 && sqlString && !sqlString.trim().toLowerCase().startsWith("explain")) {
+  if (duration > 100 && sqlString && sqlString.trim().toLowerCase().startsWith("select")) {
     try {
       const explainRes = await originalQuery(`EXPLAIN ${sqlString}`, params || text.values);
       const plan = explainRes.rows.map((row: any) => Object.values(row)[0]).join("\n");
@@ -475,6 +475,12 @@ function parseOrFilter(source: string): SimpleFilter[] {
     if (operator === "in") {
       const listMatch = rawValue.match(/^\((.*)\)$/);
       value = listMatch?.[1] ? splitTopLevel(listMatch[1]).map((item) => item.trim()) : [];
+    } else if (rawValue === "null") {
+      value = null;
+    } else if (rawValue === "true") {
+      value = true;
+    } else if (rawValue === "false") {
+      value = false;
     }
 
     return {

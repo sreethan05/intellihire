@@ -86,7 +86,7 @@ router.get("/bank/mcq", recruiterOrAdmin, async (req: AuthRequest, res) => {
     const { data, error } = await db
       .from("questions")
       .select("*")
-      .eq("created_by", req.user!.id)
+      .or(`created_by.eq.${req.user!.id},created_by.eq.null`)
       .order("created_at", { ascending: false });
     if (error) { res.status(400).json({ error: error.message }); return; }
     res.json({ questions: data || [] });
@@ -98,7 +98,7 @@ router.get("/bank/coding", recruiterOrAdmin, async (req: AuthRequest, res) => {
     const { data, error } = await db
       .from("coding_questions")
       .select("*")
-      .eq("created_by", req.user!.id)
+      .or(`created_by.eq.${req.user!.id},created_by.eq.null`)
       .order("created_at", { ascending: false });
     if (error) { res.status(400).json({ error: error.message }); return; }
     res.json({ coding_questions: data || [] });

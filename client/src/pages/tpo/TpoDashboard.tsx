@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { 
   Briefcase, FileCheck, GraduationCap, 
-  Percent, TrendingUp, AlertTriangle, ArrowRight, Loader2, Award 
+  Percent, TrendingUp, AlertTriangle, ArrowRight, Loader2, Award, PieChart as PieIcon
 } from "lucide-react";
 import { tpoApi } from "@/lib/api";
-import { MetricCard } from "@/components/dashboard/DashboardKit";
+import { MetricCard, DonutSummary, DashboardBarChart } from "@/components/dashboard/DashboardKit";
 import { Link } from "react-router-dom";
 
 export default function TpoDashboard() {
@@ -44,11 +44,18 @@ export default function TpoDashboard() {
   const verifiedCount = registeredCount - (stats.pendingVerification || 0);
   const placedCount = stats.placed || 0;
 
-  const funnelSteps = [
-    { label: "Registered Candidates", count: registeredCount, pct: 100, color: "bg-slate-200" },
-    { label: "Profiles Complete", count: completeCount, pct: registeredCount ? Math.round((completeCount / registeredCount) * 100) : 0, color: "bg-blue-200" },
-    { label: "Verified & Ready", count: verifiedCount, pct: registeredCount ? Math.round((verifiedCount / registeredCount) * 100) : 0, color: "bg-indigo-200" },
-    { label: "Placed / Offered", count: placedCount, pct: registeredCount ? Math.round((placedCount / registeredCount) * 100) : 0, color: "bg-green-200" }
+  // Recharts Chart Data
+  const funnelChartData = [
+    { stage: "Registered", "Students Count": registeredCount },
+    { stage: "Completed", "Students Count": completeCount },
+    { stage: "Verified & Ready", "Students Count": verifiedCount },
+    { stage: "Placed / Offered", "Students Count": placedCount }
+  ];
+  const funnelBars = [{ key: "Students Count", name: "Students Count", color: "#6366f1" }];
+
+  const placedUnplacedData = [
+    { name: "Placed / Offered", value: placedCount, color: "#10b981" },
+    { name: "Yet to Place", value: Math.max(0, registeredCount - placedCount), color: "#cbd5e1" }
   ];
 
   return (
@@ -116,40 +123,42 @@ export default function TpoDashboard() {
           <h2 className="text-sm font-extrabold text-slate-950 flex items-center gap-2 border-b border-slate-100 pb-2">
             <Percent className="h-4 w-4 text-blue-600" /> Placement Funnel
           </h2>
-          
-          <div className="space-y-4">
-            {funnelSteps.map((step, idx) => (
-              <div key={idx} className="space-y-1">
-                <div className="flex justify-between items-center text-xs font-bold">
-                  <span className="text-slate-700">{step.label}</span>
-                  <span className="text-slate-900">{step.count} ({step.pct}%)</span>
-                </div>
-                <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
-                  <div className={`h-full ${step.color} rounded-full`} style={{ width: `${step.pct}%` }}></div>
-                </div>
-              </div>
-            ))}
+          <div className="h-64 mt-2">
+            <DashboardBarChart data={funnelChartData} bars={funnelBars} xKey="stage" />
           </div>
         </div>
       </div>
 
-      {/* Secondary Metrics Card Grid */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm flex items-center justify-between">
-          <div>
-            <div className="text-xs font-bold text-slate-400 uppercase tracking-wide">Overall Placement Rate</div>
-            <div className="text-2xl font-black text-slate-900 mt-1">{summary?.placementRate || 0}%</div>
-            <p className="text-xs text-slate-500 mt-1">Shortlisted and accepted offers compared to total registered student base.</p>
+      {/* Donut Chart and Academic/Placement Stats */}
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Placement Ratio Donut Chart */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+          <h2 className="text-sm font-extrabold text-slate-950 flex items-center gap-2 border-b border-slate-100 pb-2">
+            <PieIcon className="h-4 w-4 text-emerald-500" /> Placement Outcome Distribution
+          </h2>
+          <div className="py-2">
+            <DonutSummary total={registeredCount} items={placedUnplacedData} />
           </div>
-          <TrendingUp className="h-8 w-8 text-green-500 shrink-0" />
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm flex items-center justify-between">
-          <div>
-            <div className="text-xs font-bold text-slate-400 uppercase tracking-wide">Average College CGPA</div>
-            <div className="text-2xl font-black text-slate-900 mt-1">{stats.averageCgpa || 0}</div>
-            <p className="text-xs text-slate-500 mt-1">Average CGPA of all registered student profiles in the system.</p>
+
+        {/* Secondary Metrics Card Column */}
+        <div className="grid gap-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm flex items-center justify-between hover:shadow-md transition">
+            <div>
+              <div className="text-xs font-bold text-slate-400 uppercase tracking-wide">Overall Placement Rate</div>
+              <div className="text-2xl font-black text-slate-900 mt-1">{summary?.placementRate || 0}%</div>
+              <p className="text-xs text-slate-500 mt-1">Shortlisted and accepted offers compared to total registered student base.</p>
+            </div>
+            <TrendingUp className="h-8 w-8 text-emerald-500 shrink-0" />
           </div>
-          <GraduationCap className="h-8 w-8 text-blue-500 shrink-0" />
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm flex items-center justify-between hover:shadow-md transition">
+            <div>
+              <div className="text-xs font-bold text-slate-400 uppercase tracking-wide">Average College CGPA</div>
+              <div className="text-2xl font-black text-slate-900 mt-1">{stats.averageCgpa || 0}</div>
+              <p className="text-xs text-slate-500 mt-1">Average CGPA of all registered student profiles in the system.</p>
+            </div>
+            <GraduationCap className="h-8 w-8 text-blue-500 shrink-0" />
+          </div>
         </div>
       </div>
     </div>
