@@ -3,6 +3,7 @@ import json
 import uuid
 import datetime
 import shutil
+import psycopg2.extras
 from fastapi import APIRouter, Request, Response, HTTPException, Depends, UploadFile, File
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
@@ -1205,4 +1206,3 @@ async def get_predictive_shortlist(user: Dict[str, Any] = Depends(require_roles(
         })
         
     return {"candidates": ranked, "total": total}
-

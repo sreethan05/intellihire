@@ -1,18 +1,17 @@
 # API Contracts & Standard Response Envelopes
 
-All endpoints in Intellihire must adhere to the standard API response structure outlined below.
+The active Python/FastAPI backend keeps the existing frontend contract. Most endpoints return route-specific JSON payloads directly, such as `{ "user": ... }`, `{ "exams": [...] }`, `{ "summary": [...] }`, or `{ "error": "..." }` for legacy-compatible failures.
 
 ---
 
 ## 1. Success Response Envelope
 
-Every successful API request must return an HTTP status code between `200` and `299`, and include the payload inside the `data` wrapper.
+Every successful API request must return an HTTP status code between `200` and `299` and a JSON body with the shape expected by the matching frontend API helper.
 
 **Format:**
 ```json
 {
-  "success": true,
-  "data": {}
+  "user": {}
 }
 ```
 
@@ -21,13 +20,12 @@ Every successful API request must return an HTTP status code between `200` and `
 **Response:**
 ```json
 {
-  "success": true,
-  "data": {
+  "user": {
     "id": "cnd_9812",
     "name": "Jane Doe",
-    "email": "jane@example.com",
-    "college": "Oxford Institute of Technology"
-  }
+    "email": "jane@example.com"
+  },
+  "profile": {}
 }
 ```
 
@@ -35,18 +33,12 @@ Every successful API request must return an HTTP status code between `200` and `
 
 ## 2. Error Response Envelope
 
-Every failed API request must return an appropriate HTTP status code (`4xx` or `5xx`), and wrap error information inside the `error` object. The error response must include a unique `requestId` to simplify server logging correlation.
+Every failed API request should return an appropriate HTTP status code (`4xx` or `5xx`). FastAPI validation failures may use the framework `detail` shape; legacy-compatible routes may return a flat `error` string.
 
 **Format:**
 ```json
 {
-  "success": false,
-  "error": {
-    "code": "ERROR_CODE_STRING",
-    "message": "Human readable description of the error",
-    "requestId": "uuid-v4-request-correlation-id",
-    "details": []
-  }
+  "error": "Human readable description of the error"
 }
 ```
 
@@ -59,21 +51,10 @@ Every failed API request must return an appropriate HTTP status code (`4xx` or `
 - `500 Internal Server Error` -> `INTERNAL_ERROR`
 
 ### Example (Validation Failure)
-**Endpoint:** `POST /api/exams/create`
+**Endpoint:** `POST /api/exam/create`
 **Response:**
 ```json
 {
-  "success": false,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Validation failed for exam parameters",
-    "requestId": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
-    "details": [
-      {
-        "field": "title",
-        "issue": "Title is required"
-      }
-    ]
-  }
+  "detail": "Title is required"
 }
 ```

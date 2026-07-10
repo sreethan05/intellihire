@@ -1,4 +1,5 @@
 import datetime
+import math
 import os
 import re
 import uuid
@@ -1515,4 +1516,3 @@ async def get_badges(user: Dict[str, Any] = Depends(get_current_user)):
             
     badges_res = await db.from_("badges").select("*").eq("candidate_id", candidate_id).order("awarded_at", ascending=False)
     return {"badges": badges_res.data or []}
-

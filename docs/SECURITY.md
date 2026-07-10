@@ -4,7 +4,7 @@ IntelliHire uses basic security controls suitable for a role-based recruitment e
 
 ## Password Hashing
 
-User passwords are not stored directly in the database. During account creation, the backend hashes the password using `bcryptjs`. During login, the entered password is compared with the stored hash.
+User passwords are not stored directly in the database. During account creation, the Python backend hashes the password using `bcrypt`. During login, the entered password is compared with the stored hash.
 
 Benefit:
 

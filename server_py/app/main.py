@@ -1,6 +1,7 @@
 import os
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import PORT
@@ -16,6 +17,8 @@ from .exam import router as exam_router
 from .candidate import router as candidate_router
 from .interview import router as interview_router
 from .result import router as result_router
+from .assets import router as assets_router
+from .proctoring import router as proctoring_router
 from .websocket import socket_app
 from .utils import storage_root
 
@@ -47,6 +50,8 @@ app.include_router(exam_router)
 app.include_router(candidate_router)
 app.include_router(interview_router)
 app.include_router(result_router)
+app.include_router(assets_router)
+app.include_router(proctoring_router)
 
 # Mount Socket.IO app
 app.mount("/socket.io", socket_app)
@@ -133,4 +138,24 @@ async def health_check():
 
 @app.get("/")
 async def root():
+    dist_index = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "server", "dist", "index.html"))
+    if os.path.exists(dist_index):
+        return FileResponse(dist_index)
+    return {"message": "IntelliHire Python Backend is running successfully."}
+
+
+dist_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "server", "dist"))
+dist_assets_dir = os.path.join(dist_dir, "assets")
+if os.path.isdir(dist_assets_dir):
+    app.mount("/assets", StaticFiles(directory=dist_assets_dir), name="frontend-assets")
+
+
+@app.get("/{full_path:path}")
+async def serve_spa(full_path: str):
+    index_path = os.path.join(dist_dir, "index.html")
+    requested_path = os.path.abspath(os.path.join(dist_dir, full_path))
+    if os.path.exists(requested_path) and requested_path.startswith(dist_dir) and os.path.isfile(requested_path):
+        return FileResponse(requested_path)
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
     return {"message": "IntelliHire Python Backend is running successfully."}

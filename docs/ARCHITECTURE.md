@@ -7,7 +7,7 @@ IntelliHire is a full-stack recruitment examination platform with four user role
 ```mermaid
 flowchart TD
   User["User Browser"] --> Frontend["React + Vite Frontend"]
-  Frontend --> API["Express Backend API"]
+  Frontend --> API["FastAPI Backend API"]
   
   subgraph Backend ["Backend Layers"]
     API --> Routes["Routes (HTTP Controller)"]
@@ -21,21 +21,20 @@ flowchart TD
   Services --> Judge["Judge0 Code Runner"]
 ```
 
-## 3-Layer Backend Architecture
+## Backend Architecture
 
-To maintain clean codebase separation and adherence to the Single Responsibility Principle, we organize our backend code into three specialized layers:
+The active backend lives in `server_py/app`. It is organized around FastAPI routers, shared helper modules, and a PostgreSQL compatibility wrapper that preserves the Supabase-style query pattern used by the earlier TypeScript code.
 
-1. **Routes (HTTP Layer)**:
+1. **Routers (HTTP Layer)**:
    - Handle incoming requests (validate inputs, verify route access, extract path/query variables).
-   - Direct work to the appropriate Service and return the HTTP response envelope.
-   - Forward errors cleanly using the Express centralized error handler `next(err)`.
-2. **Services (Business Logic)**:
+   - Direct work to helper functions or route-local workflows.
+   - Raise FastAPI `HTTPException` errors for consistent HTTP status handling.
+2. **Domain Helpers**:
    - Contain the core business rules, calculations, AI scoring pipeline invocations, and integrations.
-   - Orchestrate calls to multiple repository methods or helper utilities.
-   - Throw semantic custom errors (e.g. `ValidationError`, `NotFoundError`).
-3. **Repositories (Database Layer)**:
-   - The sole location for SQL query builders and direct database connection pool queries.
-   - Handle tables mapping, schema transformations, and direct record CRUD.
+   - Include modules such as `ai.py`, `compiler.py`, `insights.py`, `plagiarism.py`, and `utils.py`.
+3. **Database Layer**:
+   - `server_py/app/db.py` owns PostgreSQL connection pooling and Supabase-style select/upsert/filter compatibility.
+   - Raw SQL is still used in a few high-shape analytics paths where it is clearer.
 
 ---
 
@@ -48,25 +47,22 @@ sequenceDiagram
     autonumber
     actor Candidate as Candidate
     participant FE as Frontend (React)
-    participant RT as Route / Controller
-    participant SV as Exam Service
-    participant RP as Database Repository
+    participant RT as FastAPI Router
+    participant DBW as Python DB Wrapper
     participant DB as PostgreSQL
 
     Candidate->>FE: Click "Start Exam"
-    FE->>RT: POST /api/exams/:id/start
-    RT->>SV: startAttempt(examId, userId)
-    SV->>RP: getActiveAttempt() / createAttempt()
-    RP->>DB: INSERT INTO attempts (status = "started")
-    DB-->>RP: Return attempt row
-    SV-->>FE: Return attempt session + token
+    FE->>RT: POST /api/exam/start
+    RT->>DBW: getActiveAttempt() / createAttempt()
+    DBW->>DB: INSERT INTO attempts (status = "in_progress")
+    DB-->>DBW: Return attempt row
+    RT-->>FE: Return attempt session
     
     Candidate->>FE: Submit Question Answers
-    FE->>RT: POST /api/exams/:id/submit
-    RT->>SV: submitAnswer(attemptId, questionId, answerData)
-    SV->>RP: saveAnswer()
-    RP->>DB: INSERT INTO answers
-    SV-->>FE: Confirm submission success
+    FE->>RT: POST /api/result/submit-mcq
+    RT->>DBW: saveAnswer()
+    DBW->>DB: UPSERT answers
+    RT-->>FE: Confirm submission success
 ```
 
 ### 2. Real-Time Proctoring & Websocket Synchronization
@@ -76,15 +72,15 @@ sequenceDiagram
     autonumber
     actor Candidate as Candidate
     participant FE as Candidate Frontend
-    participant WS as Socket.IO Websocket Node
-    participant RD as Redis Adapter
+    participant API as FastAPI Proctoring Router
+    participant WS as Python Socket.IO App
+    participant DB as PostgreSQL
     participant REC as Recruiter Dashboard
 
     Candidate->>FE: Focus lost / tab switched
-    FE->>WS: Emit "proctor:tab-switch" (with attempt context)
-    WS->>RD: Broadcast event to Redis channel
-    RD->>WS: Sync event across websocket nodes
-    WS->>REC: Push real-time alert "Candidate tab switched"
+    FE->>API: POST /api/proctoring/events
+    API->>DB: INSERT proctoring_snapshots
+    WS->>REC: Push realtime alert when websocket context is available
 ```
 
 ---
@@ -95,5 +91,4 @@ sequenceDiagram
 - **Session Tokens**: REST routes and websocket handshakes authenticated via JSON Web Tokens (JWT).
 - **Access Control**: Role-based access control (RBAC) middleware verifying user authorizations (Candidate, Recruiter, TPO, Admin).
 - **Environment Isolation**: Database URLs, JWT secrets, and API credentials stored securely in environment configurations.
-
 
