@@ -1,17 +1,17 @@
 import { createServer } from "http";
 import { app } from "./app.js";
-import { setupWebSocket } from "./websocket.js";
+// import { setupWebSocket } from "./websocket.js";
 import { logger } from "./lib/logger.js";
 import { config } from "./config.js";
 import { pool } from "./lib/postgres.js";
 import { redisClient } from "./lib/cache.js";
 import { runDataRetentionCleanup } from "./lib/dataRetention.js";
 
-const PORT = Number(config.PORT) || 5000;
+const PORT = 5001;
 const NODE_ENV = config.NODE_ENV;
 
 const httpServer = createServer(app);
-const io = setupWebSocket(httpServer);
+const io = null;
 app.set("io", io);
 
 const serverInstance = httpServer.listen(PORT, () => {
@@ -41,11 +41,7 @@ async function gracefulShutdown(signal: string) {
     logger.info("HTTP server closed");
   });
 
-  if (io) {
-    io.close(() => {
-      logger.info("Socket.io server closed");
-    });
-  }
+
 
   // Close Redis client
   if (redisClient) {

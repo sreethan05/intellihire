@@ -1,0 +1,15 @@
+fastapi>=0.100.0
+uvicorn[standard]>=0.22.0
+pydantic[email]>=2.0
+psycopg2-binary>=2.9.6
+pyjwt>=2.7.0
+bcrypt>=4.0.1
+python-multipart>=0.0.6
+boto3>=1.26.150
+requests>=2.31.0
+python-socketio[asyncio]>=5.8.0
+redis>=4.6.0
+pdfplumber>=0.10.0
+pytesseract>=0.3.10
+python-dotenv>=1.0.0
+httpx>=0.24.0

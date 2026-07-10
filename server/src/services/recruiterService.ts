@@ -1,6 +1,6 @@
 import { recruiterRepository as recruiterRepo } from "../repositories/recruiterRepository.js";
 import { recordPipelineStage } from "../lib/postgres.js";
-import { sendRealtimeNotification } from "../websocket.js";
+import axios from "axios";
 import { aiService } from "../lib/ai.js";
 import { sendDriveRegisteredEmail } from "../lib/email.js";
 import { logger } from "../lib/logger.js";
@@ -662,11 +662,16 @@ export async function uploadOfferLetter(candidateId: string, jobId: string, file
     recruiterId
   );
 
-  sendRealtimeNotification(candidateId, {
-    title: "New Job Offer Extended! 🎉",
-    body: "You have received a new job offer with an attached letter. Go to your command center to review it.",
-    type: "offer_received",
-    metadata: { jobId }
+  axios.post("http://127.0.0.1:5000/internal/notify", {
+    userId: candidateId,
+    payload: {
+      title: "New Job Offer Extended! 🎉",
+      body: "You have received a new job offer with an attached letter. Go to your command center to review it.",
+      type: "offer_received",
+      metadata: { jobId }
+    }
+  }).catch((err) => {
+    logger.error({ err }, "Failed to send realtime notification via Python gateway");
   });
 
   await recruiterRepo.insertActivityLog({

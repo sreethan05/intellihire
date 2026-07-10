@@ -16,16 +16,16 @@ import { logger } from "./lib/logger.js";
 import { requestIdMiddleware } from "./middleware/requestId.js";
 import { csrfProtection } from "./middleware/csrf.js";
 
-import authRoutes from "./routes/auth.js";
-import adminRoutes from "./routes/admin.js";
-import recruiterRoutes from "./routes/recruiter.js";
+// import authRoutes from "./routes/auth.js";
+// import adminRoutes from "./routes/admin.js";
+// import recruiterRoutes from "./routes/recruiter.js";
 import candidateRoutes from "./routes/candidate.js";
-import tpoRoutes from "./routes/tpo.js";
+// import tpoRoutes from "./routes/tpo.js";
 import examRoutes from "./routes/exam.js";
 import resultRoutes from "./routes/result.js";
-import compilerRoutes from "./routes/compiler.js";
-import proctoringRoutes from "./routes/proctoring.js";
-import aiRoutes from "./routes/ai.js";
+// import compilerRoutes from "./routes/compiler.js";
+// import proctoringRoutes from "./routes/proctoring.js";
+// import aiRoutes from "./routes/ai.js";
 import interviewRoutes from "./routes/interview.js";
 import candidateAssetsRoutes from "./routes/candidateAssets.js";
 import candidateAnalyticsRoutes from "./routes/candidateAnalytics.js";
@@ -173,20 +173,20 @@ export function createApp() {
 
   // ─── API Routes ───
   for (const prefix of API_PREFIXES) {
-    app.use(`${prefix}/auth`, authRoutes);
-    app.use(`${prefix}/admin`, adminRoutes);
+    // app.use(`${prefix}/auth`, authRoutes);
+    // app.use(`${prefix}/admin`, adminRoutes);
     app.use(`${prefix}/admin`, adminAnalyticsRoutes);
-    app.use(`${prefix}/recruiter`, recruiterRoutes);
+    // app.use(`${prefix}/recruiter`, recruiterRoutes);
     app.use(`${prefix}/recruiter`, recruiterAnalyticsRoutes);
-    app.use(`${prefix}/tpo`, tpoRoutes);
+    // app.use(`${prefix}/tpo`, tpoRoutes);
     app.use(`${prefix}/tpo`, tpoAnalyticsRoutes);
     app.use(`${prefix}/candidate`, candidateRoutes);
     app.use(`${prefix}/candidate`, candidateAnalyticsRoutes);
     app.use(`${prefix}/exam`, examRoutes);
     app.use(`${prefix}/result`, resultRoutes);
-    app.use(`${prefix}/compiler`, compilerRoutes);
-    app.use(`${prefix}/proctoring`, proctoringRoutes);
-    app.use(`${prefix}/ai`, aiRoutes);
+    // app.use(`${prefix}/compiler`, compilerRoutes);
+    // app.use(`${prefix}/proctoring`, proctoringRoutes);
+    // app.use(`${prefix}/ai`, aiRoutes);
     app.use(`${prefix}/interview`, interviewRoutes);
     app.use(`${prefix}/assets`, candidateAssetsRoutes);
     app.use(`${prefix}/hub`, hubRoutes);

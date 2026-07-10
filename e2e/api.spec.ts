@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Health & API Checks", () => {
   test("health endpoint returns correct structure", async ({ request }) => {
-    const response = await request.get("http://localhost:5000/api/health");
+    const response = await request.get("http://127.0.0.1:5000/api/health");
     expect(response.status()).toBe(200);
 
     const body = await response.json();
@@ -18,7 +18,7 @@ test.describe("Health & API Checks", () => {
   });
 
   test("login endpoint rejects invalid credentials", async ({ request }) => {
-    const response = await request.post("http://localhost:5000/api/auth/login", {
+    const response = await request.post("http://127.0.0.1:5000/api/auth/login", {
       data: {
         email: "nonexistent@example.com",
         password: "wrongpassword",
@@ -31,7 +31,7 @@ test.describe("Health & API Checks", () => {
   });
 
   test("login endpoint validates input", async ({ request }) => {
-    const response = await request.post("http://localhost:5000/api/auth/login", {
+    const response = await request.post("http://127.0.0.1:5000/api/auth/login", {
       data: {},
     });
     expect(response.status()).toBe(400);
@@ -41,7 +41,7 @@ test.describe("Health & API Checks", () => {
   });
 
   test("protected routes require authentication", async ({ request }) => {
-    const response = await request.get("http://localhost:5000/api/admin/dashboard");
+    const response = await request.get("http://127.0.0.1:5000/api/admin/dashboard");
     expect(response.status()).toBe(401);
   });
 });
