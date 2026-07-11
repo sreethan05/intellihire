@@ -7,6 +7,9 @@ import asyncio
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(base_dir)
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from app.db import db
 
 def hash_password(password: str) -> str:
