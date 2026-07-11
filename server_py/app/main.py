@@ -1,13 +1,18 @@
+import hmac
 import os
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
-from .config import PORT
+from .config import PORT, APP_URL, NODE_ENV, INTERNAL_API_SECRET
+from .rate_limit import limiter
 from .compiler import router as compiler_router
 from .ai import router as ai_router
-from .auth_router import router as auth_router
+from .auth_router import router as auth_router, get_current_user, require_roles
 from .recruiter import router as recruiter_router
 from .tpo import router as tpo_router
 from .admin import router as admin_router
@@ -22,15 +27,28 @@ from .proctoring import router as proctoring_router
 from .websocket import socket_app
 from .utils import storage_root
 
+IS_PRODUCTION = NODE_ENV == "production"
+
 app = FastAPI(
     title="IntelliHire Python Gateway & Backend",
     version="1.0.0",
-    description="Full Python Backend for IntelliHire Assessment Platform"
+    description="Full Python Backend for IntelliHire Assessment Platform",
+    # FastAPI serves /docs, /redoc, and /openapi.json publicly by default.
+    # In production, disable the built-in ones entirely — access goes through
+    # the admin-gated docs_router below instead (see the /docs mount note).
+    docs_url=None if IS_PRODUCTION else "/docs",
+    redoc_url=None if IS_PRODUCTION else "/redoc",
+    openapi_url=None if IS_PRODUCTION else "/openapi.json",
 )
 
-from .config import APP_URL
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
-# Setup CORS middleware
+# Setup CORS middleware — explicit allowlist, never a wildcard, since the app
+# uses credentialed (cookie-based) requests. A wildcard origin combined with
+# allow_credentials=True lets any website make authenticated requests on a
+# logged-in visitor's behalf.
 allowed_origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -51,13 +69,13 @@ app.add_middleware(
 from .middleware.logger_middleware import LoggerMiddleware
 from .middleware.csrf import CSRFMiddleware
 from .middleware.audit_logger import AuditLoggerMiddleware
-from .middleware.security_headers import SecurityHeadersMiddleware
 from .middleware.error_handler import add_exception_handlers
+from .middleware.security_headers import SecurityHeadersMiddleware
 
-app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(LoggerMiddleware)
 app.add_middleware(CSRFMiddleware)
 app.add_middleware(AuditLoggerMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 
 add_exception_handlers(app)
 
@@ -68,7 +86,19 @@ app.include_router(auth_router)
 app.include_router(recruiter_router)
 app.include_router(tpo_router)
 app.include_router(admin_router)
-app.include_router(docs_router)
+
+# The auto-generated OpenAPI schema is itself a full map of every endpoint,
+# parameter, and request/response shape in the API. Fully public docs are an
+# information-disclosure risk (CWE-200), so this route is admin-only in
+# production and open in dev for convenience.
+if IS_PRODUCTION:
+    app.include_router(
+        docs_router,
+        dependencies=[Depends(require_roles(["admin"]))],
+    )
+else:
+    app.include_router(docs_router)
+
 app.include_router(hub_router)
 app.include_router(exam_router)
 app.include_router(candidate_router)
@@ -88,32 +118,56 @@ from pydantic import BaseModel
 from .websocket import send_realtime_notification
 from .db import db
 
+
 class NotifyRequest(BaseModel):
     userId: str
     payload: dict
 
+
+def _verify_internal_secret(x_internal_secret: str = Header(default="")):
+    """
+    /internal/notify is meant to be called by trusted server-side code only
+    (e.g. a background worker), never by an end user's browser. Previously it
+    had no authentication at all, so anyone could POST an arbitrary userId +
+    payload and push a fake realtime notification to any user.
+
+    This checks a shared secret passed via the X-Internal-Secret header.
+    Set INTERNAL_API_SECRET in the environment and have any legitimate
+    internal caller send that same value in this header. If the secret isn't
+    configured at all, the endpoint refuses every request rather than
+    silently falling back to "no auth".
+    """
+    if not INTERNAL_API_SECRET:
+        raise HTTPException(status_code=503, detail="Internal API secret is not configured")
+    if not x_internal_secret or not hmac.compare_digest(x_internal_secret, INTERNAL_API_SECRET):
+        raise HTTPException(status_code=401, detail="Invalid internal API secret")
+    return True
+
+
 @app.post("/internal/notify")
-async def internal_notify(req: NotifyRequest):
+@limiter.limit("60/minute")
+async def internal_notify(request: Request, req: NotifyRequest, _: bool = Depends(_verify_internal_secret)):
     await send_realtime_notification(req.userId, req.payload)
     return {"status": "success"}
+
 
 async def get_bank_stats():
     mcq_res = await db.from_("questions").select("id", count="exact", head=True)
     mcq_count = mcq_res.count or 0
-    
+
     coding_res = await db.from_("coding_questions").select("id", count="exact", head=True)
     coding_count = coding_res.count or 0
-    
+
     topics_res = await db.from_("questions").select("topic")
     topics = list({t["topic"] for t in (topics_res.data or []) if t.get("topic")})
-    
+
     diff_res = await db.from_("questions").select("difficulty")
     diff_count = {}
     for d in (diff_res.data or []):
         diff = d.get("difficulty")
         if diff:
             diff_count[diff] = diff_count.get(diff, 0) + 1
-            
+
     return {
         "totalMcq": mcq_count,
         "totalCoding": coding_count,
@@ -121,6 +175,7 @@ async def get_bank_stats():
         "difficulties": diff_count,
         "healthy": mcq_count >= 50 and coding_count >= 10
     }
+
 
 @app.get("/api/health")
 @app.get("/api/v1/health")
@@ -131,22 +186,22 @@ async def health_check():
         await db.from_("users").select("id", count="exact", head=True)
     except Exception:
         postgres_healthy = False
-        
+
     groq_configured = bool(os.getenv("GROQ_API_KEY"))
     smtp_configured = bool(os.getenv("SMTP_HOST") and os.getenv("SMTP_USER") and os.getenv("SMTP_PASS"))
-    
+
     pipeline_status = {"healthy": False, "totalMcq": 0, "totalCoding": 0}
     try:
         pipeline_status = await get_bank_stats()
     except Exception:
         pass
-        
+
     all_healthy = postgres_healthy or groq_configured
-    
+
     return {
         "status": "healthy" if all_healthy else "degraded",
         "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
-        "environment": os.getenv("NODE_ENV", "development"),
+        "environment": NODE_ENV,
         "services": {
             "postgres": postgres_healthy,
             "groq": groq_configured,
@@ -159,6 +214,7 @@ async def health_check():
             "pipeline": pipeline_status
         }
     }
+
 
 @app.get("/")
 async def root():

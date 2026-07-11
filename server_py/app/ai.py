@@ -2,15 +2,22 @@ import base64
 import io
 import re
 import os
-from fastapi import APIRouter, HTTPException, Request, Response
-from pydantic import BaseModel
-from typing import List, Optional
+from fastapi import APIRouter, HTTPException, Request, Response, Depends
+from pydantic import BaseModel, field_validator
+from typing import Any, Dict, List, Optional
 from PIL import Image
 import pdfplumber
 import pytesseract
 import httpx
 
+from .auth_router import get_current_user
+from .rate_limit import limiter
+
 router = APIRouter(tags=["ai"])
+
+MAX_RESUME_TEXT_LENGTH = 20000
+MAX_PROMPT_LENGTH = 8000
+MAX_BASE64_FILE_LENGTH = 8_000_000  # ~6MB decoded
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
@@ -21,21 +28,64 @@ class ResumeParseRequest(BaseModel):
     resume_text: str
     job_skills: Optional[List[str]] = []
 
+    @field_validator("resume_text")
+    @classmethod
+    def validate_resume_text_length(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("resume_text must not be empty")
+        if len(v) > MAX_RESUME_TEXT_LENGTH:
+            raise ValueError(f"resume_text exceeds maximum length of {MAX_RESUME_TEXT_LENGTH} characters")
+        return v
+
 class MarksheetFile(BaseModel):
     name: str
     mimeType: str
     data: str # base64
 
+    @field_validator("data")
+    @classmethod
+    def validate_file_size(cls, v: str) -> str:
+        if len(v) > MAX_BASE64_FILE_LENGTH:
+            raise ValueError("uploaded file exceeds the maximum allowed size")
+        return v
+
 class ProctoringVerifyRequest(BaseModel):
     base64DataUrl: str
+
+    @field_validator("base64DataUrl")
+    @classmethod
+    def validate_snapshot_size(cls, v: str) -> str:
+        if not v:
+            raise ValueError("base64DataUrl must not be empty")
+        if len(v) > MAX_BASE64_FILE_LENGTH:
+            raise ValueError("snapshot exceeds the maximum allowed size")
+        return v
 
 class GenerateTextRequest(BaseModel):
     prompt: str
     systemPrompt: Optional[str] = None
 
+    @field_validator("prompt")
+    @classmethod
+    def validate_prompt_length(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("prompt must not be empty")
+        if len(v) > MAX_PROMPT_LENGTH:
+            raise ValueError(f"prompt exceeds maximum length of {MAX_PROMPT_LENGTH} characters")
+        return v
+
 class GenerateJsonRequest(BaseModel):
     prompt: str
     systemPrompt: Optional[str] = None
+
+    @field_validator("prompt")
+    @classmethod
+    def validate_prompt_length(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("prompt must not be empty")
+        if len(v) > MAX_PROMPT_LENGTH:
+            raise ValueError(f"prompt exceeds maximum length of {MAX_PROMPT_LENGTH} characters")
+        return v
 
 BRANCH_MAP = {
     "COMPUTER SCIENCE AND ENGINEERING": "CSE",
@@ -232,7 +282,12 @@ def pick_skills(text: str) -> List[str]:
     return [skill for skill in known if skill in words]
 
 @router.post("/api/ai/resume-parse")
-async def resume_parse(req: ResumeParseRequest):
+@limiter.limit("20/minute")
+async def resume_parse(
+    request: Request,
+    req: ResumeParseRequest,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
     skills = pick_skills(req.resume_text)
     matched = [s for s in req.job_skills if s.lower() in skills] if req.job_skills else []
     
@@ -258,7 +313,12 @@ async def resume_parse(req: ResumeParseRequest):
 # ─── Internal loopback endpoints called by Express ───
 
 @router.post("/internal/ocr")
-async def ocr_marksheet(file: MarksheetFile):
+@limiter.limit("10/minute")
+async def ocr_marksheet(
+    request: Request,
+    file: MarksheetFile,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
     try:
         file_bytes = base64.b64decode(file.data)
     except Exception:
@@ -370,7 +430,12 @@ Schema:
     return result
 
 @router.post("/internal/proctoring/verify")
-async def verify_proctoring_snapshot(req: ProctoringVerifyRequest):
+@limiter.limit("30/minute")
+async def verify_proctoring_snapshot(
+    request: Request,
+    req: ProctoringVerifyRequest,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
     if not GROQ_API_KEY:
         raise HTTPException(status_code=500, detail="GROQ_API_KEY is not configured on Python backend")
 
@@ -433,7 +498,12 @@ Return ONLY valid JSON matching this schema:
             raise HTTPException(status_code=500, detail=f"Webcam analysis failed: {str(exc)}")
 
 @router.post("/internal/ai/generate-text")
-async def generate_text(req: GenerateTextRequest):
+@limiter.limit("15/minute")
+async def generate_text_route(
+    request: Request,
+    req: GenerateTextRequest,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
     if not GROQ_API_KEY:
         raise HTTPException(status_code=500, detail="GROQ_API_KEY is not configured")
 
@@ -463,7 +533,12 @@ async def generate_text(req: GenerateTextRequest):
             raise HTTPException(status_code=500, detail=f"AI generation failed: {str(exc)}")
 
 @router.post("/internal/ai/generate-json")
-async def generate_json(req: GenerateJsonRequest):
+@limiter.limit("15/minute")
+async def generate_json_route(
+    request: Request,
+    req: GenerateJsonRequest,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
     if not GROQ_API_KEY:
         raise HTTPException(status_code=500, detail="GROQ_API_KEY is not configured")
 
@@ -496,6 +571,16 @@ async def generate_json(req: GenerateJsonRequest):
 def has_ai_key() -> bool:
     return bool(GROQ_API_KEY)
 
+# NOTE: this is the function other modules (interview.py, interview_service.py,
+# recruiter.py, recruiter_service.py) import directly as `from .ai import
+# generate_json`. It previously shared its name with the /internal/ai/generate-json
+# ROUTE HANDLER above, which silently shadowed this definition in the module
+# namespace (Python executes top-to-bottom; the second `def generate_json`
+# overwrote the first). The route itself still worked, because FastAPI captures
+# the route function at decoration time — but anything doing `from .ai import
+# generate_json` after that point got THIS function, not the route handler,
+# which was accidental and confusing. Renaming the route handler above
+# (generate_json -> generate_json_route) removes the collision entirely.
 async def generate_json(prompt: str, systemPrompt: Optional[str] = None) -> dict:
     if not GROQ_API_KEY:
         raise ValueError("GROQ_API_KEY is not configured")

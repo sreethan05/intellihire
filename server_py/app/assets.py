@@ -2,14 +2,14 @@ from typing import Any, Dict
 
 from fastapi import APIRouter, Depends
 
-from .auth_router import get_current_user
+from .auth_router import require_roles
 from .db import db
 
 router = APIRouter(prefix="/api/assets", tags=["assets"])
 
 
 @router.get("/certificates")
-async def get_certificates(user: Dict[str, Any] = Depends(get_current_user)):
+async def get_certificates(user: Dict[str, Any] = Depends(require_roles(["candidate"]))):
     candidate_id = user["id"]
     att_res = await db.from_("attempts").select(
         "id, exam_id, score, submitted_at, exams:exam_id(id, title, total_marks, pass_marks)"
@@ -35,7 +35,7 @@ async def get_certificates(user: Dict[str, Any] = Depends(get_current_user)):
 
 
 @router.get("/badges")
-async def get_badges(user: Dict[str, Any] = Depends(get_current_user)):
+async def get_badges(user: Dict[str, Any] = Depends(require_roles(["candidate"]))):
     candidate_id = user["id"]
     att_res = await db.from_("attempts").select(
         "score, exams:exam_id(total_marks)"
