@@ -2,7 +2,7 @@
 
 IntelliHire is a full-stack recruitment, assessment, and proctoring platform for Admin, TPO, Recruiter, and Candidate workflows.
 
-The frontend remains React + TypeScript. The backend runtime is now Python/FastAPI in `server_py`, with the old TypeScript backend kept only as legacy reference code.
+The frontend remains React + TypeScript. The backend runtime is now Python/FastAPI in `server_py`.
 
 ## Features
 
