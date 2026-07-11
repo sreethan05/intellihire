@@ -6,7 +6,18 @@ from typing import Any, Dict
 
 JWT_SECRET = os.getenv("JWT_SECRET")
 
-sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
+from .config import APP_URL
+
+allowed_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+if APP_URL and APP_URL not in allowed_origins:
+    allowed_origins.append(APP_URL)
+
+sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=allowed_origins)
 socket_app = socketio.ASGIApp(sio)
 
 def get_cookie(cookie_header: str, name: str) -> str:

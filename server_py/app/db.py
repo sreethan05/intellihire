@@ -7,13 +7,13 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import psycopg2
 import psycopg2.extras
-from psycopg2.pool import SimpleConnectionPool
+from psycopg2.pool import ThreadedConnectionPool
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL is not set")
 
-pool = SimpleConnectionPool(1, 20, dsn=DATABASE_URL)
+pool = ThreadedConnectionPool(1, 20, dsn=DATABASE_URL)
 
 EMPTY_UUID = "00000000-0000-0000-0000-000000000000"
 
