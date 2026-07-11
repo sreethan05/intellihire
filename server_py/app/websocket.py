@@ -20,6 +20,33 @@ if APP_URL and APP_URL not in allowed_origins:
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=allowed_origins)
 socket_app = socketio.ASGIApp(sio)
 
+from pydantic import BaseModel, Field, ValidationError
+
+class NotificationsJoinPayload(BaseModel):
+    userId: str = Field(..., min_length=1)
+
+class ProctorJoinPayload(BaseModel):
+    attemptId: str = Field(..., min_length=1)
+
+class ProctorMonitorPayload(BaseModel):
+    examId: str = Field(..., min_length=1)
+
+class ProctorSnapshotPayload(BaseModel):
+    examId: str = Field(..., min_length=1)
+    attemptId: str = Field(..., min_length=1)
+    snapshotData: str = Field(..., min_length=1)
+    timestamp: str = Field(..., min_length=1)
+
+class ProctorViolationPayload(BaseModel):
+    examId: str = Field(..., min_length=1)
+    attemptId: str = Field(..., min_length=1)
+    violationCount: int = Field(..., ge=0)
+    message: str = Field(..., min_length=1)
+    timestamp: str = Field(..., min_length=1)
+
+class ProctorLeavePayload(BaseModel):
+    attemptId: str = Field(..., min_length=1)
+
 def get_cookie(cookie_header: str, name: str) -> str:
     if not cookie_header:
         return ""
@@ -70,25 +97,37 @@ async def disconnect(sid):
     print(f"[WebSocket] Client disconnected: {sid}")
 
 @sio.on("notifications:join")
-async def on_notifications_join(sid, data: Dict[str, Any]):
+async def on_notifications_join(sid, data: Any):
+    try:
+        validated = NotificationsJoinPayload.model_validate(data)
+    except ValidationError as e:
+        await sio.emit("error", {"message": f"Invalid payload: {str(e)}"}, to=sid)
+        return
+
     async with sio.session(sid) as session:
         user = session.get("user")
-    if not user or user.get("id") != data.get("userId"):
+    if not user or user.get("id") != validated.userId:
         await sio.emit("error", {"message": "Unauthorized notifications room join"}, to=sid)
         return
-    room = f"user:{data.get('userId')}"
+    room = f"user:{validated.userId}"
     sio.enter_room(sid, room)
     print(f"[WebSocket] User {user.get('id')} joined notifications room")
 
 @sio.on("proctor:join")
-async def on_proctor_join(sid, data: Dict[str, Any]):
+async def on_proctor_join(sid, data: Any):
+    try:
+        validated = ProctorJoinPayload.model_validate(data)
+    except ValidationError as e:
+        await sio.emit("error", {"message": f"Invalid payload: {str(e)}"}, to=sid)
+        return
+
     async with sio.session(sid) as session:
         user = session.get("user")
     if not user:
         await sio.emit("error", {"message": "Authentication required"}, to=sid)
         return
         
-    attempt_id = data.get("attemptId")
+    attempt_id = validated.attemptId
     if user.get("role") == "candidate":
         # Verify candidate is owner of the attempt
         res = await db.from_("attempts").select("candidate_id").eq("id", attempt_id).single()
@@ -104,14 +143,20 @@ async def on_proctor_join(sid, data: Dict[str, Any]):
     print(f"[WebSocket] Client joined proctoring room {room}")
 
 @sio.on("proctor:monitor")
-async def on_proctor_monitor(sid, data: Dict[str, Any]):
+async def on_proctor_monitor(sid, data: Any):
+    try:
+        validated = ProctorMonitorPayload.model_validate(data)
+    except ValidationError as e:
+        await sio.emit("error", {"message": f"Invalid payload: {str(e)}"}, to=sid)
+        return
+
     async with sio.session(sid) as session:
         user = session.get("user")
     if not user:
         await sio.emit("error", {"message": "Authentication required"}, to=sid)
         return
         
-    exam_id = data.get("examId")
+    exam_id = validated.examId
     if user.get("role") == "recruiter":
         res = await db.from_("exams").select("created_by").eq("id", exam_id).single()
         if res.error or not res.data or res.data.get("created_by") != user.get("id"):
@@ -136,33 +181,45 @@ async def on_admin_join(sid):
     print(f"[WebSocket] Admin client {sid} joined admin room")
 
 @sio.on("proctor:snapshot")
-async def on_proctor_snapshot(sid, data: Dict[str, Any]):
+async def on_proctor_snapshot(sid, data: Any):
+    try:
+        validated = ProctorSnapshotPayload.model_validate(data)
+    except ValidationError as e:
+        await sio.emit("error", {"message": f"Invalid payload: {str(e)}"}, to=sid)
+        return
+
     async with sio.session(sid) as session:
         user = session.get("user")
     if not user:
         return
         
     # Broadcast snapshot to monitoring room
-    exam_id = data.get("examId")
+    exam_id = validated.examId
     monitor_room = f"monitor:{exam_id}"
     await sio.emit("proctor:snapshot", {
-        "attemptId": data.get("attemptId"),
-        "snapshotData": data.get("snapshotData"),
-        "timestamp": data.get("timestamp"),
+        "attemptId": validated.attemptId,
+        "snapshotData": validated.snapshotData,
+        "timestamp": validated.timestamp,
     }, room=monitor_room, skip_sid=sid)
 
 @sio.on("proctor:violation")
-async def on_proctor_violation(sid, data: Dict[str, Any]):
+async def on_proctor_violation(sid, data: Any):
+    try:
+        validated = ProctorViolationPayload.model_validate(data)
+    except ValidationError as e:
+        await sio.emit("error", {"message": f"Invalid payload: {str(e)}"}, to=sid)
+        return
+
     async with sio.session(sid) as session:
         user = session.get("user")
     if not user:
         return
         
-    attempt_id = data.get("attemptId")
-    exam_id = data.get("examId")
-    violation_count = data.get("violationCount")
-    message = data.get("message")
-    timestamp = data.get("timestamp")
+    attempt_id = validated.attemptId
+    exam_id = validated.examId
+    violation_count = validated.violationCount
+    message = validated.message
+    timestamp = validated.timestamp
     
     # Broadcast to monitoring room
     monitor_room = f"monitor:{exam_id}"
@@ -200,8 +257,14 @@ async def on_proctor_violation(sid, data: Dict[str, Any]):
         print(f"[WebSocket] Admin violation alert resolve failed: {str(exc)}")
 
 @sio.on("proctor:leave")
-async def on_proctor_leave(sid, data: Dict[str, Any]):
-    sio.leave_room(sid, f"attempt:{data.get('attemptId')}")
+async def on_proctor_leave(sid, data: Any):
+    try:
+        validated = ProctorLeavePayload.model_validate(data)
+    except ValidationError as e:
+        await sio.emit("error", {"message": f"Invalid payload: {str(e)}"}, to=sid)
+        return
+
+    sio.leave_room(sid, f"attempt:{validated.attemptId}")
 
 async def send_realtime_notification(user_id: str, payload: Dict[str, Any]):
     room = f"user:{user_id}"
