@@ -28,10 +28,21 @@ app = FastAPI(
     description="Full Python Backend for IntelliHire Assessment Platform"
 )
 
+from .config import APP_URL
+
 # Setup CORS middleware
+allowed_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+if APP_URL and APP_URL not in allowed_origins:
+    allowed_origins.append(APP_URL)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Adjust if needed, or keep open for development
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -40,8 +51,10 @@ app.add_middleware(
 from .middleware.logger_middleware import LoggerMiddleware
 from .middleware.csrf import CSRFMiddleware
 from .middleware.audit_logger import AuditLoggerMiddleware
+from .middleware.security_headers import SecurityHeadersMiddleware
 from .middleware.error_handler import add_exception_handlers
 
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(LoggerMiddleware)
 app.add_middleware(CSRFMiddleware)
 app.add_middleware(AuditLoggerMiddleware)
