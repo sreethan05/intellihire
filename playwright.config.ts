@@ -21,11 +21,12 @@ export default defineConfig({
   webServer: {
     command: "npm run dev",
     url: "http://localhost:3000",
-    reuseExistingServer: false,
+    reuseExistingServer: true,
     timeout: 120 * 1000,
     env: {
       DISABLE_RATE_LIMITS: "true",
       NODE_ENV: "test",
+      NODE_OPTIONS: "--max-old-space-size=4096",
     },
   },
 });

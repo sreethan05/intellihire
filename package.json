@@ -7,7 +7,7 @@
     "dev": "concurrently \"npm run server:py\" \"npm --prefix client run dev\"",
     "client": "npm --prefix client run dev",
     "server": "npm run server:py",
-    "server:py": "server_py\\.venv\\Scripts\\uvicorn server_py.app.main:app --port 5000 --host 0.0.0.0 --reload",
+    "server:py": "server_py\\.venv\\Scripts\\uvicorn server_py.app.main:app --port 5000 --host 0.0.0.0 --reload --reload-dir server_py",
     "build": "npm --prefix client run build",
     "check": "npm --prefix client run check",
     "lint": "npm --prefix client run lint",

@@ -37,6 +37,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from .middleware.logger_middleware import LoggerMiddleware
+from .middleware.csrf import CSRFMiddleware
+from .middleware.audit_logger import AuditLoggerMiddleware
+from .middleware.error_handler import add_exception_handlers
+
+app.add_middleware(LoggerMiddleware)
+app.add_middleware(CSRFMiddleware)
+app.add_middleware(AuditLoggerMiddleware)
+
+add_exception_handlers(app)
+
 # Include all Routers
 app.include_router(compiler_router)
 app.include_router(ai_router)
