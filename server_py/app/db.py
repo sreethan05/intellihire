@@ -11,18 +11,27 @@ from psycopg2.pool import ThreadedConnectionPool
 
 from .config import DATABASE_URL
 
-pool = ThreadedConnectionPool(1, 20, dsn=DATABASE_URL)
+_pool = None
+
+
+def get_pool() -> ThreadedConnectionPool:
+    global _pool
+    if _pool is None:
+        _pool = ThreadedConnectionPool(1, 20, dsn=DATABASE_URL)
+    return _pool
+
 
 EMPTY_UUID = "00000000-0000-0000-0000-000000000000"
 
 
 @contextmanager
 def get_connection():
-    conn = pool.getconn()
+    pool_instance = get_pool()
+    conn = pool_instance.getconn()
     try:
         yield conn
     finally:
-        pool.putconn(conn)
+        pool_instance.putconn(conn)
 
 
 class QueryError(Exception):
