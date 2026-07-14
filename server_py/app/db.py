@@ -9,9 +9,7 @@ import psycopg2
 import psycopg2.extras
 from psycopg2.pool import ThreadedConnectionPool
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    raise ValueError("DATABASE_URL is not set")
+from .config import DATABASE_URL
 
 pool = ThreadedConnectionPool(1, 20, dsn=DATABASE_URL)
 
@@ -669,11 +667,13 @@ class db:
 
 
 async def transaction(func):
-    with get_connection() as conn:
-        try:
-            res = await func(conn)
-            conn.commit()
-            return res
-        except Exception as exc:
-            conn.rollback()
-            raise exc
+    def run_in_tx():
+        with get_connection() as conn:
+            try:
+                res = func(conn)
+                conn.commit()
+                return res
+            except Exception as exc:
+                conn.rollback()
+                raise exc
+    return await asyncio.to_thread(run_in_tx)

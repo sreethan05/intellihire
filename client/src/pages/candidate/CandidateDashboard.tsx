@@ -3,7 +3,7 @@ import {
   BarChart3, Bell, Briefcase, CheckCircle, Loader2, MapPin, QrCode, Trophy, User, AlertCircle,
   Github, Linkedin, Globe, Plus, Trash2, Edit, X, FileText
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { candidateApi, interviewApi } from "@/lib/api";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";

@@ -25,6 +25,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
     setLoading(false);
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "user") {
+        if (e.newValue) {
+          try {
+            setUser(JSON.parse(e.newValue));
+          } catch {
+            setUser(null);
+          }
+        } else {
+          setUser(null);
+        }
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+    };
   }, []);
 
   const login = (_token: string | null | undefined, user: User) => {

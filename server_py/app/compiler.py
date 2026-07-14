@@ -10,7 +10,7 @@ from .rate_limit import limiter
 
 router = APIRouter(prefix="/api/compiler", tags=["compiler"])
 
-JUDGE0_API = os.getenv("JUDGE0_API_URL", "https://ce.judge0.com")
+from .config import JUDGE0_API_URL as JUDGE0_API
 
 LANGUAGE_MAP = {
     "c": 50,

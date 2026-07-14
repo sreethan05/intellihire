@@ -34,7 +34,7 @@ class Cache:
     def set(key: str, val: Any, expire_seconds: int = 300) -> None:
         if redis_client:
             try:
-                redis_client.setex(key, expire_seconds, json.dumps(val))
+                redis_client.set(key, json.dumps(val), ex=expire_seconds)
             except Exception:
                 pass
 

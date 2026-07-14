@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { useAuth } from "@/context/AuthContext";
 import { authApi } from "@/lib/api";
 import { AlertCircle } from "lucide-react";

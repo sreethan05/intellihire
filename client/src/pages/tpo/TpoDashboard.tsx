@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { tpoApi } from "@/lib/api";
 import { MetricCard, DonutSummary, DashboardBarChart } from "@/components/dashboard/DashboardKit";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 
 export default function TpoDashboard() {
   const [stats, setStats] = useState<any>({});

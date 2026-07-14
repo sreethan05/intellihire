@@ -1,5 +1,5 @@
 import { type CSSProperties, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { AlertCircle, ArrowRight, Award, CheckCircle, Clock, FileText, Lock, Target, Video } from "lucide-react";
 import { Pie, PieChart, ResponsiveContainer, Tooltip, Cell } from "recharts";
 import { candidateApi, proctoringApi } from "@/lib/api";

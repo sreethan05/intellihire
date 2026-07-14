@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams } from "react-router";
 import axios from "axios";
 import { QRCodeSVG } from "qrcode.react";
 import { Briefcase, FileText, CheckCircle, MapPin, QrCode, Github, Linkedin, Globe, Trophy, BarChart3, AlertCircle } from "lucide-react";

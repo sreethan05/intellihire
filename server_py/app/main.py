@@ -8,7 +8,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-from .config import PORT, APP_URL, NODE_ENV, INTERNAL_API_SECRET
+from .config import PORT, APP_URL, NODE_ENV, INTERNAL_API_SECRET, GROQ_API_KEY, SMTP_HOST, SMTP_USER, SMTP_PASS, JUDGE0_API_URL, SENTRY_DSN, CORS_ALLOWED_ORIGINS
 from .rate_limit import limiter
 from .compiler import router as compiler_router
 from .ai import router as ai_router
@@ -57,6 +57,12 @@ allowed_origins = [
 ]
 if APP_URL and APP_URL not in allowed_origins:
     allowed_origins.append(APP_URL)
+
+if CORS_ALLOWED_ORIGINS:
+    for origin in CORS_ALLOWED_ORIGINS.split(","):
+        origin = origin.strip()
+        if origin and origin not in allowed_origins:
+            allowed_origins.append(origin)
 
 app.add_middleware(
     CORSMiddleware,
@@ -187,8 +193,8 @@ async def health_check():
     except Exception:
         postgres_healthy = False
 
-    groq_configured = bool(os.getenv("GROQ_API_KEY"))
-    smtp_configured = bool(os.getenv("SMTP_HOST") and os.getenv("SMTP_USER") and os.getenv("SMTP_PASS"))
+    groq_configured = bool(GROQ_API_KEY)
+    smtp_configured = bool(SMTP_HOST and SMTP_USER and SMTP_PASS)
 
     pipeline_status = {"healthy": False, "totalMcq": 0, "totalCoding": 0}
     try:
@@ -196,7 +202,7 @@ async def health_check():
     except Exception:
         pass
 
-    all_healthy = postgres_healthy or groq_configured
+    all_healthy = postgres_healthy
 
     return {
         "status": "healthy" if all_healthy else "degraded",
@@ -206,11 +212,11 @@ async def health_check():
             "postgres": postgres_healthy,
             "groq": groq_configured,
             "judge0": {
-                "endpoint": os.getenv("JUDGE0_API_URL", "https://ce.judge0.com"),
-                "isPrivate": bool(os.getenv("JUDGE0_API_URL") and "ce.judge0.com" not in os.getenv("JUDGE0_API_URL"))
+                "endpoint": JUDGE0_API_URL,
+                "isPrivate": bool(JUDGE0_API_URL and "ce.judge0.com" not in JUDGE0_API_URL)
             },
             "email": smtp_configured,
-            "sentry": bool(os.getenv("SENTRY_DSN")),
+            "sentry": bool(SENTRY_DSN),
             "pipeline": pipeline_status
         }
     }

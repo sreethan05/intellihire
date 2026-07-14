@@ -19,8 +19,7 @@ MAX_RESUME_TEXT_LENGTH = 20000
 MAX_PROMPT_LENGTH = 8000
 MAX_BASE64_FILE_LENGTH = 8_000_000  # ~6MB decoded
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+from .config import GROQ_API_KEY, GROQ_MODEL
 
 # ─── Types and Constants ───
 

@@ -12,8 +12,8 @@ from .db import db, transaction
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-JWT_SECRET = os.getenv("JWT_SECRET")
-NODE_ENV = os.getenv("NODE_ENV", "development")
+import psycopg2.extras
+from .config import JWT_SECRET, NODE_ENV
 
 ACCESS_TOKEN_TTL_SECONDS = 15 * 60
 REFRESH_TOKEN_TTL_DAYS = 30
@@ -187,15 +187,15 @@ async def refresh(request: Request, response: Response):
     current_hash = hash_refresh_token(current_ref_token)
     
     # Rotate refresh session in transaction
-    async def run_rotation(client):
+    def run_rotation(client):
         # We can run query manually inside client transaction cursor
         with client.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 """SELECT rt.id as refresh_token_id, rt.user_id, rt.expires_at, rt.revoked_at,
-                          u.id, u.name, u.email, u.role, u.roll_number, u.college_id, u.profile_complete, u.must_change_password
-                   FROM refresh_tokens rt
-                   JOIN users u ON u.id = rt.user_id
-                   WHERE rt.token_hash = %s FOR UPDATE""",
+                           u.id, u.name, u.email, u.role, u.roll_number, u.college_id, u.profile_complete, u.must_change_password
+                    FROM refresh_tokens rt
+                    JOIN users u ON u.id = rt.user_id
+                    WHERE rt.token_hash = %s FOR UPDATE""",
                 [current_hash]
             )
             row = cur.fetchone()
@@ -253,7 +253,6 @@ async def refresh(request: Request, response: Response):
                 }
             }
 
-    import psycopg2.extras
     try:
         rotated = await transaction(run_rotation)
     except Exception:

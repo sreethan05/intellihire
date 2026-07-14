@@ -1,5 +1,6 @@
 import os
 import datetime
+from .config import JUDGE0_API_KEY, GROQ_API_KEY
 import bcrypt
 from fastapi import APIRouter, Request, Response, HTTPException, Depends
 from pydantic import BaseModel, EmailStr
@@ -520,8 +521,8 @@ async def get_system_health(user: Dict[str, Any] = Depends(require_roles(["admin
     completed_res = await db.from_("attempts").select("id, submitted_at").eq("status", "completed").gte("submitted_at", one_day_ago)
     last_24h_completed = len(completed_res.data) if completed_res.data else 0
     
-    judge0_key = os.getenv("JUDGE0_API_KEY")
-    groq_key = os.getenv("GROQ_API_KEY")
+    judge0_key = JUDGE0_API_KEY
+    groq_key = GROQ_API_KEY
     
     apis = {
         "judge0": {

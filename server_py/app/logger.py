@@ -2,8 +2,8 @@ import os
 import sys
 import logging
 
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-is_dev = os.getenv("NODE_ENV", "development") != "production"
+from .config import LOG_LEVEL, NODE_ENV
+is_dev = NODE_ENV != "production"
 
 # Configure logging format
 log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

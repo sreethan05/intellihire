@@ -1,5 +1,6 @@
 import os
 import sys
+from ..config import SENTRY_DSN, NODE_ENV
 import traceback
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -13,7 +14,7 @@ def add_exception_handlers(app: FastAPI):
     async def app_error_handler(request: Request, exc: AppError):
         request_id = getattr(request.state, "request_id", "unknown")
 
-        sentry_dsn = os.getenv("SENTRY_DSN")
+        sentry_dsn = SENTRY_DSN
         if sentry_dsn:
             try:
                 import sentry_sdk
@@ -58,7 +59,7 @@ def add_exception_handlers(app: FastAPI):
     async def general_exception_handler(request: Request, exc: Exception):
         request_id = getattr(request.state, "request_id", "unknown")
 
-        sentry_dsn = os.getenv("SENTRY_DSN")
+        sentry_dsn = SENTRY_DSN
         if sentry_dsn:
             try:
                 import sentry_sdk
@@ -74,7 +75,7 @@ def add_exception_handlers(app: FastAPI):
             f"Unhandled error: {str(exc)}\nStack trace:\n{tb_text}\nrequest_id={request_id}"
         )
 
-        is_dev = os.getenv("NODE_ENV", "development") != "production"
+        is_dev = NODE_ENV != "production"
 
         content = {
             "success": False,

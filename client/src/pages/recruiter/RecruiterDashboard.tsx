@@ -11,7 +11,7 @@ import {
   Sparkles,
   ArrowRight
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { recruiterApi } from "@/lib/api";
 import { useCollege } from "@/context/CollegeContext";
 import { MetricCard } from "@/components/dashboard/DashboardKit";

@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import type { ComponentType, FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { 
   FileCheck, Lock, Phone, Sparkles, UploadCloud, 
   FileText, Trash2, Loader2 

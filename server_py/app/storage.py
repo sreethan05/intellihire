@@ -3,15 +3,8 @@ import boto3
 from botocore.exceptions import ClientError
 from .logger import logger
 
-NODE_ENV = os.getenv("NODE_ENV", "development")
+from .config import NODE_ENV, S3_ENDPOINT, S3_REGION, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, S3_BUCKET_NAME
 is_test = NODE_ENV == "test"
-
-# S3 Configuration
-S3_ENDPOINT = os.getenv("S3_ENDPOINT", "http://localhost:9000")
-S3_REGION = os.getenv("S3_REGION", "us-east-1")
-S3_ACCESS_KEY_ID = os.getenv("S3_ACCESS_KEY_ID", "minioadmin")
-S3_SECRET_ACCESS_KEY = os.getenv("S3_SECRET_ACCESS_KEY", "minioadminpass")
-S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "intellihire")
 
 s3_client = None
 

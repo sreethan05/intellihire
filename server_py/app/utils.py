@@ -6,9 +6,7 @@ from typing import Optional, Dict, Any
 from .db import db, get_connection
 import psycopg2
 
-JWT_SECRET = os.getenv("JWT_SECRET")
-NODE_ENV = os.getenv("NODE_ENV", "development")
-FILE_STORAGE_DIR = os.getenv("FILE_STORAGE_DIR", "uploads")
+from .config import JWT_SECRET, NODE_ENV, FILE_STORAGE_DIR
 
 storage_root = os.path.abspath(FILE_STORAGE_DIR)
 os.makedirs(storage_root, exist_ok=True)
@@ -66,7 +64,7 @@ import json
 import redis
 import asyncio
 
-REDIS_URL = os.getenv("REDIS_URL")
+from .config import REDIS_URL
 redis_client = None
 if REDIS_URL:
     try:

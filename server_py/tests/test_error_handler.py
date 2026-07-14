@@ -68,7 +68,7 @@ async def test_general_exception_handler():
         assert "Generic Database Fault" in mock_logger.error.call_args[0][0]
         
         # Sentry check
-        with patch.dict("os.environ", {"SENTRY_DSN": "http://public@localhost/1"}):
+        with patch("app.middleware.error_handler.SENTRY_DSN", "http://public@localhost/1"):
             with patch("app.middleware.error_handler.logger") as mock_logger_2:
                 import sys
                 mock_sentry = MagicMock()

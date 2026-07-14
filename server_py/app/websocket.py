@@ -4,9 +4,7 @@ import jwt
 from .db import db
 from typing import Any, Dict
 
-JWT_SECRET = os.getenv("JWT_SECRET")
-
-from .config import APP_URL
+from .config import APP_URL, JWT_SECRET, CORS_ALLOWED_ORIGINS
 
 allowed_origins = [
     "http://localhost:3000",
@@ -16,6 +14,12 @@ allowed_origins = [
 ]
 if APP_URL and APP_URL not in allowed_origins:
     allowed_origins.append(APP_URL)
+
+if CORS_ALLOWED_ORIGINS:
+    for origin in CORS_ALLOWED_ORIGINS.split(","):
+        origin = origin.strip()
+        if origin and origin not in allowed_origins:
+            allowed_origins.append(origin)
 
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=allowed_origins)
 socket_app = socketio.ASGIApp(sio)

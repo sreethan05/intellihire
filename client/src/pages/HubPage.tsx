@@ -4,7 +4,7 @@ import {
   Sparkles, Trophy, ArrowRight, AlertTriangle, 
   RefreshCw, Loader2, Info
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { hubApi } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { 

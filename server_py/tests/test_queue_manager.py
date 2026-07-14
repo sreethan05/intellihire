@@ -15,11 +15,12 @@ def test_grading_queue_push_redis():
 def test_grading_queue_push_local():
     with patch.object(gradingQueue, "redis_client", None):
         with patch.object(gradingQueue, "local_queue", []) as mock_local:
-            with patch.object(gradingQueue, "save_local_queue") as mock_save:
-                with patch("app.queue_manager.asyncio.create_task") as mock_task:
-                    gradingQueue.push("attempt_456")
-                    assert "attempt_456" in mock_local
-                    mock_save.assert_called_once()
+            with patch.object(gradingQueue, "save_local_queue", new_callable=MagicMock) as mock_save:
+                with patch.object(gradingQueue, "process_local_queue", new_callable=MagicMock) as mock_process:
+                    with patch("app.queue_manager.asyncio.create_task") as mock_task:
+                        gradingQueue.push("attempt_456")
+                        assert "attempt_456" in mock_local
+                        mock_save.assert_called_once()
 
 def test_grading_queue_push_interview_evaluation_redis():
     mock_redis = MagicMock()

@@ -1,6 +1,6 @@
 import { useAuth } from "@/context/AuthContext";
 import { useCollege } from "@/context/CollegeContext";
-import { Outlet, Link, useLocation } from "react-router-dom";
+import { Outlet, Link, useLocation } from "react-router";
 import { useState, useEffect } from "react";
 import api from "@/lib/api";
 import { toast } from "sonner";

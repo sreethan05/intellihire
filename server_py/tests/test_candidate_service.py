@@ -11,7 +11,7 @@ def test_cache_get_set():
         assert Cache.get("key") == "cached_val"
         
         Cache.set("key", "val", 100)
-        mock_redis.setex.assert_called_once_with("key", 100, '"val"')
+        mock_redis.set.assert_called_once_with("key", '"val"', ex=100)
 
 @pytest.mark.asyncio
 async def test_build_public_portfolio_not_found():
