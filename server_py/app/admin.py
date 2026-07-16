@@ -63,7 +63,7 @@ async def get_recruiters(user: Dict[str, Any] = Depends(require_roles(["admin"])
 @router.get("/tpos")
 async def get_tpos(user: Dict[str, Any] = Depends(require_roles(["admin"]))):
     # Fetch TPOs along with college details if needed (we can fetch colleges separately and map, or run raw join)
-    import psycopg2.extras
+    from psycopg.rows import dict_row
     query = """
         SELECT u.id, u.name, u.email, u.college_id, u.created_at, c.name as college_name, c.code as college_code
         FROM users u
@@ -72,7 +72,7 @@ async def get_tpos(user: Dict[str, Any] = Depends(require_roles(["admin"]))):
         ORDER BY u.created_at DESC
     """
     with get_connection() as conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(query)
             rows = cur.fetchall()
             res_list = []
@@ -89,10 +89,10 @@ async def get_tpos(user: Dict[str, Any] = Depends(require_roles(["admin"]))):
 
 @router.get("/dashboard")
 async def get_dashboard(user: Dict[str, Any] = Depends(require_roles(["admin"]))):
-    import psycopg2.extras
+    from psycopg.rows import dict_row
     
     with get_connection() as conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        with conn.cursor(row_factory=dict_row) as cur:
             # Recruiter count
             cur.execute("SELECT COUNT(*) FROM users WHERE role = 'recruiter' AND created_by = %s", [user["id"]])
             recruiter_count = cur.fetchone()["count"]

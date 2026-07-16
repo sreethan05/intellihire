@@ -3,7 +3,7 @@ import json
 import uuid
 import datetime
 import shutil
-import psycopg2.extras
+from psycopg.rows import dict_row
 from fastapi import APIRouter, Request, Response, HTTPException, Depends, UploadFile, File
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
@@ -100,7 +100,7 @@ async def find_eligible_candidates(drive: any) -> list:
     query += " ORDER BY cp.cgpa DESC"
     
     with get_connection() as conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(query, params)
             rows = cur.fetchall()
             return [dict(r) for r in rows]
@@ -545,11 +545,11 @@ async def upload_offer_letter(candidate_id: str, job_id: str, offerLetter: Uploa
 
 @router.get("/dashboard")
 async def get_dashboard(collegeId: Optional[str] = None, user: Dict[str, Any] = Depends(require_roles(["recruiter"]))):
-    import psycopg2.extras
+    from psycopg.rows import dict_row
     
     # Use raw SQL to execute custom joins for the dashboard metrics
     with get_connection() as conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        with conn.cursor(row_factory=dict_row) as cur:
             # 1. Fetch drives
             cur.execute('SELECT * FROM jobs WHERE created_by = %s', [user["id"]])
             drives = [dict(r) for r in cur.fetchall()]

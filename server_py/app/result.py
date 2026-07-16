@@ -11,6 +11,7 @@ from .compiler import run_with_judge0
 from .plagiarism import run_plagiarism_check
 from .utils import send_email_async, record_pipeline_stage
 from .websocket import sio
+from .logger import logger
 
 router = APIRouter(prefix="/api/result", tags=["result"])
 
@@ -262,7 +263,7 @@ async def grade_attempt_background(attempt_id: str, user: dict, exam_id: str, su
         # Plagiarism check
         await run_plagiarism_check(attempt_id)
     except Exception as e:
-        print("Background grading error:", str(e))
+        logger.error(f"Background grading error: {str(e)}")
 
 @router.get("/attempt/{attemptId}")
 async def get_attempt(attemptId: str, user: Dict[str, Any] = Depends(get_current_user)):

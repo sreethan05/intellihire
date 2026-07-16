@@ -2,6 +2,7 @@ import re
 import math
 from typing import Set, List, Dict, Any
 from .db import db
+from .logger import logger
 
 PROGRAMMING_KEYWORDS = {
     "def", "function", "fn", "var", "let", "const", "class", "return", "if", "else", "elif", "for", "while", "do",
@@ -169,4 +170,4 @@ async def run_plagiarism_check(attempt_id: str) -> None:
                             "notes": f"High code similarity ({similarity}%) detected on \"{q_title}\" with {cur_candidate_name}'s submission."
                         })
     except Exception as e:
-        print("Error executing plagiarism checks:", str(e))
+        logger.error(f"Error executing plagiarism checks: {str(e)}")

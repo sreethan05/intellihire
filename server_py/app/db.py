@@ -5,19 +5,19 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
-import psycopg2
-import psycopg2.extras
-from psycopg2.pool import ThreadedConnectionPool
+import psycopg
+from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 
 from .config import DATABASE_URL
 
 _pool = None
 
 
-def get_pool() -> ThreadedConnectionPool:
+def get_pool() -> ConnectionPool:
     global _pool
     if _pool is None:
-        _pool = ThreadedConnectionPool(1, 20, dsn=DATABASE_URL)
+        _pool = ConnectionPool(conninfo=DATABASE_URL, min_size=1, max_size=20, open=False)
     return _pool
 
 
@@ -27,11 +27,8 @@ EMPTY_UUID = "00000000-0000-0000-0000-000000000000"
 @contextmanager
 def get_connection():
     pool_instance = get_pool()
-    conn = pool_instance.getconn()
-    try:
+    with pool_instance.connection() as conn:
         yield conn
-    finally:
-        pool_instance.putconn(conn)
 
 
 class QueryError(Exception):
@@ -440,7 +437,7 @@ class DBBuilder:
             sql += f" WHERE {where_sql}"
         sql += order_sql + limit_sql + offset_sql
 
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(sql, params)
             raw_rows = [dict(row) for row in cur.fetchall()]
 
@@ -453,7 +450,7 @@ class DBBuilder:
         sql = f"SELECT COUNT(*) AS count FROM {quote_identifier(self.table)}"
         if where_sql:
             sql += f" WHERE {where_sql}"
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(sql, where_params)
             row = cur.fetchone()
             return int(row["count"] if row else 0)
@@ -491,7 +488,7 @@ class DBBuilder:
                 sql += f" ON CONFLICT ({conflict_sql}) DO UPDATE SET {updates}"
 
         sql += " RETURNING *"
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(sql, params)
             conn.commit()
             raw_rows = [dict(row) for row in cur.fetchall()]
@@ -515,7 +512,7 @@ class DBBuilder:
         if where_sql:
             sql += f" WHERE {where_sql}"
         sql += " RETURNING *"
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(sql, params)
             conn.commit()
             raw_rows = [dict(row) for row in cur.fetchall()]
@@ -530,7 +527,7 @@ class DBBuilder:
         if where_sql:
             sql += f" WHERE {where_sql}"
         sql += " RETURNING *"
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(sql, where_params)
             conn.commit()
             raw_rows = [dict(row) for row in cur.fetchall()]

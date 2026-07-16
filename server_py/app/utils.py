@@ -4,9 +4,9 @@ import bcrypt
 import jwt
 from typing import Optional, Dict, Any
 from .db import db, get_connection
-import psycopg2
 
 from .config import JWT_SECRET, NODE_ENV, FILE_STORAGE_DIR
+from .logger import logger
 
 storage_root = os.path.abspath(FILE_STORAGE_DIR)
 os.makedirs(storage_root, exist_ok=True)
@@ -58,7 +58,7 @@ async def record_pipeline_stage(
                 )
                 conn.commit()
     except Exception as exc:
-        print(f"[Pipeline] Failed to record pipeline stage transition to {stage}: {str(exc)}")
+        logger.error(f"[Pipeline] Failed to record pipeline stage transition to {stage}: {str(exc)}")
 
 import json
 import redis
@@ -73,7 +73,7 @@ if REDIS_URL:
         pass
 
 def send_email(to: str, subject: str, body: str) -> bool:
-    print(f"[Email] Sending email to {to} | Subject: {subject} | Body: {body[:100]}...")
+    logger.info(f"[Email] Sending email to {to} | Subject: {subject} | Body: {body[:100]}...")
     return True
 
 async def send_email_async(to: str, subject: str, body: str) -> bool:

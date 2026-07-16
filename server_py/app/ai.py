@@ -12,6 +12,7 @@ import httpx
 
 from .auth_router import get_current_user
 from .rate_limit import limiter
+from .logger import logger
 
 router = APIRouter(tags=["ai"])
 
@@ -421,7 +422,7 @@ Schema:
                     if parsed.get("warnings"):
                         result["warnings"] = [str(w) for w in parsed["warnings"]]
         except Exception as exc:
-            print(f"[Gateway] Marksheet AI correction failed: {str(exc)}")
+            logger.error(f"[Gateway] Marksheet AI correction failed: {str(exc)}")
 
     if not result["roll_number"] and not result["name"]:
         raise HTTPException(status_code=400, detail=f"Could not extract student data from {file.name}.")

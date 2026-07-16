@@ -12,7 +12,7 @@ from .db import db, transaction
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-import psycopg2.extras
+from psycopg.rows import dict_row
 from .config import JWT_SECRET, NODE_ENV
 
 ACCESS_TOKEN_TTL_SECONDS = 15 * 60
@@ -189,7 +189,7 @@ async def refresh(request: Request, response: Response):
     # Rotate refresh session in transaction
     def run_rotation(client):
         # We can run query manually inside client transaction cursor
-        with client.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        with client.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 """SELECT rt.id as refresh_token_id, rt.user_id, rt.expires_at, rt.revoked_at,
                            u.id, u.name, u.email, u.role, u.roll_number, u.college_id, u.profile_complete, u.must_change_password

@@ -132,7 +132,7 @@ async def get_dashboard(user: Dict[str, Any] = Depends(require_roles(["tpo"]))):
     student_ids = {s["user_id"] for s in students}
     
     # Attempts
-    import psycopg2.extras
+    from psycopg.rows import dict_row
     attempts = []
     if student_ids:
         # Use psycopg2 to run dynamic list in attempts
@@ -143,7 +143,7 @@ async def get_dashboard(user: Dict[str, Any] = Depends(require_roles(["tpo"]))):
             WHERE a.status = 'completed' AND a.candidate_id IN %s
         """
         with get_connection() as conn:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(query, [tuple(student_ids)])
                 attempts = [dict(r) for r in cur.fetchall()]
                 
@@ -238,9 +238,9 @@ async def get_students(page: int = 1, limit: int = 10, user: Dict[str, Any] = De
     """
     count_query = "SELECT COUNT(*) FROM candidate_profiles WHERE college_id = %s"
     
-    import psycopg2.extras
+    from psycopg.rows import dict_row
     with get_connection() as conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(query, [college_id, limit, offset])
             rows = cur.fetchall()
             
