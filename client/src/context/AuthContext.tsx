@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import type { User } from "@/types";
+import { authApi } from "@/lib/api";
 
 interface AuthContextType {
   user: User | null;
@@ -16,53 +17,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
+    let active = true;
+    async function fetchMe() {
       try {
-        setUser(JSON.parse(storedUser));
+        const response = await authApi.getMe();
+        if (active && response.data?.user) {
+          setUser(response.data.user);
+        }
       } catch {
-        localStorage.removeItem("user");
-      }
-    }
-    setLoading(false);
-
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === "user") {
-        if (e.newValue) {
-          try {
-            setUser(JSON.parse(e.newValue));
-          } catch {
-            setUser(null);
-          }
-        } else {
-          setUser(null);
+        setUser(null);
+      } finally {
+        if (active) {
+          setLoading(false);
         }
       }
-    };
-
-    window.addEventListener("storage", handleStorageChange);
+    }
+    fetchMe();
     return () => {
-      window.removeEventListener("storage", handleStorageChange);
+      active = false;
     };
   }, []);
 
   const login = (_token: string | null | undefined, user: User) => {
-    localStorage.setItem("user", JSON.stringify(user));
     setUser(user);
   };
 
   const logout = () => {
-    localStorage.removeItem("user");
     setUser(null);
     window.location.href = "/login";
   };
 
   const updateUser = (updatedUser: Partial<User>) => {
-    if (user) {
-      const newUser = { ...user, ...updatedUser };
-      localStorage.setItem("user", JSON.stringify(newUser));
-      setUser(newUser);
-    }
+    setUser((prev) => prev ? { ...prev, ...updatedUser } : null);
   };
 
   return (

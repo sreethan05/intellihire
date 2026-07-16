@@ -1,7 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { AuthProvider, useAuth } from "./AuthContext";
 import type { User } from "@/types";
+
+// Mock authApi
+vi.mock("@/lib/api", () => {
+  return {
+    authApi: {
+      getMe: vi.fn(() => Promise.resolve({ data: { user: null } })),
+    },
+  };
+});
 
 // Mock window.location
 const locationMock = { href: "" };
@@ -47,14 +56,15 @@ describe("AuthContext", () => {
     vi.clearAllMocks();
   });
 
-  it("manages login, update, and logout state updates", () => {
+  it("manages login, update, and logout state updates", async () => {
     render(
       <AuthProvider>
         <TestComponent />
       </AuthProvider>
     );
 
-    // Initial state: Logged out
+    // Wait for the async /me query loading sequence to complete
+    await screen.findByTestId("logout-status");
     expect(screen.getByTestId("logout-status")).toHaveTextContent("Logged out");
 
     // Click Login
@@ -68,7 +78,9 @@ describe("AuthContext", () => {
 
     // Click Logout
     fireEvent.click(screen.getByText("Logout"));
-    expect(screen.queryByTestId("username")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByTestId("username")).not.toBeInTheDocument();
+    });
     expect(locationMock.href).toBe("/login");
   });
 });

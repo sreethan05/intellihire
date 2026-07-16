@@ -17,7 +17,7 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    if (error.response?.status === 401 && !error.config?.url?.includes("/auth/login")) {
+    if (error.response?.status === 401 && !error.config?.url?.includes("/auth/login") && !error.config?.url?.includes("/auth/me")) {
       localStorage.removeItem("user");
       window.location.href = "/login";
     }
@@ -30,6 +30,8 @@ export default api;
 export const authApi = {
   login: (email: string, password: string) =>
     api.post("/auth/login", { email, password }),
+  getMe: () =>
+    api.get("/auth/me"),
 };
 
 export const adminApi = {
