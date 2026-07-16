@@ -735,31 +735,31 @@ export default function TakeExam() {
   };
 
   const getQuestionTileClass = (active: boolean, answered: boolean, reviewing: boolean) => {
-    if (active) return "border-blue-600 bg-blue-50 text-blue-700 ring-1 ring-blue-600";
-    if (answered && reviewing) return "border-violet-300 bg-violet-100 text-violet-800";
-    if (reviewing) return "border-orange-300 bg-orange-100 text-orange-800";
-    if (answered) return "border-emerald-200 bg-emerald-100 text-emerald-800";
-    return "border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50";
+    if (active) return "border-blue-600 bg-blue-600 text-white shadow-lg shadow-blue-500/20";
+    if (answered && reviewing) return "border-purple-500/30 bg-purple-500/10 text-purple-400";
+    if (reviewing) return "border-amber-500/30 bg-amber-500/10 text-amber-400";
+    if (answered) return "border-emerald-500/30 bg-emerald-500/10 text-emerald-400";
+    return "border-slate-800 bg-slate-900/40 text-slate-400 hover:border-slate-700 hover:bg-slate-900/60 hover:text-white";
   };
 
   return (
-    <div ref={examContainerRef} className="min-h-screen bg-white text-slate-950">
+    <div ref={examContainerRef} className="min-h-screen bg-[#090d16] text-slate-200">
       {securityLocked && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-6 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_30px_80px_rgba(15,23,42,0.35)]">
-            <div className="mb-3 flex items-center gap-3 text-slate-900">
-              <Monitor className="h-5 w-5 text-blue-600" />
-              <h3 className="text-lg font-bold">Exam Locked</h3>
+          <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-[#0d1527]/90 p-8 shadow-[0_30px_80px_rgba(0,0,0,0.6)] backdrop-blur-xl">
+            <div className="mb-4 flex items-center gap-3 text-white">
+              <Monitor className="h-5 w-5 text-blue-500" />
+              <h3 className="text-lg font-black">Exam Locked</h3>
             </div>
-            <p className="text-sm leading-6 text-slate-600">{securityMessage}</p>
-            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <p className="text-sm leading-6 text-slate-400">{securityMessage}</p>
+            <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-400 font-bold">
               Violations used: {violationCount}/{MAX_VIOLATIONS}
             </div>
-            <div className="mt-5 flex gap-3">
-              <Button className="flex-1" onClick={() => void requestExamFullscreen()}>
+            <div className="mt-6 flex gap-3">
+              <Button className="flex-1 rounded-xl bg-blue-600 hover:bg-blue-500" onClick={() => void requestExamFullscreen()}>
                 Return to Fullscreen
               </Button>
-              <Button variant="outline" className="flex-1" onClick={() => void handleSubmitExam("security lock")}>
+              <Button variant="outline" className="flex-1 rounded-xl border-slate-800 text-slate-450 hover:bg-slate-900" onClick={() => void handleSubmitExam("security lock")}>
                 Submit Now
               </Button>
             </div>
@@ -767,92 +767,92 @@ export default function TakeExam() {
         </div>
       )}
 
-      <header className="sticky top-0 z-30 grid h-[68px] grid-cols-[280px_minmax(0,1fr)_390px] items-center border-b border-slate-200 bg-white px-6">
+      <header className="sticky top-0 z-30 grid h-[68px] grid-cols-[280px_minmax(0,1fr)_390px] items-center border-b border-slate-800 bg-[#0d1527]/90 px-6 backdrop-blur-md">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
             <FileCode2 className="h-5 w-5" />
           </div>
-          <div className="text-lg font-bold text-slate-950">Online Examination</div>
+          <div className="text-lg font-black text-white tracking-tight">Online Examination</div>
         </div>
-        <div className="truncate text-center text-xl font-bold text-blue-900">{exam.title}</div>
+        <div className="truncate text-center text-lg font-black text-blue-400">{exam.title}</div>
         <div className="flex items-center justify-end gap-4">
           <Button
             variant="outline"
             onClick={() => void handleSubmitExam()}
             disabled={submitting}
-            className="h-10 rounded-md border-red-200 px-5 text-red-600 hover:bg-red-50 hover:text-red-700"
+            className="h-10 rounded-xl border-rose-500/30 bg-rose-500/10 hover:bg-rose-500 hover:text-white px-5 text-rose-400 font-bold transition duration-200"
           >
             <Send className="mr-2 h-4 w-4" />
             {submitting ? "Submitting..." : "Submit Exam"}
           </Button>
-          <div className="h-8 w-px bg-slate-200" />
-          <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-            <span>Time Left</span>
-            <Clock className="h-5 w-5 text-slate-700" />
-            <span className={timeLeft < 300 ? "font-bold text-red-600" : "font-bold text-slate-950"}>{formatTime(timeLeft)}</span>
+          <div className="h-8 w-px bg-slate-800" />
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-300">
+            <span>Time Left:</span>
+            <Clock className="h-4.5 w-4.5 text-slate-400 animate-pulse" />
+            <span className={timeLeft < 300 ? "font-black text-rose-500" : "font-black text-white"}>{formatTime(timeLeft)}</span>
           </div>
-          <button type="button" onClick={() => void requestExamFullscreen()} className="rounded-md p-2 text-slate-600 hover:bg-slate-100" aria-label="Fullscreen">
-            <Maximize className="h-5 w-5" />
+          <button type="button" onClick={() => void requestExamFullscreen()} className="rounded-xl p-2 text-slate-400 hover:bg-slate-900 hover:text-white transition duration-200" aria-label="Fullscreen">
+            <Maximize className="h-4.5 w-4.5" />
           </button>
         </div>
       </header>
 
-      <div className="border-b border-slate-200 bg-white px-6">
+      <div className="border-b border-slate-800 bg-[#090d16] px-6">
         <div className="flex items-center justify-between gap-4">
           <div className="flex">
             <button
               type="button"
               onClick={() => setTab("mcq")}
               className={`min-w-36 border-b-2 px-5 py-4 text-left transition ${
-                tab === "mcq" ? "border-blue-600 text-blue-700" : "border-transparent text-slate-600 hover:text-slate-900"
+                tab === "mcq" ? "border-blue-500 text-blue-400 font-black" : "border-transparent text-slate-500 hover:text-slate-300"
               }`}
             >
-              <div className="font-semibold">Section A</div>
-              <div className="mt-1 text-sm">{mcqQuestions.length} Questions</div>
+              <div className="text-xs font-black uppercase tracking-wider">Section A // MCQs</div>
+              <div className="mt-1 text-[11px] font-bold text-slate-500">{mcqQuestions.length} Questions</div>
             </button>
             <button
               type="button"
               onClick={() => setTab("coding")}
               className={`min-w-36 border-b-2 px-5 py-4 text-left transition ${
-                tab === "coding" ? "border-blue-600 text-blue-700" : "border-transparent text-slate-600 hover:text-slate-900"
+                tab === "coding" ? "border-blue-500 text-blue-400 font-black" : "border-transparent text-slate-500 hover:text-slate-300"
               }`}
             >
-              <div className="font-semibold">Section B</div>
-              <div className="mt-1 text-sm">{codingQuestions.length} Questions</div>
+              <div className="text-xs font-black uppercase tracking-wider">Section B // Coding</div>
+              <div className="mt-1 text-[11px] font-bold text-slate-500">{codingQuestions.length} Questions</div>
             </button>
           </div>
 
           <div className="flex items-center gap-3">
-            <Button variant="outline" className="h-11 rounded-md" onClick={() => setShowCalculator((value) => !value)}>
-              <Calculator className="mr-2 h-4 w-4" />
+            <Button variant="outline" className="h-10 rounded-xl border-slate-850 bg-slate-900/40 text-slate-300 hover:bg-slate-900" onClick={() => setShowCalculator((value) => !value)}>
+              <Calculator className="mr-2 h-4 w-4 text-slate-400" />
               Calculator
             </Button>
-            <Button variant="outline" className="h-11 rounded-md" onClick={() => setShowNotes((value) => !value)}>
-              <NotebookTabs className="mr-2 h-4 w-4" />
+            <Button variant="outline" className="h-10 rounded-xl border-slate-850 bg-slate-900/40 text-slate-300 hover:bg-slate-900" onClick={() => setShowNotes((value) => !value)}>
+              <NotebookTabs className="mr-2 h-4 w-4 text-slate-400" />
               Notes
             </Button>
-            <Button variant="outline" className="h-11 rounded-md" onClick={toggleReviewFlag}>
-              {currentMarked ? <BookmarkCheck className="mr-2 h-4 w-4 text-orange-500" /> : <Bookmark className="mr-2 h-4 w-4" />}
-              {currentMarked ? "Marked" : "Mark for Review"}
+            <Button variant="outline" className="h-10 rounded-xl border-slate-850 bg-slate-900/40 text-slate-300 hover:bg-slate-900" onClick={toggleReviewFlag}>
+              {currentMarked ? <BookmarkCheck className="mr-2 h-4 w-4 text-amber-400" /> : <Bookmark className="mr-2 h-4 w-4 text-slate-400" />}
+              {currentMarked ? "Marked for Review" : "Bookmark Question"}
             </Button>
           </div>
         </div>
       </div>
 
       {(showNotes || showCalculator || timeLeft < 300) && (
-        <div className="grid gap-3 border-b border-slate-200 bg-slate-50 px-6 py-3 lg:grid-cols-3">
+        <div className="grid gap-3 border-b border-slate-800 bg-[#090d16] px-6 py-3 lg:grid-cols-3">
           {timeLeft < 300 && (
-            <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
-              <AlertTriangle className="h-4 w-4" />
-              Less than 5 minutes remaining.
+            <div className="flex items-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-xs font-bold text-rose-450 text-rose-400">
+              <AlertTriangle className="h-4.5 w-4.5 text-rose-400" />
+              CRITICAL: Less than 5 minutes remaining!
             </div>
           )}
           {showCalculator && (
-            <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700">
-              <div className="mb-2 font-semibold text-slate-900">Calculator</div>
+            <div className="rounded-xl border border-slate-800 bg-slate-900/30 p-4 text-xs text-slate-300">
+              <div className="mb-2.5 font-black uppercase tracking-wider text-slate-400">Calculator</div>
               <div className="grid grid-cols-4 gap-2">
                 {["7", "8", "9", "/", "4", "5", "6", "*", "1", "2", "3", "-", "0", ".", "=", "+"].map((key) => (
-                  <button key={key} type="button" className="h-9 rounded-md border border-slate-200 bg-slate-50 font-semibold hover:bg-blue-50">
+                  <button key={key} type="button" className="h-9 rounded-lg border border-slate-850 bg-slate-950/40 font-bold text-white hover:bg-slate-900 hover:border-slate-700 transition">
                     {key}
                   </button>
                 ))}
@@ -860,13 +860,13 @@ export default function TakeExam() {
             </div>
           )}
           {showNotes && (
-            <div className="rounded-lg border border-slate-200 bg-white p-3 lg:col-span-2">
-              <div className="mb-2 font-semibold text-slate-900">Notes</div>
+            <div className="rounded-xl border border-slate-800 bg-slate-900/30 p-4 lg:col-span-2">
+              <div className="mb-2.5 font-black uppercase tracking-wider text-slate-400">Scratch Notes</div>
               <textarea
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
-                placeholder="Write rough notes here..."
-                className="h-24 w-full resize-none rounded-md border border-slate-200 p-3 text-sm outline-none focus:border-blue-400"
+                placeholder="Type rough notes or test case workings here (autosaved locally)..."
+                className="h-24 w-full resize-none rounded-xl border border-slate-850 bg-slate-950/40 p-3 text-xs text-white placeholder:text-slate-600 outline-none focus:border-blue-500 transition"
               />
             </div>
           )}
@@ -874,30 +874,30 @@ export default function TakeExam() {
       )}
 
       <main className="grid min-h-[calc(100vh-140px)] grid-cols-[minmax(0,1fr)_370px]">
-        <section className="flex flex-col border-r border-slate-200">
+        <section className="flex flex-col border-r border-slate-800">
           <div className="flex-1 overflow-auto p-6">
             {tab === "mcq" ? (
               mcqQuestions.length === 0 ? (
-                <Card>
-                  <CardContent className="p-8 text-center text-gray-400">No MCQ questions in this exam.</CardContent>
+                <Card className="border-slate-800 bg-slate-900/30">
+                  <CardContent className="p-8 text-center text-slate-500">No MCQ questions in this exam.</CardContent>
                 </Card>
               ) : (
-                <div className="min-h-[620px] rounded-lg border border-slate-200 bg-white p-6">
+                <div className="min-h-[620px] rounded-xl border border-slate-800 bg-slate-900/10 p-6">
                   <div className="mb-10 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                      <div className="text-lg font-bold text-slate-900">Question {currentMcq + 1} of {mcqQuestions.length}</div>
-                      <span className="rounded-md bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700">Multiple Choice</span>
+                      <div className="text-lg font-black text-white">Question {currentMcq + 1} of {mcqQuestions.length}</div>
+                      <span className="rounded-lg bg-blue-500/10 border border-blue-500/20 px-3 py-1 text-xs font-bold text-blue-400 uppercase tracking-wider">Multiple Choice</span>
                     </div>
-                    <div className="flex items-center gap-6 text-sm">
-                      <span>Marks: <strong className="text-emerald-600">+{currentMarks.toFixed(2)}</strong></span>
-                      <span>Negative Marks: <strong className="text-red-600">-{Number(exam.negative_marking || 0).toFixed(2)}</strong></span>
-                      <button type="button" onClick={toggleReviewFlag} className="text-slate-600 hover:text-blue-700">
-                        {currentMarked ? <BookmarkCheck className="h-5 w-5 text-orange-500" /> : <Bookmark className="h-5 w-5" />}
+                    <div className="flex items-center gap-6 text-xs font-bold text-slate-400">
+                      <span>Marks: <strong className="text-emerald-400">+{currentMarks.toFixed(2)}</strong></span>
+                      <span>Negative Marks: <strong className="text-rose-450 text-rose-400">-{Number(exam.negative_marking || 0).toFixed(2)}</strong></span>
+                      <button type="button" onClick={toggleReviewFlag} className="text-slate-400 hover:text-white transition">
+                        {currentMarked ? <BookmarkCheck className="h-5 w-5 text-amber-400 animate-pulse" /> : <Bookmark className="h-5 w-5" />}
                       </button>
                     </div>
                   </div>
 
-                  <h2 className="mb-9 text-lg font-bold leading-8 text-slate-950">{currentMcqQuestion?.question.question_text}</h2>
+                  <h2 className="mb-9 text-lg font-black leading-8 text-white">{currentMcqQuestion?.question.question_text}</h2>
 
                   <RadioGroup
                     value={currentMcqQuestion ? answers[currentMcqQuestion.question_id] || "" : ""}
@@ -911,40 +911,40 @@ export default function TakeExam() {
                         <Label
                           key={option}
                           htmlFor={`opt-${option}`}
-                          className={`flex min-h-[72px] cursor-pointer items-center gap-5 rounded-lg border px-5 text-base transition ${
-                            selected ? "border-blue-500 bg-blue-50 shadow-sm" : "border-slate-200 bg-white hover:border-blue-200"
+                          className={`flex min-h-[72px] cursor-pointer items-center gap-5 rounded-xl border px-5 text-sm transition duration-150 ${
+                            selected ? "border-blue-500 bg-blue-500/10 shadow shadow-blue-500/10" : "border-slate-800 bg-slate-950/40 hover:border-slate-700"
                           }`}
                         >
-                          <RadioGroupItem value={option.toUpperCase()} id={`opt-${option}`} />
-                          <span className="w-8 font-bold text-blue-700">{option.toUpperCase()}.</span>
-                          <span className="font-medium text-slate-800">{getOptionText(currentMcqQuestion.question, option)}</span>
-                          {selected && <Check className="ml-auto h-5 w-5 text-blue-600" />}
+                          <RadioGroupItem value={option.toUpperCase()} id={`opt-${option}`} className="border-slate-700 text-blue-500" />
+                          <span className="w-8 font-black text-blue-400">{option.toUpperCase()}.</span>
+                          <span className="font-bold text-slate-200">{getOptionText(currentMcqQuestion.question, option)}</span>
+                          {selected && <Check className="ml-auto h-5 w-5 text-blue-400" />}
                         </Label>
                       );
                     })}
                   </RadioGroup>
 
-                  <Button variant="outline" className="mt-7 h-11 rounded-md" onClick={clearCurrentAnswer}>
+                  <Button variant="outline" className="mt-7 h-10 rounded-xl border-slate-850 bg-slate-900/40 text-slate-350 hover:bg-slate-900" onClick={clearCurrentAnswer}>
                     Clear Answer
                   </Button>
                 </div>
               )
             ) : codingQuestions.length === 0 ? (
-              <Card>
-                <CardContent className="p-8 text-center text-gray-400">No coding questions in this exam.</CardContent>
+              <Card className="border-slate-800 bg-slate-900/30">
+                <CardContent className="p-8 text-center text-slate-500">No coding questions in this exam.</CardContent>
               </Card>
             ) : (
-              <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
                 <div className="mb-4 flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="text-lg font-bold text-slate-900">Question {currentCoding + 1} of {codingQuestions.length}</div>
-                    <span className="rounded-md bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700">Coding Problem</span>
+                    <div className="text-lg font-black text-white">Question {currentCoding + 1} of {codingQuestions.length}</div>
+                    <span className="rounded-lg bg-blue-500/10 border border-blue-500/20 px-3 py-1 text-xs font-bold text-blue-400 uppercase tracking-wider">Coding Problem</span>
                   </div>
-                  <div className="flex items-center gap-6 text-sm">
-                    <span>Marks: <strong className="text-emerald-600">+{currentMarks.toFixed(2)}</strong></span>
-                    <span>Negative Marks: <strong className="text-red-600">-{Number(exam.negative_marking || 0).toFixed(2)}</strong></span>
-                    <button type="button" onClick={toggleReviewFlag} className="flex items-center gap-2 text-slate-600 hover:text-blue-700">
-                      {currentMarked ? <BookmarkCheck className="h-5 w-5 text-orange-500" /> : <Bookmark className="h-5 w-5" />}
+                  <div className="flex items-center gap-6 text-xs font-bold text-slate-400">
+                    <span>Marks: <strong className="text-emerald-400">+{currentMarks.toFixed(2)}</strong></span>
+                    <span>Negative Marks: <strong className="text-rose-450 text-rose-400">-{Number(exam.negative_marking || 0).toFixed(2)}</strong></span>
+                    <button type="button" onClick={toggleReviewFlag} className="flex items-center gap-2 text-slate-400 hover:text-white transition">
+                      {currentMarked ? <BookmarkCheck className="h-5 w-5 text-amber-400" /> : <Bookmark className="h-5 w-5" />}
                       Bookmark
                     </button>
                   </div>
@@ -964,18 +964,18 @@ export default function TakeExam() {
             )}
           </div>
 
-          <div className="grid h-20 grid-cols-3 items-center border-t border-slate-200 bg-white px-6">
+          <div className="grid h-20 grid-cols-3 items-center border-t border-slate-800 bg-[#090d16] px-6">
             <div>
-              <Button variant="outline" className="h-11 min-w-36 rounded-md border-blue-300 text-blue-700" onClick={goToPrevious} disabled={activeQuestionIndex === 0}>
+              <Button variant="outline" className="h-10 min-w-36 rounded-xl border-slate-850 bg-slate-900/40 text-slate-300 hover:bg-slate-900 hover:text-white transition" onClick={goToPrevious} disabled={activeQuestionIndex === 0}>
                 <ChevronLeft className="mr-2 h-4 w-4" />
                 Previous
               </Button>
             </div>
-            <div className="text-center text-sm font-medium text-slate-500">
-              Question {activeQuestionIndex + 1} / {activeQuestionTotal}
+            <div className="text-center text-xs font-bold uppercase tracking-wider text-slate-500">
+              Question {activeQuestionIndex + 1} of {activeQuestionTotal}
             </div>
             <div className="flex justify-end">
-              <Button className="h-11 min-w-36 rounded-md bg-blue-700 hover:bg-blue-800" onClick={goToNext} disabled={activeQuestionIndex === activeQuestionTotal - 1}>
+              <Button className="h-10 min-w-36 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold transition" onClick={goToNext} disabled={activeQuestionIndex === activeQuestionTotal - 1}>
                 Next
                 <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
@@ -983,14 +983,14 @@ export default function TakeExam() {
           </div>
         </section>
 
-        <aside className="bg-white">
-          <div className="border-b border-slate-200 p-6">
-            <div className="mb-5 text-lg font-bold text-slate-900">Question Navigator</div>
-            <div className="grid grid-cols-2 gap-x-5 gap-y-3 text-sm text-slate-600">
-              <div className="flex items-center gap-2"><span className="h-4 w-4 rounded bg-emerald-100 ring-1 ring-emerald-200" />Answered</div>
-              <div className="flex items-center gap-2"><span className="h-4 w-4 rounded bg-white ring-1 ring-slate-200" />Not Answered</div>
-              <div className="flex items-center gap-2"><span className="h-4 w-4 rounded bg-orange-100 ring-1 ring-orange-300" />Marked</div>
-              <div className="flex items-center gap-2"><span className="h-4 w-4 rounded bg-violet-100 ring-1 ring-violet-300" />Answered & Marked</div>
+        <aside className="bg-[#0b1322] border-l border-slate-800">
+          <div className="border-b border-slate-800 p-6">
+            <div className="mb-5 text-sm font-black uppercase tracking-wider text-white">Question Navigator</div>
+            <div className="grid grid-cols-2 gap-x-5 gap-y-3 text-[10px] font-bold text-slate-400">
+              <div className="flex items-center gap-2"><span className="h-4 w-4 rounded bg-emerald-500/10 ring-1 ring-emerald-500/30" />Answered</div>
+              <div className="flex items-center gap-2"><span className="h-4 w-4 rounded bg-slate-900/40 ring-1 ring-slate-850" />Not Answered</div>
+              <div className="flex items-center gap-2"><span className="h-4 w-4 rounded bg-amber-500/10 ring-1 ring-amber-500/30" />Marked</div>
+              <div className="flex items-center gap-2"><span className="h-4 w-4 rounded bg-purple-500/10 ring-1 ring-purple-500/30" />Answered & Marked</div>
             </div>
 
             <div className="mt-7 grid grid-cols-5 gap-3">
@@ -1029,56 +1029,56 @@ export default function TakeExam() {
             </div>
           </div>
 
-          <div className="p-4">
-            <div className="mb-4 rounded-lg border border-slate-200 bg-slate-950 p-2">
-              <div className="mb-2 flex items-center justify-between px-1 text-xs font-semibold uppercase text-white/80">
-                <span className="flex items-center gap-2">
-                  <Camera className="h-3.5 w-3.5 text-emerald-300" />
-                  Camera On
+          <div className="p-4 space-y-4">
+            <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5 shadow-lg">
+              <div className="mb-2 flex items-center justify-between px-1 text-[10px] font-black uppercase tracking-wider text-white/80">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Proctor Stream // Active
                 </span>
-                <span>{violationCount}/{MAX_VIOLATIONS}</span>
+                <span>{violationCount} / {MAX_VIOLATIONS} Violations</span>
               </div>
               <video
                 ref={videoRef}
                 muted
                 playsInline
-                className="aspect-video w-full rounded-md bg-slate-900 object-cover"
+                className="aspect-video w-full rounded-lg bg-slate-900 object-cover border border-slate-800"
               />
             </div>
 
-            <div className="rounded-lg border border-slate-200 bg-white">
-              <div className="border-b border-slate-200 px-4 py-2.5 font-bold text-slate-900">Test Overview</div>
+            <div className="rounded-xl border border-slate-800 bg-slate-900/30 overflow-hidden shadow-lg">
+              <div className="border-b border-slate-800 px-4 py-3 text-xs font-black uppercase tracking-wider text-white">Test Overview</div>
               {[
-                { label: "Total Questions", value: totalQuestions, icon: ListChecks, color: "text-blue-600" },
-                { label: "Attempted", value: totalAnswered, icon: CheckCircle2, color: "text-emerald-600" },
+                { label: "Total Questions", value: totalQuestions, icon: ListChecks, color: "text-blue-400" },
+                { label: "Attempted", value: totalAnswered, icon: CheckCircle2, color: "text-emerald-400" },
                 { label: "Not Attempted", value: unattemptedCount, icon: Circle, color: "text-slate-500" },
-                { label: "Marked for Review", value: totalMarked, icon: Bookmark, color: "text-orange-500" },
-                { label: "Violations", value: `${violationCount}/${MAX_VIOLATIONS}`, icon: ShieldAlert, color: "text-amber-500" },
+                { label: "Marked for Review", value: totalMarked, icon: Bookmark, color: "text-amber-400" },
+                { label: "Violations logged", value: `${violationCount} / ${MAX_VIOLATIONS}`, icon: ShieldAlert, color: "text-rose-450 text-rose-400" },
               ].map((item) => {
                 const Icon = item.icon;
                 return (
-                  <div key={item.label} className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5 last:border-b-0">
-                    <div className="flex items-center gap-3 text-sm text-slate-600">
+                  <div key={item.label} className="flex items-center justify-between border-b border-slate-850 px-4 py-2.5 last:border-b-0 text-xs font-bold">
+                    <div className="flex items-center gap-2.5 text-slate-400">
                       <Icon className={`h-4 w-4 ${item.color}`} />
                       {item.label}
                     </div>
-                    <div className="font-semibold text-slate-900">{item.value}</div>
+                    <div className="text-white">{item.value}</div>
                   </div>
                 );
               })}
             </div>
 
             {tab === "coding" && (
-              <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
-                <div className="mb-2 flex items-center gap-2 font-bold text-blue-800">
-                  <FileCode2 className="h-4 w-4" />
-                  Coding Instructions
+              <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4 shadow-lg">
+                <div className="mb-2 flex items-center gap-2 text-xs font-black uppercase tracking-wider text-blue-400">
+                  <FileCode2 className="h-4.5 w-4.5" />
+                  Coding Rules
                 </div>
-                <ul className="list-disc space-y-0.5 pl-5 text-xs leading-5 text-slate-700">
-                  <li>Use standard input for taking input.</li>
-                  <li>Print output to standard output.</li>
-                  <li>Your code is autosaved while typing.</li>
-                  <li>You can run code multiple times before submitting.</li>
+                <ul className="list-disc space-y-1.5 pl-5 text-[11px] font-bold leading-relaxed text-slate-400">
+                  <li>Read standard input for custom parameters.</li>
+                  <li>Print outputs directly to standard output.</li>
+                  <li>Your solution compiles against the standard sandbox.</li>
+                  <li>You can run tests as many times as needed.</li>
                 </ul>
               </div>
             )}
