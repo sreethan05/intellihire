@@ -5,6 +5,7 @@ from .db import db
 from typing import Any, Dict
 
 from .config import APP_URL, JWT_SECRET, CORS_ALLOWED_ORIGINS
+from .logger import logger
 
 allowed_origins = [
     "http://localhost:3000",
@@ -83,22 +84,22 @@ async def connect(sid, environ):
                 
     token = cookie_token or auth_token
     if not token:
-        print(f"[WebSocket] Rejected connection {sid} - authentication required")
+        logger.warning(f"[WebSocket] Rejected connection {sid} - authentication required")
         return False
         
     try:
         decoded = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
         async with sio.session(sid) as session:
             session["user"] = decoded
-        print(f"[WebSocket] Connected client {sid} as user {decoded.get('id')}")
+        logger.info(f"[WebSocket] Connected client {sid} as user {decoded.get('id')}")
     except Exception as exc:
-        print(f"[WebSocket] Rejected connection {sid} - invalid token: {str(exc)}")
+        logger.warning(f"[WebSocket] Rejected connection {sid} - invalid token: {str(exc)}")
         return False
     return True
 
 @sio.event
 async def disconnect(sid):
-    print(f"[WebSocket] Client disconnected: {sid}")
+    logger.info(f"[WebSocket] Client disconnected: {sid}")
 
 @sio.on("notifications:join")
 async def on_notifications_join(sid, data: Any):
@@ -115,7 +116,7 @@ async def on_notifications_join(sid, data: Any):
         return
     room = f"user:{validated.userId}"
     sio.enter_room(sid, room)
-    print(f"[WebSocket] User {user.get('id')} joined notifications room")
+    logger.info(f"[WebSocket] User {user.get('id')} joined notifications room")
 
 @sio.on("proctor:join")
 async def on_proctor_join(sid, data: Any):
@@ -144,7 +145,7 @@ async def on_proctor_join(sid, data: Any):
         
     room = f"attempt:{attempt_id}"
     sio.enter_room(sid, room)
-    print(f"[WebSocket] Client joined proctoring room {room}")
+    logger.info(f"[WebSocket] Client joined proctoring room {room}")
 
 @sio.on("proctor:monitor")
 async def on_proctor_monitor(sid, data: Any):
@@ -172,7 +173,7 @@ async def on_proctor_monitor(sid, data: Any):
         
     room = f"monitor:{exam_id}"
     sio.enter_room(sid, room)
-    print(f"[WebSocket] Client joined monitor room {room}")
+    logger.info(f"[WebSocket] Client joined monitor room {room}")
 
 @sio.on("admin:join")
 async def on_admin_join(sid):
@@ -182,7 +183,7 @@ async def on_admin_join(sid):
         await sio.emit("error", {"message": "Unauthorized admin room join"}, to=sid)
         return
     sio.enter_room(sid, "admin")
-    print(f"[WebSocket] Admin client {sid} joined admin room")
+    logger.info(f"[WebSocket] Admin client {sid} joined admin room")
 
 @sio.on("proctor:snapshot")
 async def on_proctor_snapshot(sid, data: Any):
@@ -258,7 +259,7 @@ async def on_proctor_violation(sid, data: Any):
             "timestamp": timestamp,
         }, room="admin")
     except Exception as exc:
-        print(f"[WebSocket] Admin violation alert resolve failed: {str(exc)}")
+        logger.error(f"[WebSocket] Admin violation alert resolve failed: {str(exc)}")
 
 @sio.on("proctor:leave")
 async def on_proctor_leave(sid, data: Any):

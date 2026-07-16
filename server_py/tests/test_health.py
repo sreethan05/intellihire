@@ -1,3 +1,7 @@
+import warnings
+# Suppress Starlette's deprecation warning regarding TestClient and httpx
+warnings.filterwarnings("ignore", message="Using httpx with starlette.testclient is deprecated")
+
 from fastapi.testclient import TestClient
 from app.main import app
 

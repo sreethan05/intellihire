@@ -1,4 +1,8 @@
 import os
+import warnings
+# Suppress Starlette's deprecation warning regarding TestClient and httpx
+warnings.filterwarnings("ignore", message="Using httpx with starlette.testclient is deprecated")
+
 from dotenv import load_dotenv
 
 # Load environment variables from the project's root or server_py directory

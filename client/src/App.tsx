@@ -1,42 +1,40 @@
 import { Routes, Route, Navigate } from "react-router";
+import { lazy, Suspense } from "react";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { CollegeProvider } from "./context/CollegeContext";
-import Login from "./pages/Login";
-// AdminDashboard removed
-import AdminExamActivity from "./pages/admin/AdminExamActivity";
-import AdminRecruiterAnalytics from "./pages/admin/AdminRecruiterAnalytics";
-import AdminManage from "./pages/admin/AdminManage";
-import CreateRecruiter from "./pages/admin/CreateRecruiter";
-import CreateTpo from "./pages/admin/CreateTpo";
-// TpoDashboard removed
-import TpoStudents from "./pages/tpo/TpoStudents";
-import TpoReports from "./pages/tpo/TpoReports";
-import TpoActivity from "./pages/tpo/TpoActivity";
-// RecruiterDashboard removed
-import RecruiterCandidateAnalytics from "./pages/recruiter/RecruiterCandidateAnalytics";
-import RecruiterExamAnalytics from "./pages/recruiter/RecruiterExamAnalytics";
-import CreateDrive from "./pages/recruiter/CreateDrive";
-import CreateCandidate from "./pages/recruiter/CreateCandidate";
-import CreateExam from "./pages/recruiter/CreateExam";
-import ViewCandidates from "./pages/recruiter/ViewCandidates";
-import ViewResults from "./pages/recruiter/ViewResults";
-import RecruiterProctoring from "./pages/recruiter/RecruiterProctoring";
-import RecruiterActiveMonitoring from "./pages/recruiter/RecruiterActiveMonitoring";
-import VoiceInterviews from "./pages/recruiter/VoiceInterviews";
-import AIInterviewScheduling from "./pages/recruiter/AIInterviewScheduling";
-// CandidateDashboard removed
-import CandidateSandbox from "./pages/candidate/CandidateSandbox";
-import CandidateExamAnalytics from "./pages/candidate/CandidateExamAnalytics";
-import CandidateMyExams from "./pages/candidate/CandidateMyExams";
-import CandidateOnboarding from "./pages/candidate/CandidateOnboarding";
-import CandidateInterview from "./pages/candidate/CandidateInterview";
-import CandidateCertificates from "./pages/candidate/CandidateCertificates";
-import TakeExam from "./pages/candidate/TakeExam";
 import Layout from "./components/layout/Layout";
-import RecruiterAIStudio from "./pages/recruiter/RecruiterAIStudio";
-import RecruiterColleges from "./pages/recruiter/RecruiterColleges";
-import PublicPortfolio from "./pages/PublicPortfolio";
-import HubPage from "./pages/HubPage";
+
+const Login = lazy(() => import("./pages/Login"));
+const AdminExamActivity = lazy(() => import("./pages/admin/AdminExamActivity"));
+const AdminRecruiterAnalytics = lazy(() => import("./pages/admin/AdminRecruiterAnalytics"));
+const AdminManage = lazy(() => import("./pages/admin/AdminManage"));
+const CreateRecruiter = lazy(() => import("./pages/admin/CreateRecruiter"));
+const CreateTpo = lazy(() => import("./pages/admin/CreateTpo"));
+const TpoStudents = lazy(() => import("./pages/tpo/TpoStudents"));
+const TpoReports = lazy(() => import("./pages/tpo/TpoReports"));
+const TpoActivity = lazy(() => import("./pages/tpo/TpoActivity"));
+const RecruiterCandidateAnalytics = lazy(() => import("./pages/recruiter/RecruiterCandidateAnalytics"));
+const RecruiterExamAnalytics = lazy(() => import("./pages/recruiter/RecruiterExamAnalytics"));
+const CreateDrive = lazy(() => import("./pages/recruiter/CreateDrive"));
+const CreateCandidate = lazy(() => import("./pages/recruiter/CreateCandidate"));
+const CreateExam = lazy(() => import("./pages/recruiter/CreateExam"));
+const ViewCandidates = lazy(() => import("./pages/recruiter/ViewCandidates"));
+const ViewResults = lazy(() => import("./pages/recruiter/ViewResults"));
+const RecruiterProctoring = lazy(() => import("./pages/recruiter/RecruiterProctoring"));
+const RecruiterActiveMonitoring = lazy(() => import("./pages/recruiter/RecruiterActiveMonitoring"));
+const VoiceInterviews = lazy(() => import("./pages/recruiter/VoiceInterviews"));
+const AIInterviewScheduling = lazy(() => import("./pages/recruiter/AIInterviewScheduling"));
+const CandidateSandbox = lazy(() => import("./pages/candidate/CandidateSandbox"));
+const CandidateExamAnalytics = lazy(() => import("./pages/candidate/CandidateExamAnalytics"));
+const CandidateMyExams = lazy(() => import("./pages/candidate/CandidateMyExams"));
+const CandidateOnboarding = lazy(() => import("./pages/candidate/CandidateOnboarding"));
+const CandidateInterview = lazy(() => import("./pages/candidate/CandidateInterview"));
+const CandidateCertificates = lazy(() => import("./pages/candidate/CandidateCertificates"));
+const TakeExam = lazy(() => import("./pages/candidate/TakeExam"));
+const RecruiterAIStudio = lazy(() => import("./pages/recruiter/RecruiterAIStudio"));
+const RecruiterColleges = lazy(() => import("./pages/recruiter/RecruiterColleges"));
+const PublicPortfolio = lazy(() => import("./pages/PublicPortfolio"));
+const HubPage = lazy(() => import("./pages/HubPage"));
 
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles: string[] }) {
@@ -167,7 +165,9 @@ function App() {
     <ErrorBoundary>
       <AuthProvider>
         <CollegeProvider>
-          <AppRoutes />
+          <Suspense fallback={<div className="flex items-center justify-center h-screen bg-slate-50 text-slate-500 font-medium">Loading page...</div>}>
+            <AppRoutes />
+          </Suspense>
         </CollegeProvider>
       </AuthProvider>
     </ErrorBoundary>
