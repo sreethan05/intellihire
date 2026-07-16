@@ -15,7 +15,7 @@ COPY server ./server
 RUN npm --prefix client run build
 
 # Production Python backend
-FROM python:3.11-slim AS production
+FROM python:3.11.15-slim AS production
 
 WORKDIR /app
 
@@ -40,4 +40,4 @@ USER appuser
 
 EXPOSE 5000
 
-CMD ["uvicorn", "server_py.app.main:app", "--host", "0.0.0.0", "--port", "5000"]
+CMD ["gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "server_py.app.main:app", "--bind", "0.0.0.0:5000"]
