@@ -1,5 +1,6 @@
 import hmac
 import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -26,13 +27,28 @@ from .assets import router as assets_router
 from .proctoring import router as proctoring_router
 from .websocket import socket_app
 from .utils import storage_root
+from .migration_runner import run_migrations
 
 IS_PRODUCTION = NODE_ENV == "production"
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup migrations runner
+    try:
+        run_migrations()
+    except Exception as e:
+        if IS_PRODUCTION:
+            raise e
+        else:
+            from .logger import logger
+            logger.warning(f"Database migration skipped/failed during startup: {e}")
+    yield
 
 app = FastAPI(
     title="IntelliHire Python Gateway & Backend",
     version="1.0.0",
     description="Full Python Backend for IntelliHire Assessment Platform",
+    lifespan=lifespan,
     # FastAPI serves /docs, /redoc, and /openapi.json publicly by default.
     # In production, disable the built-in ones entirely — access goes through
     # the admin-gated docs_router below instead (see the /docs mount note).
@@ -221,7 +237,6 @@ async def health_check():
         }
     }
 
-
 @app.get("/")
 async def root():
     dist_index = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "server", "dist", "index.html"))
@@ -238,6 +253,10 @@ if os.path.isdir(dist_assets_dir):
 
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):
+    # Exclude API and Socket.IO endpoints from catch-all fallback to avoid masking 404s
+    if full_path.startswith("api") or full_path.startswith("socket.io"):
+        raise HTTPException(status_code=404, detail="API route not found")
+
     index_path = os.path.join(dist_dir, "index.html")
     requested_path = os.path.abspath(os.path.join(dist_dir, full_path))
     if os.path.exists(requested_path) and requested_path.startswith(dist_dir) and os.path.isfile(requested_path):
