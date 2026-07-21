@@ -27,7 +27,7 @@ def is_production() -> bool:
 
 def generate_token(user: Dict[str, Any]) -> str:
     payload = {
-        "id": user["id"],
+        "id": str(user["id"]),
         "email": user["email"],
         "role": user["role"],
         "exp": datetime.datetime.utcnow() + datetime.timedelta(seconds=ACCESS_TOKEN_TTL_SECONDS)

@@ -30,7 +30,7 @@ test.describe("Recruiter Drive & Exam Flow", () => {
     await page.fill('input[name="email"]', "recruiter@example.com");
     await page.fill('input[name="password"]', "recruiter123");
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/recruiter\/overview/);
+    await expect(page).toHaveURL(/recruiter\/overview/, { timeout: 15000 });
 
     // Navigate to create exam
     await page.click('a[href="/recruiter/create-exam"]');

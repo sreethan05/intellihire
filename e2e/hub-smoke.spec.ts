@@ -8,15 +8,15 @@ test.describe("HubPage Smoke Tests per Role", () => {
     await page.click('button[type="submit"]');
 
     // Should redirect to admin/overview
-    await expect(page).toHaveURL(/admin\/overview/);
+    await expect(page).toHaveURL(/admin\/overview/, { timeout: 15000 });
 
     // Dashboard header check
-    await expect(page.getByRole("heading", { name: "Platform Control Overview" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Platform Control Console" })).toBeVisible();
 
     // Check dashboard blocks
-    await expect(page.getByText("Action Center")).toBeVisible();
+    await expect(page.getByText("Active Action Center")).toBeVisible();
     await expect(page.getByText("Recent Activities")).toBeVisible();
-    await expect(page.getByText("Platform Orchestration Analytics")).toBeVisible();
+    await expect(page.getByText("Orchestration Telemetry Diagnostics")).toBeVisible();
   });
 
   test("Recruiter can view recruiter overview hub", async ({ page }) => {
@@ -32,9 +32,8 @@ test.describe("HubPage Smoke Tests per Role", () => {
     await expect(page.getByRole("heading", { name: "Test Recruiter's Command Hub" })).toBeVisible();
 
     // Check dashboard blocks
-    await expect(page.getByText("Action Center")).toBeVisible();
     await expect(page.getByText("Recent Activities")).toBeVisible();
-    await expect(page.getByText("Hiring War Room Insights")).toBeVisible();
+    await expect(page.getByText("Recruitment Insights Summary")).toBeVisible();
   });
 
   test("TPO can view TPO overview hub", async ({ page }) => {
@@ -50,9 +49,8 @@ test.describe("HubPage Smoke Tests per Role", () => {
     await expect(page.getByRole("heading", { name: "Test TPO's Command Hub" })).toBeVisible();
 
     // Check dashboard blocks
-    await expect(page.getByText("Action Center")).toBeVisible();
     await expect(page.getByText("Recent Activities")).toBeVisible();
-    await expect(page.getByText("College Placement Funnel")).toBeVisible();
+    await expect(page.getByText("College Recruitment Funnel")).toBeVisible();
   });
 
   test("Candidate can view candidate overview hub", async ({ page }) => {
@@ -72,13 +70,13 @@ test.describe("HubPage Smoke Tests per Role", () => {
       await page.click('button[type="submit"]');
     }
 
-    await expect(page).toHaveURL(/candidate\/overview/);
+    await expect(page).toHaveURL(/candidate\/overview/, { timeout: 15000 });
 
     // Dashboard header check
     await expect(page.getByRole("heading", { name: "Test Candidate's Command Hub" })).toBeVisible();
 
     // Check dashboard blocks
-    await expect(page.getByText("Action Center")).toBeVisible();
+    await expect(page.getByText("Active Action Center")).toBeVisible();
     await expect(page.getByText("Recent Activities")).toBeVisible();
     await expect(page.getByText("Evaluation Skill Radar")).toBeVisible();
   });

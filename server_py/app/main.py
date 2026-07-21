@@ -14,13 +14,27 @@ from .rate_limit import limiter
 from .compiler import router as compiler_router
 from .ai import router as ai_router
 from .auth_router import router as auth_router, get_current_user, require_roles
-from .recruiter import router as recruiter_router
 from .tpo import router as tpo_router
-from .admin import router as admin_router
 from .docs import router as docs_router
 from .hub import router as hub_router
 from .exam import router as exam_router
-from .candidate import router as candidate_router
+from .interview import router as interview_router
+from .result import router as result_router
+from .assets import router as assets_router
+from .proctoring import router as proctoring_router
+
+# Modularized sub-routers
+from .routers.candidate_profile import router as candidate_profile_router
+from .routers.candidate_exams import router as candidate_exams_router
+from .routers.candidate_analytics import router as candidate_analytics_router
+from .routers.candidate_dashboard import router as candidate_dashboard_router
+
+from .routers.recruiter_candidates import router as recruiter_candidates_router
+from .routers.recruiter_drives import router as recruiter_drives_router
+from .routers.recruiter_dashboard import router as recruiter_dashboard_router
+
+from .routers.admin_users import router as admin_users_router
+from .routers.admin_analytics import router as admin_analytics_router
 from .interview import router as interview_router
 from .result import router as result_router
 from .assets import router as assets_router
@@ -105,9 +119,12 @@ add_exception_handlers(app)
 app.include_router(compiler_router)
 app.include_router(ai_router)
 app.include_router(auth_router)
-app.include_router(recruiter_router)
+app.include_router(recruiter_candidates_router)
+app.include_router(recruiter_drives_router)
+app.include_router(recruiter_dashboard_router)
 app.include_router(tpo_router)
-app.include_router(admin_router)
+app.include_router(admin_users_router)
+app.include_router(admin_analytics_router)
 
 # The auto-generated OpenAPI schema is itself a full map of every endpoint,
 # parameter, and request/response shape in the API. Fully public docs are an
@@ -123,7 +140,10 @@ else:
 
 app.include_router(hub_router)
 app.include_router(exam_router)
-app.include_router(candidate_router)
+app.include_router(candidate_profile_router)
+app.include_router(candidate_exams_router)
+app.include_router(candidate_analytics_router)
+app.include_router(candidate_dashboard_router)
 app.include_router(interview_router)
 app.include_router(result_router)
 app.include_router(assets_router)

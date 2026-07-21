@@ -8,6 +8,7 @@ vi.mock("@/lib/api", () => {
   return {
     authApi: {
       getMe: vi.fn(() => Promise.resolve({ data: { user: null } })),
+      logout: vi.fn(() => Promise.resolve({})),
     },
   };
 });

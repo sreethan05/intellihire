@@ -18,6 +18,8 @@ def get_pool() -> ConnectionPool:
     global _pool
     if _pool is None:
         _pool = ConnectionPool(conninfo=DATABASE_URL, min_size=1, max_size=20, open=False)
+    if _pool.closed:
+        _pool.open()
     return _pool
 
 

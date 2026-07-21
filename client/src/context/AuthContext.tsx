@@ -43,8 +43,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    setUser(null);
-    window.location.href = "/login";
+    authApi.logout().finally(() => {
+      setUser(null);
+      window.location.href = "/login";
+    });
   };
 
   const updateUser = (updatedUser: Partial<User>) => {

@@ -11,7 +11,7 @@ test.describe("Admin Dashboard", () => {
 
   test("can view and navigate admin pages", async ({ page }) => {
     // Overview page
-    await expect(page.getByRole("heading", { name: "Platform Control Overview" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Platform Control Console" })).toBeVisible();
 
     // Navigate to manage
     await page.click('a[href="/admin/manage"]');

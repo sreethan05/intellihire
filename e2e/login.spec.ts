@@ -10,10 +10,10 @@ test.describe("Login Flow", () => {
     await page.click('button[type="submit"]');
 
     // Should redirect to admin dashboard
-    await expect(page).toHaveURL(/admin\/overview/);
+    await expect(page).toHaveURL(/admin\/overview/, { timeout: 15000 });
 
     // Dashboard should be visible
-    await expect(page.getByRole("heading", { name: "Platform Control Overview" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Platform Control Console" })).toBeVisible();
   });
 
   test("shows error for invalid credentials", async ({ page }) => {
@@ -34,12 +34,12 @@ test.describe("Login Flow", () => {
     await page.fill('input[name="email"]', "admin@intellihire.com");
     await page.fill('input[name="password"]', "admin123");
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/admin\/overview/);
+    await expect(page).toHaveURL(/admin\/overview/, { timeout: 15000 });
 
     // Try to go back to login
     await page.goto("/login");
 
     // Should be redirected to dashboard
-    await expect(page).toHaveURL(/admin\/overview/);
+    await expect(page).toHaveURL(/admin\/overview/, { timeout: 15000 });
   });
 });

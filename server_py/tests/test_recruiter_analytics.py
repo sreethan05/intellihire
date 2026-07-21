@@ -1,7 +1,8 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
-from app.recruiter import get_candidate_analytics, get_exam_topic_performance
+from app.routers.recruiter_candidates import get_candidate_analytics
+from app.routers.recruiter_dashboard import get_exam_topic_performance
 
 class AwaitableMock(MagicMock):
     def __init__(self, await_result=None, *args, **kwargs):
@@ -46,7 +47,7 @@ async def test_get_candidate_analytics_not_found():
     mock_query.single.return_value = mock_query
     mock_db.from_.return_value = mock_query
     
-    with patch("app.recruiter.db", mock_db):
+    with patch("app.routers.recruiter_candidates.db", mock_db):
         with pytest.raises(HTTPException) as exc:
             await get_candidate_analytics("cand_123", {"id": "rec_123"})
         assert exc.value.status_code == 404
@@ -54,7 +55,7 @@ async def test_get_candidate_analytics_not_found():
 @pytest.mark.asyncio
 async def test_get_candidate_analytics_success():
     mock_db = make_mock_db()
-    with patch("app.recruiter.db", mock_db):
+    with patch("app.routers.recruiter_candidates.db", mock_db):
         result = await get_candidate_analytics("cand_123", {"id": "rec_123"})
         assert "candidate" in result
         assert "examStats" in result
@@ -63,7 +64,7 @@ async def test_get_candidate_analytics_success():
 @pytest.mark.asyncio
 async def test_get_exam_topic_performance_success():
     mock_db = make_mock_db()
-    with patch("app.recruiter.db", mock_db):
+    with patch("app.routers.recruiter_dashboard.db", mock_db):
         result = await get_exam_topic_performance("exam_123", {"id": "rec_123"})
         assert "topics" in result
         assert len(result["topics"]) == 0

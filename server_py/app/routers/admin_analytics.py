@@ -1,91 +1,13 @@
-import os
 import datetime
-from .config import JUDGE0_API_KEY, GROQ_API_KEY
-import bcrypt
-from fastapi import APIRouter, Request, Response, HTTPException, Depends
-from pydantic import BaseModel, EmailStr
-from typing import Optional, List, Dict, Any
-from .db import db, get_connection, transaction
-from .auth_router import get_current_user, require_roles
-from .utils import hash_password, check_password
+from typing import Dict, Any, Optional
+from fastapi import APIRouter, Depends, HTTPException
 
-router = APIRouter(prefix="/api/admin", tags=["admin"])
+from ..auth_router import get_current_user, require_roles
+from ..db import db, get_connection
+from ..config import JUDGE0_API_KEY, GROQ_API_KEY
+from .recruiter_drives import deserialize_drive_colleges
 
-class CreateRecruiterRequest(BaseModel):
-    name: str
-    email: str
-    password: str
-
-class CreateTpoRequest(BaseModel):
-    name: str
-    email: str
-    password: str
-    college_id: str
-
-@router.post("/create-recruiter")
-async def create_recruiter(req: CreateRecruiterRequest, user: Dict[str, Any] = Depends(require_roles(["admin"]))):
-    pwd_hash = hash_password(req.password)
-    res = await db.from_("users").insert({
-        "name": req.name,
-        "email": req.email.strip().lower(),
-        "password_hash": pwd_hash,
-        "role": "recruiter",
-        "created_by": user["id"]
-    }).select().single()
-    
-    if res.error:
-        raise HTTPException(status_code=400, detail=res.error.message)
-    return {"message": "Recruiter created successfully", "recruiter": res.data}
-
-@router.post("/create-tpo")
-async def create_tpo(req: CreateTpoRequest, user: Dict[str, Any] = Depends(require_roles(["admin"]))):
-    pwd_hash = hash_password(req.password)
-    res = await db.from_("users").insert({
-        "name": req.name,
-        "email": req.email.strip().lower(),
-        "password_hash": pwd_hash,
-        "role": "tpo",
-        "college_id": req.college_id,
-        "created_by": user["id"]
-    }).select().single()
-    
-    if res.error:
-        raise HTTPException(status_code=400, detail=res.error.message)
-    return {"message": "TPO created successfully", "tpo": res.data}
-
-@router.get("/recruiters")
-async def get_recruiters(user: Dict[str, Any] = Depends(require_roles(["admin"]))):
-    res = await db.from_("users").select("id, name, email, created_at").eq("role", "recruiter").eq("created_by", user["id"]).order("created_at", False)
-    if res.error:
-        raise HTTPException(status_code=400, detail=res.error.message)
-    return {"recruiters": res.data or []}
-
-@router.get("/tpos")
-async def get_tpos(user: Dict[str, Any] = Depends(require_roles(["admin"]))):
-    # Fetch TPOs along with college details if needed (we can fetch colleges separately and map, or run raw join)
-    from psycopg.rows import dict_row
-    query = """
-        SELECT u.id, u.name, u.email, u.college_id, u.created_at, c.name as college_name, c.code as college_code
-        FROM users u
-        LEFT JOIN colleges c ON c.id = u.college_id
-        WHERE u.role = 'tpo'
-        ORDER BY u.created_at DESC
-    """
-    with get_connection() as conn:
-        with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute(query)
-            rows = cur.fetchall()
-            res_list = []
-            for r in rows:
-                res_list.append({
-                    "id": r["id"],
-                    "name": r["name"],
-                    "email": r["email"],
-                    "college_id": r["college_id"],
-                    "created_at": r["created_at"].isoformat() if r["created_at"] else None,
-                    "college": {"name": r["college_name"], "code": r["college_code"]} if r["college_id"] else None
-                })
-            return {"tpos": res_list}
+router = APIRouter(prefix="/api/admin", tags=["admin_analytics"])
 
 @router.get("/dashboard")
 async def get_dashboard(user: Dict[str, Any] = Depends(require_roles(["admin"]))):
@@ -323,7 +245,6 @@ async def get_dashboard(user: Dict[str, Any] = Depends(require_roles(["admin"]))
 
 def get_week_key(d: datetime.date) -> str:
     year = d.year
-    # ISO week number
     week = d.isocalendar()[1]
     return f"{year}-W{str(week).zfill(2)}"
 
@@ -414,7 +335,6 @@ async def get_platform_growth(user: Dict[str, Any] = Depends(require_roles(["adm
                 
     monthly = {}
     for i in range(11, -1, -1):
-        # Subtract months
         year = now.year
         month = now.month - i
         while month <= 0:
@@ -521,17 +441,14 @@ async def get_system_health(user: Dict[str, Any] = Depends(require_roles(["admin
     completed_res = await db.from_("attempts").select("id, submitted_at").eq("status", "completed").gte("submitted_at", one_day_ago)
     last_24h_completed = len(completed_res.data) if completed_res.data else 0
     
-    judge0_key = JUDGE0_API_KEY
-    groq_key = GROQ_API_KEY
-    
     apis = {
         "judge0": {
-            "status": "healthy" if judge0_key else "unknown",
-            "responseTimeMs": 800 if judge0_key else 0
+            "status": "healthy" if JUDGE0_API_KEY else "unknown",
+            "responseTimeMs": 800 if JUDGE0_API_KEY else 0
         },
         "groq": {
-            "status": "healthy" if groq_key else "unknown",
-            "responseTimeMs": 1200 if groq_key else 0
+            "status": "healthy" if GROQ_API_KEY else "unknown",
+            "responseTimeMs": 1200 if GROQ_API_KEY else 0
         }
     }
     
@@ -655,4 +572,3 @@ async def get_real_time_activity(user: Dict[str, Any] = Depends(require_roles(["
             "cameraOffline": camera_offline
         }
     }
-

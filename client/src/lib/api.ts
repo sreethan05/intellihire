@@ -32,6 +32,8 @@ export const authApi = {
     api.post("/auth/login", { email, password }),
   getMe: () =>
     api.get("/auth/me"),
+  logout: () =>
+    api.post("/auth/logout"),
 };
 
 export const adminApi = {
