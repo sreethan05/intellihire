@@ -357,6 +357,29 @@ export default function TakeExam() {
   }, [cameraReady, started]);
 
   useEffect(() => {
+    if (!started) return;
+
+    const preventCopyPaste = (e: Event) => {
+      e.preventDefault();
+      toast.error("Copying and pasting are disabled during the exam for anti-cheat compliance.");
+    };
+
+    const preventContextMenu = (e: Event) => {
+      e.preventDefault();
+    };
+
+    window.addEventListener("copy", preventCopyPaste);
+    window.addEventListener("paste", preventCopyPaste);
+    window.addEventListener("contextmenu", preventContextMenu);
+
+    return () => {
+      window.removeEventListener("copy", preventCopyPaste);
+      window.removeEventListener("paste", preventCopyPaste);
+      window.removeEventListener("contextmenu", preventContextMenu);
+    };
+  }, [started]);
+
+  useEffect(() => {
     if (!started || !attemptId) return;
 
     void logProctoringEvent("camera_check", "Camera enabled before exam start", captureSnapshot());

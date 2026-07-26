@@ -770,7 +770,7 @@ export default function CandidateSandbox() {
                   <HelpCircle className="h-3.5 w-3.5 text-violet-500" /> test cases checkpoints
                 </div>
                 
-                <div className="flex-1 overflow-y-auto pt-2 space-y-1.5">
+                <div className="flex-1 overflow-y-auto pt-2 space-y-2">
                   {!testResults ? (
                     <div className="text-[10px] text-slate-400 italic">
                       Run evaluation to trigger case checking.
@@ -779,23 +779,42 @@ export default function CandidateSandbox() {
                     testResults.map((tr) => (
                       <div
                         key={tr.caseNum}
-                        className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[10px] font-bold border transition ${
+                        className={`rounded-lg border p-2.5 text-[10px] transition ${
                           tr.passed
-                            ? "bg-emerald-500/5 border-emerald-100/70 text-emerald-800"
-                            : "bg-rose-500/5 border-rose-100/70 text-rose-800"
+                            ? "bg-emerald-500/5 border-emerald-200/80 text-emerald-950"
+                            : "bg-rose-500/5 border-rose-200/80 text-rose-950"
                         }`}
                       >
-                        <div className="flex items-center gap-1.5">
-                          {tr.passed ? (
-                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                          ) : (
-                            <XCircle className="h-3.5 w-3.5 text-rose-600" />
-                          )}
-                          <span>Case {tr.caseNum}</span>
+                        <div className="flex items-center justify-between font-bold">
+                          <div className="flex items-center gap-1.5">
+                            {tr.passed ? (
+                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                            ) : (
+                              <XCircle className="h-3.5 w-3.5 text-rose-600" />
+                            )}
+                            <span>Case {tr.caseNum}</span>
+                          </div>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-extrabold ${tr.passed ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
+                            {tr.passed ? "PASSED" : "FAILED"}
+                          </span>
                         </div>
-                        <span className="text-[9px] text-slate-400 font-normal">
-                          {tr.passed ? "Success" : "Failed"}
-                        </span>
+
+                        {!tr.passed && (
+                          <div className="mt-2 space-y-1 font-mono text-[9.5px] border-t border-rose-100 pt-1.5">
+                            <div className="flex justify-between">
+                              <span className="text-slate-500 font-semibold">Input:</span>
+                              <span className="text-slate-800 font-bold">{tr.input}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-emerald-700 font-semibold">Expected:</span>
+                              <span className="text-emerald-700 font-bold">{tr.expected}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-rose-700 font-semibold">Received:</span>
+                              <span className="text-rose-700 font-bold">{tr.actual}</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))
                   )}

@@ -49,18 +49,35 @@ export default function CandidateCertificates() {
             </CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3">
-            {certificates.map((certificate) => (
-              <div key={certificate.id} className="flex items-center justify-between rounded-lg border border-slate-200 p-4">
-                <div>
-                  <div className="font-bold text-slate-900">{certificate.exam?.title || "Assessment Certificate"}</div>
-                  <div className="mt-1 text-xs text-slate-500">Issued {new Date(certificate.issued_at).toLocaleDateString()}</div>
+            {certificates.map((certificate) => {
+              const verifyUrl = `${window.location.origin}/certificates/verify/${certificate.id}`;
+              return (
+                <div key={certificate.id} className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 font-bold border border-blue-100">
+                      <Award className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-900">{certificate.exam?.title || "Assessment Certificate"}</div>
+                      <div className="mt-0.5 text-xs text-slate-500 flex items-center gap-2">
+                        <span>Issued {new Date(certificate.issued_at).toLocaleDateString()}</span>
+                        <span>•</span>
+                        <a href={verifyUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-600 hover:underline">
+                          Verify Credentials
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <Button variant="outline" size="sm" onClick={() => printCertificate(certificate)}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Print Certificate
+                    </Button>
+                  </div>
                 </div>
-                <Button variant="outline" onClick={() => printCertificate(certificate)}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Print
-                </Button>
-              </div>
-            ))}
+              );
+            })}
             {certificates.length === 0 && <div className="rounded-lg border border-dashed p-8 text-center text-sm text-slate-500">Pass an assessment to unlock certificates.</div>}
           </CardContent>
         </Card>

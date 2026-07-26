@@ -1,92 +1,53 @@
-name: CI/CD Pipeline
+name: IntelliHire CI Pipeline
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
 
 jobs:
-  backend-tests:
-    name: Backend Tests (Python)
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: "pip"
-
-      - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r server_py/requirements.txt
-
-      - name: Load Database Schema
-        env:
-          PGPASSWORD: postgres
-        run: |
-          for f in database/*.sql; do
-            echo "Applying $f"
-            psql -h localhost -U postgres -d postgres -f "$f"
-          done
-
-      - name: Run Pytest
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
-          JWT_SECRET: testing_only_dummy_secret_at_least_32_chars_long
-          NODE_ENV: test
-        run: |
-          cd server_py
-          pytest -W ignore::DeprecationWarning
-
-  frontend-tests:
-    name: Frontend Tests (React)
+  client-check:
+    name: Client Lint & Type Check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: client/package-lock.json
+          node-version: 20
+          cache: 'npm'
 
-      - name: Install Dependencies
-        run: |
-          cd client
-          npm ci
+      - name: Install Client Dependencies
+        run: npm --prefix client ci
 
-      - name: Run Lint
-        run: |
-          cd client
-          npm run lint
+      - name: Run ESLint
+        run: npm --prefix client run lint
 
-      - name: Run TypeScript Checks
-        run: |
-          cd client
-          npm run check
+      - name: Run TypeScript Check
+        run: npm --prefix client run check
 
-      - name: Run Frontend Tests
+      - name: Run Client Vitest Unit Tests
+        run: npm --prefix client test
+
+  backend-pytest:
+    name: FastAPI Backend Pytest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python Dependencies
         run: |
-          cd client
-          npm run test
+          python -m pip install --upgrade pip
+          pip install pytest pytest-asyncio pytest-cov bcrypt pyjwt fastapi pydantic uvicorn slowapi psycopg pydantic-settings
+
+      - name: Run Pytest Suite
+        run: pytest server_py/tests

@@ -34,6 +34,7 @@ const TakeExam = lazy(() => import("./pages/candidate/TakeExam"));
 const RecruiterAIStudio = lazy(() => import("./pages/recruiter/RecruiterAIStudio"));
 const RecruiterColleges = lazy(() => import("./pages/recruiter/RecruiterColleges"));
 const PublicPortfolio = lazy(() => import("./pages/PublicPortfolio"));
+const PublicCertificateVerify = lazy(() => import("./pages/PublicCertificateVerify"));
 const HubPage = lazy(() => import("./pages/HubPage"));
 
 
@@ -152,6 +153,7 @@ function AppRoutes() {
       </Route>
 
       <Route path="/portfolio/:slug" element={<PublicPortfolio />} />
+      <Route path="/certificates/verify/:id" element={<PublicCertificateVerify />} />
 
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
