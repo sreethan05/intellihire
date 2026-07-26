@@ -25,15 +25,14 @@ The frontend remains React + TypeScript. The backend runtime is now Python/FastA
 
 ```text
 intellihire/
-├── client/          # React/Vite frontend
-├── server_py/       # Python/FastAPI backend
-│   ├── app/         # API routers, DB wrapper, Socket.IO app, helpers
+├── client/          # React/Vite frontend (React 19, TypeScript, Tailwind)
+├── server_py/       # Python/FastAPI backend (Uvicorn, Socket.IO, PostgreSQL)
+│   ├── app/         # FastAPI routers, DB wrapper, Socket.IO handlers
 │   └── requirements.txt
-├── server/          # Legacy TypeScript backend reference and frontend build output
-├── database/        # SQL migrations and seed data
-├── e2e/             # Playwright tests
-├── Dockerfile       # Python production image with frontend build stage
-└── package.json     # Workspace scripts for frontend + Python backend
+├── database/        # PostgreSQL schema migrations and seed scripts
+├── e2e/             # Playwright End-to-End test suite
+├── Dockerfile       # Python production container image
+└── package.json     # Workspace root scripts
 ```
 
 ## Setup

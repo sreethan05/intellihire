@@ -253,15 +253,18 @@ async def health_check():
         }
     }
 
+# Detect frontend static build output directory (root dist or legacy server/dist)
+dist_dir_primary = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "dist"))
+dist_dir_legacy = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "server", "dist"))
+dist_dir = dist_dir_primary if os.path.exists(dist_dir_primary) else dist_dir_legacy
+
 @app.get("/")
 async def root():
-    dist_index = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "server", "dist", "index.html"))
+    dist_index = os.path.join(dist_dir, "index.html")
     if os.path.exists(dist_index):
         return FileResponse(dist_index)
     return {"message": "IntelliHire Python Backend is running successfully."}
 
-
-dist_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "server", "dist"))
 dist_assets_dir = os.path.join(dist_dir, "assets")
 if os.path.isdir(dist_assets_dir):
     app.mount("/assets", StaticFiles(directory=dist_assets_dir), name="frontend-assets")
