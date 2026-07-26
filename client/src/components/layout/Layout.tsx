@@ -42,7 +42,9 @@ export default function Layout() {
   const { user, logout, updateUser } = useAuth();
   const { selectedCollegeId, setSelectedCollegeId, collegesSummary } = useCollege();
   const location = useLocation();
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
@@ -264,14 +266,18 @@ export default function Layout() {
             </div>
             {/* Dark Mode Toggle Button */}
             <button
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900 transition focus:outline-none cursor-pointer"
-              title="Toggle Dark Mode"
+              type="button"
+              onClick={() => {
+                const current = resolvedTheme || theme;
+                setTheme(current === "dark" ? "light" : "dark");
+              }}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 transition focus:outline-none cursor-pointer"
+              title="Toggle Dark / Light Mode"
             >
-              {theme === "dark" ? (
-                <Sun className="h-4.5 w-4.5 text-amber-500 animate-spin-slow" />
+              {mounted && (resolvedTheme === "dark" || theme === "dark") ? (
+                <Sun className="h-4.5 w-4.5 text-amber-500 transition-transform duration-300 hover:rotate-45" />
               ) : (
-                <Moon className="h-4.5 w-4.5 text-slate-500" />
+                <Moon className="h-4.5 w-4.5 text-slate-600 dark:text-slate-400 transition-transform duration-300 hover:-rotate-12" />
               )}
             </button>
 

@@ -21,7 +21,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} forcedTheme="light">
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <App />
           <Toaster richColors position="top-right" closeButton />
         </ThemeProvider>
