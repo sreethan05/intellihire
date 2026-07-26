@@ -35,10 +35,6 @@ from .routers.recruiter_dashboard import router as recruiter_dashboard_router
 
 from .routers.admin_users import router as admin_users_router
 from .routers.admin_analytics import router as admin_analytics_router
-from .interview import router as interview_router
-from .result import router as result_router
-from .assets import router as assets_router
-from .proctoring import router as proctoring_router
 from .websocket import socket_app
 from .utils import storage_root
 from .migration_runner import run_migrations
