@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { 
   BarChart3, TrendingUp, Users, GraduationCap, CheckCircle, 
-  Landmark, UploadCloud, Search, Mail, Target
+  Landmark, UploadCloud, Search, Mail, Target, Download
 } from "lucide-react";
 import { tpoApi, examApi, resultApi, tpoAnalyticsApi } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { exportToCSV } from "@/lib/csvExport";
 import { toast } from "sonner";
 import AttemptDetailModal from "@/components/AttemptDetailModal";
 import {
@@ -139,11 +141,38 @@ export default function TpoReports() {
   return (
     <div className="space-y-6">
       {/* Title Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-950">Campus Reports &amp; Placement Analytics</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Monitor branch placement rates, student practice readiness indices, and bulk upload trend reports.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-950">Campus Reports &amp; Placement Analytics</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Monitor branch placement rates, student practice readiness indices, and bulk upload trend reports.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            const formatted = students.map((s) => ({
+              name: s.user?.name || s.name || "Student",
+              email: s.user?.email || s.email || "N/A",
+              branch: s.branch || "N/A",
+              roll_number: s.roll_number || "N/A",
+              cgpa: s.cgpa || "N/A",
+              verified: s.documents_verified ? "Yes" : "No",
+            }));
+            exportToCSV(
+              formatted,
+              ["name", "email", "branch", "roll_number", "cgpa", "verified"],
+              `campus_placement_report_${new Date().toISOString().slice(0, 10)}`,
+              ["Student Name", "Email", "Branch", "Roll Number", "CGPA", "Verified"]
+            );
+            toast.success("Campus placement report exported to CSV");
+          }}
+          className="h-9 px-3.5 text-xs font-bold border-slate-200 text-slate-700 hover:bg-slate-50"
+        >
+          <Download className="mr-2 h-4 w-4 text-blue-600" />
+          Export Report (CSV)
+        </Button>
       </div>
 
       {/* Tab Navigation Controls */}

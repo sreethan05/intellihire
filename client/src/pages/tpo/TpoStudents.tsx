@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
-import { FileImage, RefreshCw, ScanLine, ShieldCheck, XCircle, Search, Sparkles, Database, FileSpreadsheet, Check } from "lucide-react";
+import { FileImage, RefreshCw, ScanLine, ShieldCheck, XCircle, Search, Sparkles, Database, FileSpreadsheet, Check, Download } from "lucide-react";
 
 import { toast } from "sonner";
 import { tpoApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { exportToCSV } from "@/lib/csvExport";
 
 type Student = {
   id: string;
@@ -322,6 +323,32 @@ export default function TpoStudents() {
                     className="h-8 w-44 rounded-lg border border-slate-200 pl-8 pr-3 text-[11px] font-semibold outline-none focus:border-violet-500 bg-slate-50/50 focus:bg-white"
                   />
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const formatted = students.map((s) => ({
+                      name: s.user?.name || "Student",
+                      email: s.user?.email || "N/A",
+                      roll_number: s.roll_number || "N/A",
+                      branch: s.branch || "N/A",
+                      cgpa: s.cgpa || "N/A",
+                      graduation_year: s.graduation_year || "N/A",
+                      verified: s.documents_verified ? "Yes" : "No",
+                    }));
+                    exportToCSV(
+                      formatted,
+                      ["roll_number", "name", "email", "branch", "cgpa", "graduation_year", "verified"],
+                      `student_directory_${new Date().toISOString().slice(0, 10)}`,
+                      ["Roll Number", "Student Name", "Email", "Branch", "CGPA", "Graduation Year", "Verified"]
+                    );
+                    toast.success("Student directory exported to CSV");
+                  }}
+                  className="h-8 border-slate-200 text-slate-700 font-bold rounded-lg text-xs hover:bg-slate-50"
+                >
+                  <Download className="mr-1.5 h-3.5 w-3.5 text-violet-600" />
+                  Export CSV
+                </Button>
                 <Button variant="outline" size="sm" onClick={loadStudents} className="h-8 border-slate-200 text-slate-700 font-bold rounded-lg text-xs">
                   <RefreshCw className="h-3 w-3" />
                 </Button>
