@@ -1,6 +1,5 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { useNavigate } from "react-router";
 import { useAuth } from "@/context/AuthContext";
 import { authApi } from "@/lib/api";
 import { AlertCircle } from "lucide-react";
@@ -45,7 +44,6 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
-  const navigate = useNavigate();
 
   const currentTab = TABS.find((t) => t.key === activeTab)!;
 
@@ -63,12 +61,6 @@ export default function Login() {
     try {
       const { data } = await authApi.login(email, password);
       login(data.token, data.user);
-      if (data.user.role === "admin") navigate("/admin/dashboard");
-      else if (data.user.role === "tpo") navigate("/tpo/dashboard");
-      else if (data.user.role === "recruiter") navigate("/recruiter/dashboard");
-      else if (data.user.must_change_password || data.user.profile_complete === false)
-        navigate("/candidate/onboarding");
-      else navigate("/candidate/dashboard");
     } catch (err: any) {
       setError(err.response?.data?.error || "Invalid credentials. Please try again.");
     } finally {

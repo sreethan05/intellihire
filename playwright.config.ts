@@ -19,15 +19,23 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
   ],
-  webServer: {
-    command: "npm run dev",
-    url: "http://localhost:3000",
-    reuseExistingServer: true,
-    timeout: 120 * 1000,
-    env: {
-      DISABLE_RATE_LIMITS: "true",
-      NODE_ENV: "test",
-      NODE_OPTIONS: "--max-old-space-size=4096",
+  webServer: [
+    {
+      command: "npm run server:py",
+      url: "http://127.0.0.1:5000/api/health",
+      reuseExistingServer: true,
+      timeout: 120 * 1000,
     },
-  },
+    {
+      command: "npm --prefix client run dev",
+      url: "http://localhost:3000",
+      reuseExistingServer: true,
+      timeout: 120 * 1000,
+      env: {
+        DISABLE_RATE_LIMITS: "true",
+        NODE_ENV: "test",
+        NODE_OPTIONS: "--max-old-space-size=4096",
+      },
+    },
+  ],
 });

@@ -9,18 +9,15 @@ const serverPyDir = path.join(projectRoot, "server_py");
 
 const isWin = process.platform === "win32";
 const venvBinDir = isWin ? "Scripts" : "bin";
-const uvicornName = isWin ? "uvicorn" : "uvicorn"; // shell: true handles extension automatically
+const pythonName = isWin ? "python.exe" : "python";
+const pythonPath = path.join(serverPyDir, ".venv", venvBinDir, pythonName);
 
-const uvicornPath = path.join(serverPyDir, ".venv", venvBinDir, uvicornName);
-
-// Fallback to global uvicorn if local venv one is missing (useful for some dev / container setups)
-let binToRun = uvicornPath;
-if (!fs.existsSync(uvicornPath) && !fs.existsSync(uvicornPath + ".exe")) {
-  console.warn(`Local virtualenv uvicorn not found at: ${uvicornPath}. Falling back to system uvicorn...`);
-  binToRun = "uvicorn";
+let binToRun = pythonPath;
+if (!fs.existsSync(pythonPath)) {
+  binToRun = "python";
 }
 
-const args = process.argv.slice(2);
+const args = ["-m", "uvicorn", ...process.argv.slice(2)];
 
 console.log(`Launching: ${binToRun} ${args.join(" ")}`);
 

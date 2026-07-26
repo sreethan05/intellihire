@@ -115,7 +115,7 @@ async def on_notifications_join(sid, data: Any):
         await sio.emit("error", {"message": "Unauthorized notifications room join"}, to=sid)
         return
     room = f"user:{validated.userId}"
-    sio.enter_room(sid, room)
+    await sio.enter_room(sid, room)
     logger.info(f"[WebSocket] User {user.get('id')} joined notifications room")
 
 @sio.on("proctor:join")
@@ -144,7 +144,7 @@ async def on_proctor_join(sid, data: Any):
         return
         
     room = f"attempt:{attempt_id}"
-    sio.enter_room(sid, room)
+    await sio.enter_room(sid, room)
     logger.info(f"[WebSocket] Client joined proctoring room {room}")
 
 @sio.on("proctor:monitor")
@@ -172,7 +172,7 @@ async def on_proctor_monitor(sid, data: Any):
         return
         
     room = f"monitor:{exam_id}"
-    sio.enter_room(sid, room)
+    await sio.enter_room(sid, room)
     logger.info(f"[WebSocket] Client joined monitor room {room}")
 
 @sio.on("admin:join")
@@ -182,7 +182,7 @@ async def on_admin_join(sid):
     if not user or user.get("role") != "admin":
         await sio.emit("error", {"message": "Unauthorized admin room join"}, to=sid)
         return
-    sio.enter_room(sid, "admin")
+    await sio.enter_room(sid, "admin")
     logger.info(f"[WebSocket] Admin client {sid} joined admin room")
 
 @sio.on("proctor:snapshot")
