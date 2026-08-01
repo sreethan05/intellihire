@@ -67,7 +67,11 @@ app = FastAPI(
     openapi_url=None if IS_PRODUCTION else "/openapi.json",
 )
 
+from prometheus_fastapi_instrumentator import Instrumentator
+Instrumentator().instrument(app).expose(app)
+
 app.state.limiter = limiter
+
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 

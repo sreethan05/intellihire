@@ -114,7 +114,6 @@ export default function TakeExam() {
         loadedMcqQuestions.forEach((question: ExamQuestion) => {
           initialAnswers[question.question_id] = "";
         });
-        setAnswers(initialAnswers);
 
         const initialCode: Record<string, { code: string; language: string }> = {};
         loadedCodingQuestions.forEach((question: ExamCodingQuestion) => {
@@ -123,11 +122,30 @@ export default function TakeExam() {
             language: "python",
           };
         });
+
+        // Optimistic local state restoration
+        const savedDraftStr = localStorage.getItem(`intellihire_exam_draft_${examId}`);
+        if (savedDraftStr) {
+          try {
+            const draft = JSON.parse(savedDraftStr);
+            if (draft.answers) Object.assign(initialAnswers, draft.answers);
+            if (draft.codeSubmissions) Object.assign(initialCode, draft.codeSubmissions);
+          } catch (_) {}
+        }
+
+        setAnswers(initialAnswers);
         setCodeSubmissions(initialCode);
       })
       .catch(() => toast.error("Failed to load exam"))
       .finally(() => setLoading(false));
   }, [examId]);
+
+  // Persist answers optimistically to local backup
+  useEffect(() => {
+    if (started && examId) {
+      localStorage.setItem(`intellihire_exam_draft_${examId}`, JSON.stringify({ answers, codeSubmissions }));
+    }
+  }, [started, examId, answers, codeSubmissions]);
 
   const requestExamFullscreen = useCallback(async () => {
     const target = examContainerRef.current || document.documentElement;

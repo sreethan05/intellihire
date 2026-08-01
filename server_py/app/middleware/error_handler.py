@@ -26,15 +26,24 @@ def add_exception_handlers(app: FastAPI):
             f"AppError status={exc.statusCode} code={exc.code} message={exc.message} request_id={request_id}"
         )
 
+        # RFC 7807 compliant problem details response with backward compatibility
+        problem_details = {
+            "type": f"https://intellihire.com/errors/{exc.code.lower()}",
+            "title": exc.code.replace("_", " ").title(),
+            "status": exc.statusCode,
+            "detail": exc.message,
+            "instance": str(request.url.path),
+            "success": False,
+            "error": exc.message,
+            "code": exc.code,
+            "requestId": request_id,
+            "details": exc.details,
+        }
+
         return JSONResponse(
             status_code=exc.statusCode,
-            content={
-                "success": False,
-                "error": exc.message,
-                "code": exc.code,
-                "requestId": request_id,
-                "details": exc.details,
-            },
+            media_type="application/problem+json",
+            content=problem_details,
         )
 
     @app.exception_handler(RequestValidationError)
@@ -44,15 +53,23 @@ def add_exception_handlers(app: FastAPI):
 
         logger.warning(f"RequestValidationError request_id={request_id} errors={errors}")
 
+        problem_details = {
+            "type": "https://intellihire.com/errors/validation_error",
+            "title": "Validation Error",
+            "status": 400,
+            "detail": "Request payload validation failed",
+            "instance": str(request.url.path),
+            "success": False,
+            "error": "Validation failed",
+            "code": "VALIDATION_ERROR",
+            "requestId": request_id,
+            "details": errors,
+        }
+
         return JSONResponse(
             status_code=400,
-            content={
-                "success": False,
-                "error": "Validation failed",
-                "code": "VALIDATION_ERROR",
-                "requestId": request_id,
-                "details": errors,
-            },
+            media_type="application/problem+json",
+            content=problem_details,
         )
 
     @app.exception_handler(Exception)
@@ -77,7 +94,12 @@ def add_exception_handlers(app: FastAPI):
 
         is_dev = NODE_ENV != "production"
 
-        content = {
+        problem_details = {
+            "type": "https://intellihire.com/errors/internal_error",
+            "title": "Internal Server Error",
+            "status": 500,
+            "detail": "An unexpected server error occurred",
+            "instance": str(request.url.path),
             "success": False,
             "error": "Internal server error",
             "code": "INTERNAL_ERROR",
@@ -85,6 +107,11 @@ def add_exception_handlers(app: FastAPI):
         }
 
         if is_dev:
-            content["details"] = [{"stack": tb_text}]
+            problem_details["details"] = [{"stack": tb_text}]
 
-        return JSONResponse(status_code=500, content=content)
+        return JSONResponse(
+            status_code=500,
+            media_type="application/problem+json",
+            content=problem_details,
+        )
+
