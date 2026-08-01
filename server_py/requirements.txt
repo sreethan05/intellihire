@@ -7,7 +7,7 @@ psycopg-pool==3.3.1
 pyjwt==2.13.0
 bcrypt==5.0.0
 python-multipart==0.0.32
-boto3==1.43.44
+boto3==1.43.58
 requests==2.34.2
 python-socketio[asyncio]==5.16.3
 redis==8.0.1
