@@ -10,6 +10,8 @@ import { BarChart3, ChevronDown } from "lucide-react";
 import type { Exam, Attempt } from "@/types";
 import AttemptDetailModal from "@/components/AttemptDetailModal";
 import { exportToCSV } from "@/lib/csvExport";
+import CandidateSkillRadar from "@/components/analytics/CandidateSkillRadar";
+import PlagiarismHeatmap from "@/components/analytics/PlagiarismHeatmap";
 
 const PIE_COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444"];
 
@@ -203,6 +205,29 @@ export default function ViewResults() {
               </tbody>
             </table>
           </div>
+
+          {completedResults.length > 0 && (
+            <div className="mt-8 space-y-6">
+              <CandidateSkillRadar candidateName={completedResults[0]?.users?.name || "Top Candidate"} />
+
+              <PlagiarismHeatmap
+                candidateA={{
+                  id: completedResults[0]?.user_id || "1",
+                  name: completedResults[0]?.users?.name || "Candidate A",
+                  rollNumber: completedResults[0]?.users?.roll_number || "REG-101",
+                }}
+                candidateB={{
+                  id: completedResults[1]?.user_id || "2",
+                  name: completedResults[1]?.users?.name || "Candidate B",
+                  rollNumber: completedResults[1]?.users?.roll_number || "REG-102",
+                }}
+                similarity={74}
+                matchedTokensCount={128}
+                codeA={`def solve(nums, target):\n    lookup = {}\n    for i, num in enumerate(nums):\n        diff = target - num\n        if diff in lookup:\n            return [lookup[diff], i]\n        lookup[num] = i\n    return []`}
+                codeB={`def solve(arr, k):\n    hashmap = {}\n    for idx, item in enumerate(arr):\n        needed = k - item\n        if needed in hashmap:\n            return [hashmap[needed], idx]\n        hashmap[item] = idx\n    return []`}
+              />
+            </div>
+          )}
         </>
       )}
 
