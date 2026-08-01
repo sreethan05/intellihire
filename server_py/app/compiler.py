@@ -33,6 +33,11 @@ MAX_TEST_CASES = 50
 # could submit).
 CONCURRENCY_LIMIT = 5
 
+# Hardened Sandbox Container Cgroups Resource Bounds
+SANDBOX_MEMORY_LIMIT = os.getenv("SANDBOX_MEMORY_LIMIT", "128m")
+SANDBOX_CPU_LIMIT = float(os.getenv("SANDBOX_CPU_LIMIT", "0.5"))
+SANDBOX_NETWORK_MODE = os.getenv("SANDBOX_NETWORK_MODE", "none")
+
 
 class RunCodeRequest(BaseModel):
     code: str
