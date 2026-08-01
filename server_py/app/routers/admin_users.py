@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ..auth_router import get_current_user, require_roles
+from ..audit import record_audit_event
 from ..db import db, get_connection
 from ..utils import hash_password
 
@@ -32,6 +33,7 @@ async def create_recruiter(req: CreateRecruiterRequest, user: Dict[str, Any] = D
     
     if res.error:
         raise HTTPException(status_code=400, detail=res.error.message)
+    await record_audit_event(actor_id=user["id"], action="ROLE_ASSIGNED", resource="user", resource_id=res.data["id"], payload={"role": "recruiter"})
     return {"message": "Recruiter created successfully", "recruiter": res.data}
 
 @router.post("/create-tpo")
@@ -48,6 +50,7 @@ async def create_tpo(req: CreateTpoRequest, user: Dict[str, Any] = Depends(requi
     
     if res.error:
         raise HTTPException(status_code=400, detail=res.error.message)
+    await record_audit_event(actor_id=user["id"], action="ROLE_ASSIGNED", resource="user", resource_id=res.data["id"], payload={"role": "tpo", "college_id": req.college_id})
     return {"message": "TPO created successfully", "tpo": res.data}
 
 @router.get("/recruiters")

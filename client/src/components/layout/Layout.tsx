@@ -2,7 +2,8 @@ import { useAuth } from "@/context/AuthContext";
 import { useCollege } from "@/context/CollegeContext";
 import { Outlet, Link, useLocation } from "react-router";
 import { useState, useEffect } from "react";
-import api from "@/lib/api";
+import { profileApi } from "@/lib/api";
+import { ProfileStatsResponseSchema } from "@/lib/apiSchemas";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import { io } from "socket.io-client";
@@ -74,13 +75,14 @@ export default function Layout() {
 
   useEffect(() => {
     if (!user) return;
-    api.get("/ai/profile-stats")
+    profileApi.getStats()
       .then((res) => {
-        if (res.data && res.data.stats) {
-          setProfileStats(res.data);
+        const parsed = ProfileStatsResponseSchema.safeParse(res.data);
+        if (parsed.success) {
+          setProfileStats(parsed.data);
         }
       })
-      .catch((err) => console.error("Error fetching profile stats:", err));
+      .catch(() => undefined);
   }, [user]);
 
   // Connect to notifications WebSocket

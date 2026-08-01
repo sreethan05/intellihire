@@ -1,4 +1,5 @@
 import axios from "axios";
+import type { AuthMeResponse, ProfileStatsResponse } from "./apiSchemas";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 
@@ -31,7 +32,7 @@ export const authApi = {
   login: (email: string, password: string) =>
     api.post("/auth/login", { email, password }),
   getMe: () =>
-    api.get("/auth/me"),
+    api.get<AuthMeResponse>("/auth/me"),
   logout: () =>
     api.post("/auth/logout"),
 };
@@ -223,7 +224,6 @@ export const proctoringApi = {
     attempt_id: string;
     exam_id: string;
     event_type: "camera_check" | "snapshot" | "violation" | "submission";
-    violation_count?: number;
     message?: string;
     snapshot_data?: string | null;
   }) => api.post("/proctoring/events", data),
@@ -324,4 +324,8 @@ export const adminAnalyticsApi = {
 
 export const hubApi = {
   getOverview: () => api.get("/hub/overview"),
+};
+
+export const profileApi = {
+  getStats: () => api.get<ProfileStatsResponse>("/ai/profile-stats"),
 };

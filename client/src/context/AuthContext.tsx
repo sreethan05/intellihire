@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import type { User } from "@/types";
 import { authApi } from "@/lib/api";
+import { AuthMeResponseSchema } from "@/lib/apiSchemas";
 
 interface AuthContextType {
   user: User | null;
@@ -21,8 +22,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function fetchMe() {
       try {
         const response = await authApi.getMe();
-        if (active && response.data?.user) {
-          setUser(response.data.user);
+        const parsed = AuthMeResponseSchema.safeParse(response.data);
+        if (active && parsed.success) {
+          setUser(parsed.data.user);
+        } else if (active) {
+          setUser(null);
         }
       } catch {
         setUser(null);

@@ -44,6 +44,20 @@ interface Problem {
   solution: string;
 }
 
+interface SandboxTestResult {
+  caseNum: number;
+  input: string;
+  expected: string;
+  actual: string;
+  passed: boolean;
+}
+
+interface SandboxExecutionResult {
+  success: boolean;
+  results?: SandboxTestResult[];
+  error?: string;
+}
+
 const PROBLEMS: Problem[] = [
   {
     id: "two-sum",
@@ -315,50 +329,67 @@ export default function CandidateSandbox() {
     return "bg-rose-50 text-rose-700 border-rose-200";
   };
 
-  const executeJavaScript = (codeStr: string, problemId: string, testCases: any[]) => {
-    try {
-      let solverName = "";
-      if (problemId === "two-sum") solverName = "twoSum";
-      else if (problemId === "valid-parentheses") solverName = "isValid";
-      else if (problemId === "longest-substring") solverName = "lengthOfLongestSubstring";
+  const executeJavaScript = (code: string, problemId: string, testCases: Problem["testCases"]) => {
+    const solverName = problemId === "two-sum"
+      ? "twoSum"
+      : problemId === "valid-parentheses"
+        ? "isValid"
+        : problemId === "longest-substring"
+          ? "lengthOfLongestSubstring"
+          : "";
 
-      const creator = new Function(`${codeStr}; return typeof ${solverName} !== 'undefined' ? ${solverName} : null;`);
-      const userFunc = creator();
-
-      if (!userFunc || typeof userFunc !== "function") {
-        throw new Error(`Could not find defined function: '${solverName}'. Please make sure you write the core function.`);
-      }
-
-      const results = testCases.map((tc, idx) => {
-        try {
-          const clonedArgs = JSON.parse(JSON.stringify(tc.inputArgs));
-          const result = userFunc(...clonedArgs);
-          const passed = JSON.stringify(result) === JSON.stringify(tc.expected);
-          return {
-            caseNum: idx + 1,
-            input: JSON.stringify(tc.inputArgs),
-            expected: JSON.stringify(tc.expected),
-            actual: JSON.stringify(result),
-            passed,
-          };
-        } catch (e: any) {
-          return {
-            caseNum: idx + 1,
-            input: JSON.stringify(tc.inputArgs),
-            expected: JSON.stringify(tc.expected),
-            actual: `Error: ${e.message}`,
-            passed: false,
-          };
-        }
-      });
-
-      return { success: true, results };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    if (!solverName) {
+      return Promise.resolve<SandboxExecutionResult>({ success: false, error: "Unsupported practice problem" });
     }
+
+    return new Promise<SandboxExecutionResult>((resolve) => {
+      const requestId = crypto.randomUUID();
+      const iframe = document.createElement("iframe");
+      const payload = JSON.stringify({ code, solverName, testCases, requestId }).replace(/</g, "\\u003c");
+      const cleanup = () => {
+        window.removeEventListener("message", onMessage);
+        window.clearTimeout(timeoutId);
+        iframe.remove();
+      };
+      const onMessage = (event: MessageEvent<SandboxExecutionResult & { source?: string; requestId?: string }>) => {
+        if (event.source !== iframe.contentWindow || event.data?.source !== "intellihire-practice-sandbox" || event.data.requestId !== requestId) return;
+        cleanup();
+        resolve({ success: event.data.success, results: event.data.results, error: event.data.error });
+      };
+      const timeoutId = window.setTimeout(() => {
+        cleanup();
+        resolve({ success: false, error: "Code execution timed out" });
+      }, 5_000);
+
+      iframe.sandbox.add("allow-scripts");
+      iframe.style.display = "none";
+      iframe.srcdoc = `<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'">
+<script>
+const payload = ${payload};
+const send = (result) => parent.postMessage({ source: "intellihire-practice-sandbox", requestId: payload.requestId, ...result }, "*");
+try {
+  const creator = new Function(payload.code + "; return typeof " + payload.solverName + " !== 'undefined' ? " + payload.solverName + " : null;");
+  const userFunc = creator();
+  if (typeof userFunc !== "function") throw new Error("Could not find the required function: " + payload.solverName);
+  const results = payload.testCases.map((testCase, index) => {
+    try {
+      const result = userFunc(...structuredClone(testCase.inputArgs));
+      return { caseNum: index + 1, input: JSON.stringify(testCase.inputArgs), expected: JSON.stringify(testCase.expected), actual: JSON.stringify(result), passed: JSON.stringify(result) === JSON.stringify(testCase.expected) };
+    } catch (error) {
+      return { caseNum: index + 1, input: JSON.stringify(testCase.inputArgs), expected: JSON.stringify(testCase.expected), actual: "Error: " + (error instanceof Error ? error.message : String(error)), passed: false };
+    }
+  });
+  send({ success: true, results });
+} catch (error) {
+  send({ success: false, error: error instanceof Error ? error.message : String(error) });
+}
+</script>`;
+      window.addEventListener("message", onMessage);
+      document.body.appendChild(iframe);
+    });
   };
 
-  const handleRunCode = () => {
+  const handleRunCode = async () => {
     setRunning(true);
     setConsoleOutput("");
     setConsoleError("");
@@ -366,16 +397,14 @@ export default function CandidateSandbox() {
     setTestResults(null);
     setSubmissionSuccess(null);
 
-    setTimeout(() => {
-      if (language !== "javascript") {
-        // Mock non-JS compilers
-        setConsoleStatus("Finished");
-        setConsoleOutput("Remote compiler sandbox output:\nAll syntax checks passed. JavaScript compiler is recommended for active evaluation.");
-        setRunning(false);
-        return;
-      }
+    if (language !== "javascript") {
+      setConsoleStatus("Finished");
+      setConsoleOutput("Remote compiler sandbox output:\nAll syntax checks passed. JavaScript compiler is recommended for active evaluation.");
+      setRunning(false);
+      return;
+    }
 
-      const evalResult = executeJavaScript(currentCode, problem.id, problem.testCases);
+    const evalResult = await executeJavaScript(currentCode, problem.id, problem.testCases);
       if (evalResult.success && evalResult.results) {
         setTestResults(evalResult.results);
         const allPassed = evalResult.results.every((r) => r.passed);
@@ -385,11 +414,10 @@ export default function CandidateSandbox() {
         setConsoleStatus("Runtime Error");
         setConsoleError(evalResult.error || "Execution failed");
       }
-      setRunning(false);
-    }, 900);
+    setRunning(false);
   };
 
-  const handleSubmitCode = () => {
+  const handleSubmitCode = async () => {
     setSubmitting(true);
     setConsoleOutput("");
     setConsoleError("");
@@ -397,16 +425,15 @@ export default function CandidateSandbox() {
     setTestResults(null);
     setSubmissionSuccess(null);
 
-    setTimeout(() => {
-      if (language !== "javascript") {
-        setConsoleStatus("Accepted");
-        setSubmissionSuccess(true);
-        setConsoleOutput("Submission Accepted!\nRuntime: 52ms\nMemory: 42MB\nBeats 95.8% of users.");
-        setSubmitting(false);
-        return;
-      }
+    if (language !== "javascript") {
+      setConsoleStatus("Accepted");
+      setSubmissionSuccess(true);
+      setConsoleOutput("Submission Accepted!\nRuntime: 52ms\nMemory: 42MB\nBeats 95.8% of users.");
+      setSubmitting(false);
+      return;
+    }
 
-      const evalResult = executeJavaScript(currentCode, problem.id, problem.testCases);
+    const evalResult = await executeJavaScript(currentCode, problem.id, problem.testCases);
       if (evalResult.success && evalResult.results) {
         setTestResults(evalResult.results);
         const allPassed = evalResult.results.every((r) => r.passed);
@@ -438,8 +465,7 @@ export default function CandidateSandbox() {
         setConsoleError(evalResult.error || "Compilation failed");
         setSubmissionSuccess(false);
       }
-      setSubmitting(false);
-    }, 1400);
+    setSubmitting(false);
   };
 
   return (

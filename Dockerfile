@@ -10,7 +10,6 @@ RUN npm ci
 RUN npm --prefix client ci
 
 COPY client ./client
-COPY server ./server
 
 RUN npm --prefix client run build
 
@@ -32,7 +31,7 @@ RUN pip install --no-cache-dir -r server_py/requirements.txt
 COPY server_py ./server_py
 COPY database ./database
 COPY package.json ./
-COPY --from=frontend-builder /app/server/dist ./server/dist
+COPY --from=frontend-builder /app/dist ./dist
 
 RUN useradd --create-home --uid 1001 appuser \
     && chown -R appuser:appuser /app

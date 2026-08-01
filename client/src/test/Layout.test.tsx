@@ -3,6 +3,12 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import Layout from "../components/layout/Layout";
 
+vi.mock("@/lib/api", () => ({
+  profileApi: {
+    getStats: vi.fn().mockResolvedValue({ data: { title: "Profile", stats: [] } }),
+  },
+}));
+
 // Mock next-themes
 vi.mock("next-themes", () => ({
   useTheme: () => ({

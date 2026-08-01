@@ -9,6 +9,7 @@ import pdfplumber
 
 from ..auth_router import get_current_user
 from ..db import db
+from ..upload_validation import read_validated_pdf
 from ..utils import storage_root, hash_password
 
 router = APIRouter(prefix="/api/candidate", tags=["candidate_profile"])
@@ -213,16 +214,13 @@ async def onboarding(req: OnboardingRequest, user: Dict[str, Any] = Depends(get_
 
 @router.post("/resume/upload")
 async def upload_resume(resume: UploadFile = File(...), user: Dict[str, Any] = Depends(get_current_user)):
-    if not resume.filename.endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF format resumes are supported")
-        
-    # Read PDF content
-    file_bytes = await resume.read()
+    file_bytes = await read_validated_pdf(resume)
     
     # Save physical copy locally
     unique_name = f"{int(datetime.datetime.utcnow().timestamp())}-{uuid.uuid4().hex[:8]}.pdf"
     file_path = os.path.join(storage_root, "resumes", unique_name)
-    
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
     with open(file_path, "wb") as f:
         f.write(file_bytes)
         

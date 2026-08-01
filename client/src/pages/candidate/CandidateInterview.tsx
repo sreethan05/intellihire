@@ -242,7 +242,6 @@ export default function CandidateInterview() {
     eventType: "camera_check" | "snapshot" | "violation" | "submission",
     message?: string,
     snapshotData?: string | null,
-    nextViolationCount = violationCount,
   ) => {
     if (!attemptId || !examId) return;
 
@@ -251,14 +250,13 @@ export default function CandidateInterview() {
         attempt_id: attemptId,
         exam_id: examId,
         event_type: eventType,
-        violation_count: nextViolationCount,
         message: message ? `[AI Interview] ${message}` : undefined,
         snapshot_data: snapshotData ?? null,
       });
     } catch {
       // Proctoring logs are silent background operations
     }
-  }, [attemptId, examId, violationCount]);
+  }, [attemptId, examId]);
 
   const requestInterviewFullscreen = useCallback(async () => {
     const target = interviewContainerRef.current || document.documentElement;
@@ -403,7 +401,7 @@ export default function CandidateInterview() {
 
     setViolationCount((previous) => {
       const next = previous + 1;
-      void logProctoringEvent("violation", message, captureSnapshot(), next);
+      void logProctoringEvent("violation", message, captureSnapshot());
 
       if (next >= 3) {
         toast.error("Maximum security violations reached. Auto-submitting interview.");

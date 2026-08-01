@@ -103,7 +103,9 @@ from .middleware.csrf import CSRFMiddleware
 from .middleware.audit_logger import AuditLoggerMiddleware
 from .middleware.error_handler import add_exception_handlers
 from .middleware.security_headers import SecurityHeadersMiddleware
+from .middleware.request_id import RequestIdMiddleware
 
+app.add_middleware(RequestIdMiddleware)
 app.add_middleware(LoggerMiddleware)
 app.add_middleware(CSRFMiddleware)
 app.add_middleware(AuditLoggerMiddleware)

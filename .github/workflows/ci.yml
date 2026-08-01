@@ -57,3 +57,25 @@ jobs:
 
       - name: Run Pytest Suite
         run: pytest server_py/tests
+
+      - name: Scan Python source with Bandit
+        run: bandit -q -r server_py/app
+
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install locked client dependencies
+        run: npm --prefix client ci
+
+      - name: Audit client dependencies
+        run: npm --prefix client audit --audit-level=high

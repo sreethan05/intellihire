@@ -10,7 +10,7 @@ from .rate_limit import limiter
 
 router = APIRouter(prefix="/api/compiler", tags=["compiler"])
 
-from .config import JUDGE0_API_URL as JUDGE0_API
+from .config import JUDGE0_API_KEY, JUDGE0_API_URL as JUDGE0_API, NODE_ENV
 
 LANGUAGE_MAP = {
     "c": 50,
@@ -110,7 +110,12 @@ async def run_with_judge0(code: str, language: str, stdin: str = ""):
     if not lang_id:
         raise HTTPException(status_code=400, detail=f"Unsupported language: {language}")
 
-    url = f"{JUDGE0_API}/submissions?base64_encoded=true&wait=true"
+    if not JUDGE0_API:
+        raise HTTPException(status_code=503, detail="Code execution is not configured")
+    if NODE_ENV == "production" and "ce.judge0.com" in JUDGE0_API:
+        raise HTTPException(status_code=503, detail="Production code execution requires a private Judge0 instance")
+
+    url = f"{JUDGE0_API.rstrip('/')}/submissions?base64_encoded=true&wait=true"
     payload = {
         "source_code": b64encode(code),
         "language_id": lang_id,
@@ -119,7 +124,10 @@ async def run_with_judge0(code: str, language: str, stdin: str = ""):
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
-            response = await client.post(url, json=payload, headers={"Content-Type": "application/json"})
+            headers = {"Content-Type": "application/json"}
+            if JUDGE0_API_KEY:
+                headers["X-Auth-Token"] = JUDGE0_API_KEY
+            response = await client.post(url, json=payload, headers=headers)
             if response.status_code not in [200, 201]:
                 raise HTTPException(status_code=500, detail="Judge0 request failed")
 

@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     AWS_ACCESS_KEY_ID: str = Field("", validation_alias="AWS_ACCESS_KEY_ID")
     AWS_SECRET_ACCESS_KEY: str = Field("", validation_alias="AWS_SECRET_ACCESS_KEY")
     AWS_REGION: str = Field("us-east-1", validation_alias="AWS_REGION")
-    S3_BUCKET_NAME: str = Field("", validation_alias="S3_BUCKET_NAME")
+    S3_BUCKET_NAME: str = Field("intellihire-uploads", validation_alias="S3_BUCKET_NAME")
     INTERNAL_API_SECRET: str = Field("", validation_alias="INTERNAL_API_SECRET")
     NODE_ENV: str = Field("development", validation_alias="NODE_ENV")
 
@@ -81,4 +81,3 @@ S3_REGION = settings.S3_REGION
 S3_ACCESS_KEY_ID = settings.S3_ACCESS_KEY_ID
 S3_SECRET_ACCESS_KEY = settings.S3_SECRET_ACCESS_KEY
 CORS_ALLOWED_ORIGINS = settings.CORS_ALLOWED_ORIGINS
-

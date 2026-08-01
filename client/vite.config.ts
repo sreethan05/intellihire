@@ -1,6 +1,9 @@
 import path from "path"
+import { fileURLToPath } from "node:url"
 import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -29,11 +32,17 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
+            if (id.includes('react/') || id.includes('react-dom') || id.includes('react-router') || id.includes('scheduler')) {
+              return 'vendor-react';
+            }
             if (id.includes('monaco-editor') || id.includes('@monaco-editor')) {
               return 'vendor-monaco';
             }
             if (id.includes('recharts') || id.includes('d3')) {
               return 'vendor-charts';
+            }
+            if (id.includes('@radix-ui') || id.includes('cmdk') || id.includes('vaul') || id.includes('react-day-picker')) {
+              return 'vendor-ui';
             }
             if (id.includes('lucide-react')) {
               return 'vendor-icons';

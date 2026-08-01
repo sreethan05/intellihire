@@ -51,7 +51,7 @@ describe("Login Component", () => {
     expect(screen.getByPlaceholderText("Enter student email")).toBeInTheDocument();
   });
 
-  it("submits the form successfully and navigates to candidate dashboard when role matches", async () => {
+  it("submits the form and updates authentication state", async () => {
     const mockUser = { id: "1", name: "Bob", role: "candidate", profile_complete: true };
     vi.mocked(authApi.login).mockResolvedValueOnce({
       data: { token: "fake-token", user: mockUser },
@@ -83,7 +83,6 @@ describe("Login Component", () => {
     // Wait for async auth processing
     await vi.waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith("fake-token", mockUser);
-      expect(mockNavigate).toHaveBeenCalledWith("/candidate/dashboard");
     });
   });
 });

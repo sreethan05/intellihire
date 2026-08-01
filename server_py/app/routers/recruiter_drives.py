@@ -10,6 +10,7 @@ from psycopg.rows import dict_row
 
 from ..auth_router import get_current_user, require_roles
 from ..db import db, get_connection
+from ..upload_validation import read_validated_pdf
 from ..utils import record_pipeline_stage, send_drive_registered_email, storage_root
 from ..websocket import send_realtime_notification
 from ..ai import generate_json, has_ai_key
@@ -356,14 +357,13 @@ Return a JSON object in this format:
 
 @router.post("/offers/{candidate_id}/{job_id}")
 async def upload_offer_letter(candidate_id: str, job_id: str, offerLetter: UploadFile = File(...), user: Dict[str, Any] = Depends(require_roles(["recruiter"]))):
-    if not offerLetter.filename.endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files are allowed for offer letters")
-        
+    file_bytes = await read_validated_pdf(offerLetter)
     unique_name = f"{int(datetime.datetime.utcnow().timestamp())}-{uuid.uuid4().hex[:8]}.pdf"
     file_path = os.path.join(storage_root, "offers", unique_name)
-    
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
     with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(offerLetter.file, buffer)
+        buffer.write(file_bytes)
         
     offer_url = f"/uploads/offers/{unique_name}"
     

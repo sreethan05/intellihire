@@ -1,24 +1,24 @@
 import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, Field
 
 from .auth_router import get_current_user, require_roles
+from .audit import record_audit_event
 from .db import db
+from .rate_limit import limiter
 
 router = APIRouter(prefix="/api/proctoring", tags=["proctoring"])
 
 
 class ProctoringEventRequest(BaseModel):
-    attempt_id: str
-    exam_id: str
-    event_type: str
-    violation_count: Optional[int] = 0
-    violation_severity: Optional[str] = None
-    message: Optional[str] = None
-    snapshot_data: Optional[str] = None
-    typing_speed_wpm: Optional[int] = 0
+    attempt_id: str = Field(min_length=1, max_length=128)
+    exam_id: str = Field(min_length=1, max_length=128)
+    event_type: Literal["camera_check", "snapshot", "violation", "submission"]
+    message: Optional[str] = Field(default=None, max_length=2_000)
+    snapshot_data: Optional[str] = Field(default=None, max_length=1_500_000)
+    typing_speed_wpm: Optional[int] = Field(default=0, ge=0, le=500)
 
 
 class OverrideSnapshotRequest(BaseModel):
@@ -72,13 +72,26 @@ async def _assert_attempt_access(attempt_id: str, user: Dict[str, Any]) -> Dict[
 
 
 @router.post("/events")
-async def log_event(req: ProctoringEventRequest, user: Dict[str, Any] = Depends(get_current_user)):
+@limiter.limit("120/minute")
+async def log_event(
+    request: Request,
+    req: ProctoringEventRequest,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    if user.get("role") != "candidate":
+        raise HTTPException(status_code=403, detail="Only candidates can submit proctoring events")
     attempt = await _assert_attempt_access(req.attempt_id, user)
     if attempt.get("exam_id") != req.exam_id:
         raise HTTPException(status_code=400, detail="Attempt does not belong to this exam")
 
-    violation_count = int(req.violation_count or 0)
-    severity = _severity_for_event(req.event_type, violation_count, req.violation_severity)
+    if req.message == "OVERRIDE_UNLOCK":
+        raise HTTPException(status_code=400, detail="Reserved proctoring event message")
+
+    prior_violations = await db.from_("proctoring_snapshots").select("id", count="exact", head=True).eq(
+        "attempt_id", req.attempt_id
+    ).eq("event_type", "violation")
+    violation_count = (prior_violations.count or 0) + 1 if req.event_type == "violation" else 0
+    severity = _severity_for_event(req.event_type, violation_count)
     payload = {
         "attempt_id": req.attempt_id,
         "exam_id": req.exam_id,
@@ -182,7 +195,7 @@ async def get_active_monitoring(
         events_res = await db.from_("proctoring_snapshots").select("*").eq("attempt_id", attempt["id"]).order("captured_at", ascending=False)
         events = events_res.data or []
         latest = _latest_event(events)
-        latest_override = next((event for event in events if event.get("message") == "OVERRIDE_UNLOCK"), None)
+        latest_override = next((event for event in events if event.get("event_type") == "admin_override"), None)
         violations = [event for event in events if event.get("event_type") == "violation"]
         latest_violation = violations[0] if violations else None
         is_unlocked = latest_override and latest_violation and latest_override.get("captured_at") >= latest_violation.get("captured_at")
@@ -208,14 +221,15 @@ async def override_attempt(attemptId: str, user: Dict[str, Any] = Depends(requir
         "attempt_id": attemptId,
         "exam_id": attempt["exam_id"],
         "candidate_id": attempt["candidate_id"],
-        "event_type": "camera_check",
+        "event_type": "admin_override",
         "violation_count": 0,
         "violation_severity": "low",
-        "message": "OVERRIDE_UNLOCK",
+        "message": "Attempt unlocked by an authorized reviewer",
     }
     res = await db.from_("proctoring_snapshots").insert(payload).select().single()
     if res.error:
         raise HTTPException(status_code=400, detail=res.error.message)
+    await record_audit_event(actor_id=user["id"], action="PROCTORING_ATTEMPT_OVERRIDE", resource="attempt", resource_id=attemptId, payload={"candidate_id": attempt["candidate_id"]})
     return {"success": True, "event": res.data}
 
 
@@ -239,4 +253,5 @@ async def override_snapshot(
     }).eq("id", snapshotId).select().single()
     if update_res.error:
         raise HTTPException(status_code=400, detail=update_res.error.message)
+    await record_audit_event(actor_id=user["id"], action="PROCTORING_SNAPSHOT_OVERRIDE", resource="proctoring_snapshot", resource_id=snapshotId, payload={"violation_severity": req.violation_severity})
     return {"snapshot": update_res.data}

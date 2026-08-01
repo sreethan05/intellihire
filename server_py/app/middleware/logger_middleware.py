@@ -29,6 +29,7 @@ class LoggerMiddleware(BaseHTTPMiddleware):
             status_code=response.status_code,
             duration_ms=duration_ms,
             user_id=user_id,
+            request_id=getattr(request.state, "request_id", None),
         )
 
         return response

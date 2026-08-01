@@ -115,11 +115,12 @@ export default function Login() {
           )}
 
           <div>
-            <label className="mb-2 block text-xs font-black uppercase tracking-wider text-slate-400">
+            <label htmlFor="login-email" className="mb-2 block text-xs font-black uppercase tracking-wider text-slate-400">
               Username or Email
             </label>
             <input
               type="text"
+              id="login-email"
               name="email"
               required
               value={email}
@@ -130,9 +131,10 @@ export default function Login() {
           </div>
 
           <div>
-            <label className="mb-2 block text-xs font-black uppercase tracking-wider text-slate-400">Password</label>
+            <label htmlFor="login-password" className="mb-2 block text-xs font-black uppercase tracking-wider text-slate-400">Password</label>
             <input
               type="password"
+              id="login-password"
               name="password"
               required
               value={password}

@@ -46,6 +46,7 @@ services:
       - DATABASE_URL=postgresql://dev:devpass@postgres:5432/intellihire
       - REDIS_URL=redis://redis:6379
       - S3_ENDPOINT=http://minio:9000
+      - S3_BUCKET_NAME=intellihire-uploads
       - S3_ACCESS_KEY_ID=minioadmin
       - S3_SECRET_ACCESS_KEY=minioadminpass
       - NODE_ENV=production

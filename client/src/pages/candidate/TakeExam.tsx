@@ -189,7 +189,6 @@ export default function TakeExam() {
     eventType: "camera_check" | "snapshot" | "violation" | "submission",
     message?: string,
     snapshotData?: string | null,
-    nextViolationCount = violationCount,
   ) => {
     if (!attemptId || !examId) return;
 
@@ -198,14 +197,13 @@ export default function TakeExam() {
         attempt_id: attemptId,
         exam_id: examId,
         event_type: eventType,
-        violation_count: nextViolationCount,
         message,
         snapshot_data: snapshotData ?? null,
       });
     } catch {
       // Proctoring logs should not interrupt the candidate's exam flow.
     }
-  }, [attemptId, examId, violationCount]);
+  }, [attemptId, examId]);
 
   const requestCameraAccess = useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -305,7 +303,7 @@ export default function TakeExam() {
 
     setViolationCount((previous) => {
       const next = previous + 1;
-      void logProctoringEvent("violation", message, captureSnapshot(), next);
+      void logProctoringEvent("violation", message, captureSnapshot());
 
       if (next >= MAX_VIOLATIONS) {
         toast.error("Maximum security violations reached. Auto-submitting exam.");
