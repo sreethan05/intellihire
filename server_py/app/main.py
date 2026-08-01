@@ -2,6 +2,8 @@ import hmac
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response, Header, HTTPException, Depends
+from pydantic import BaseModel
+from typing import Optional, Dict, Any
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
