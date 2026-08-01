@@ -1,22 +1,21 @@
 import pytest
 from app.ml_ranker import CandidateJobFitRanker, ranker
 
-def test_ml_ranker_training():
-    """Verify ML model trains cleanly and reports benchmark metrics."""
+def test_ml_ranker_maximized_training():
+    """Verify ML model trains cleanly with 5-Fold CV, Grid Search, and Ensemble Stacking."""
     test_ranker = CandidateJobFitRanker()
     metrics = test_ranker.train()
 
     assert test_ranker.is_trained is True
-    assert "primary_model" in metrics
-    assert metrics["primary_model"] == "GradientBoostingClassifier"
-    assert "feature_importances" in metrics
+    assert "ensemble_architecture" in metrics
+    assert "test_performance" in metrics
     assert len(metrics["feature_importances"]) == 5
 
-    # Check benchmark evaluation metrics
-    benchmarks = metrics["benchmark_comparison"]
-    assert "gradient_boosting" in benchmarks
-    assert benchmarks["gradient_boosting"]["accuracy"] > 0.80
-    assert benchmarks["gradient_boosting"]["roc_auc"] > 0.85
+    # Verify high model convergence metrics
+    perf = metrics["test_performance"]
+    assert perf["accuracy"] > 0.85
+    assert perf["roc_auc"] > 0.90
+    assert perf["f1_score"] > 0.80
 
 def test_ml_ranker_prediction_high_performer():
     """Verify strong hire prediction for top-tier candidate."""
@@ -53,3 +52,4 @@ def test_ml_ranker_robustness():
 
     assert 0.0 <= result["job_fit_score"] <= 100.0
     assert result["fit_level"] in ["Strong Hire", "Hire", "Consider", "Reject"]
+    assert "model_metadata" in result
