@@ -30,7 +30,6 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import CodingCompiler from "@/components/compiler/CodingCompiler";
 import OfflineBanner from "@/components/OfflineBanner";
-import { createInitialAdaptiveState, updateAdaptiveState, selectNextAdaptiveQuestion } from "@/lib/adaptiveEngine";
 import type { Exam, ExamCodingQuestion, ExamQuestion } from "@/types";
 
 const MAX_VIOLATIONS = 3;

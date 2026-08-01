@@ -66,7 +66,7 @@ export function selectNextAdaptiveQuestion(
 
   // Attempt to match target difficulty, fallback to any available question
   const matchedIndex = remainingQuestions.findIndex(
-    (q) => (q.difficulty || "medium").toLowerCase() === targetDifficulty
+    (q) => (((q as any).difficulty || "medium") as string).toLowerCase() === targetDifficulty
   );
 
   const selectedIndex = matchedIndex !== -1 ? matchedIndex : 0;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { WifiOff, RefreshCw, CheckCircle2 } from "lucide-react";
+import { WifiOff, CheckCircle2 } from "lucide-react";
 
 interface OfflineBannerProps {
   onSyncDrafts?: () => void;
