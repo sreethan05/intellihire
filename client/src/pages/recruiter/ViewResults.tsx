@@ -212,14 +212,14 @@ export default function ViewResults() {
 
               <PlagiarismHeatmap
                 candidateA={{
-                  id: completedResults[0]?.user_id || "1",
+                  id: (completedResults[0] as any)?.user_id || "1",
                   name: completedResults[0]?.users?.name || "Candidate A",
-                  rollNumber: completedResults[0]?.users?.roll_number || "REG-101",
+                  rollNumber: (completedResults[0]?.users as any)?.roll_number || "REG-101",
                 }}
                 candidateB={{
-                  id: completedResults[1]?.user_id || "2",
+                  id: (completedResults[1] as any)?.user_id || "2",
                   name: completedResults[1]?.users?.name || "Candidate B",
-                  rollNumber: completedResults[1]?.users?.roll_number || "REG-102",
+                  rollNumber: (completedResults[1]?.users as any)?.roll_number || "REG-102",
                 }}
                 similarity={74}
                 matchedTokensCount={128}
