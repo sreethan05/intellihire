@@ -38,6 +38,14 @@ from .routers.admin_analytics import router as admin_analytics_router
 from .websocket import socket_app
 from .utils import storage_root
 from .migration_runner import run_migrations
+from .ml_ranker import ranker
+
+class RankCandidateRequest(BaseModel):
+    mcq_score_pct: Optional[float] = 50.0
+    coding_score_pct: Optional[float] = 50.0
+    time_taken_ratio: Optional[float] = 0.8
+    proctor_trust_score: Optional[float] = 100.0
+    code_efficiency_score: Optional[float] = 70.0
 
 IS_PRODUCTION = NODE_ENV == "production"
 
@@ -193,6 +201,13 @@ def _verify_internal_secret(x_internal_secret: str = Header(default="")):
 async def internal_notify(request: Request, req: NotifyRequest, _: bool = Depends(_verify_internal_secret)):
     await send_realtime_notification(req.userId, req.payload)
     return {"status": "success"}
+
+
+@app.post("/api/ml/rank-candidate")
+@limiter.limit("60/minute")
+async def rank_candidate_endpoint(request: Request, body: RankCandidateRequest, _: Dict[str, Any] = Depends(get_current_user)):
+    prediction = ranker.predict(body.model_dump())
+    return prediction
 
 
 async def get_bank_stats():

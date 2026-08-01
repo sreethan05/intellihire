@@ -26,3 +26,5 @@ safety==3.8.1
 gunicorn==23.0.0
 prometheus-fastapi-instrumentator==8.1.0
 hypothesis==6.128.0
+scikit-learn==1.6.1
+numpy==2.2.3
