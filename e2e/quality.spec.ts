@@ -31,7 +31,7 @@ test.describe("Accessibility and performance", () => {
     expect(Date.now() - startedAt).toBeLessThan(MAX_LOGIN_MS);
 
     if (page.url().includes("onboarding")) test.skip(true, "Seed candidate requires onboarding");
-    await expect(page.getByRole("heading")).toBeVisible({ timeout: MAX_DASHBOARD_MS });
+    await expect(page.getByRole("heading").first()).toBeVisible({ timeout: MAX_DASHBOARD_MS });
   });
 
   test("candidate exam entry is keyboard-accessible and responsive", async ({ page }) => {
@@ -40,6 +40,6 @@ test.describe("Accessibility and performance", () => {
 
     await page.getByRole("link", { name: "Manage" }).click();
     await expect(page).toHaveURL(/candidate\/my-exams/, { timeout: MAX_EXAM_PAGE_MS });
-    await expect(page.getByRole("main").or(page.locator("body"))).toBeVisible();
+    await expect(page.locator("main")).toBeVisible();
   });
 });

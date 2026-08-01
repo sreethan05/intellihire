@@ -989,12 +989,12 @@ export default function CreateExam() {
                           <span className="text-sm font-medium text-gray-500">Q{index + 1}</span>
                           <Button variant="ghost" size="sm" onClick={() => removeMcqQuestion(index)}><Trash2 className="w-4 h-4 text-red-500" /></Button>
                         </div>
-                        <div className="space-y-2"><Label>Question</Label><Textarea value={q.question_text} onChange={e => updateMcqQuestion(index, "question_text", e.target.value)} /></div>
+                        <div className="space-y-2"><Label htmlFor={`mcq-${index}-q`}>Question</Label><Textarea id={`mcq-${index}-q`} value={q.question_text} onChange={e => updateMcqQuestion(index, "question_text", e.target.value)} /></div>
                         <div className="grid grid-cols-2 gap-3">
                           {["a","b","c","d"].map(opt => (
                             <div key={opt} className="space-y-1">
-                              <Label className="capitalize">Option {opt}</Label>
-                              <Input value={(q as any)[`option_${opt}`]} onChange={e => updateMcqQuestion(index, `option_${opt}` as any, e.target.value)} />
+                              <Label htmlFor={`mcq-${index}-opt-${opt}`} className="capitalize">Option {opt}</Label>
+                              <Input id={`mcq-${index}-opt-${opt}`} value={(q as any)[`option_${opt}`]} onChange={e => updateMcqQuestion(index, `option_${opt}` as any, e.target.value)} />
                             </div>
                           ))}
                         </div>

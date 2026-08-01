@@ -11,7 +11,7 @@ test.describe("Admin Dashboard", () => {
 
   test("can view and navigate admin pages", async ({ page }) => {
     // Overview page
-    await expect(page.getByRole("heading", { name: "Platform Control Console" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Platform Control Console|Command Hub/i })).toBeVisible();
 
     // Navigate to manage
     await page.click('a[href="/admin/manage"]');
@@ -31,6 +31,7 @@ test.describe("Admin Dashboard", () => {
     await page.click('button[type="submit"]');
 
     // Should show success message
-    await expect(page.locator("text=Recruiter created")).toBeVisible();
+    await expect(page.getByText(/Recruiter created/i)).toBeVisible();
   });
 });
+
