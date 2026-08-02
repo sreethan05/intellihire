@@ -131,7 +131,9 @@ export default function TakeExam() {
             const draft = JSON.parse(savedDraftStr);
             if (draft.answers) Object.assign(initialAnswers, draft.answers);
             if (draft.codeSubmissions) Object.assign(initialCode, draft.codeSubmissions);
-          } catch (_) {}
+          } catch (_) {
+            // Ignore invalid JSON draft parsing
+          }
         }
 
         setAnswers(initialAnswers);
