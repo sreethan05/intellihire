@@ -33,6 +33,13 @@ MAX_TEST_CASES = 50
 # could submit).
 CONCURRENCY_LIMIT = 5
 
+# Global semaphore: caps total in-flight Judge0 requests across ALL users /
+# requests, preventing a coordinated cohort from exhausting the Judge0 pool.
+# Sized to a reasonable default for a shared ce.judge0.com instance; raise
+# for a dedicated private instance.
+import asyncio as _asyncio
+_GLOBAL_JUDGE0_SEMAPHORE = _asyncio.Semaphore(int(os.getenv("JUDGE0_GLOBAL_CONCURRENCY", "10")))
+
 # Hardened Sandbox Container Cgroups Resource Bounds
 SANDBOX_MEMORY_LIMIT = os.getenv("SANDBOX_MEMORY_LIMIT", "128m")
 SANDBOX_CPU_LIMIT = float(os.getenv("SANDBOX_CPU_LIMIT", "0.5"))
@@ -129,24 +136,27 @@ async def run_with_judge0(code: str, language: str, stdin: str = "", timeout: in
         "cpu_extra_time": 1,
     }
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        try:
-            headers = {"Content-Type": "application/json"}
-            if JUDGE0_API_KEY:
-                headers["X-Auth-Token"] = JUDGE0_API_KEY
-            response = await client.post(url, json=payload, headers=headers)
-            if response.status_code not in [200, 201]:
-                raise HTTPException(status_code=500, detail="Judge0 request failed")
+    # Acquire the global semaphore so total concurrent Judge0 calls across all
+    # users stay bounded.
+    async with _GLOBAL_JUDGE0_SEMAPHORE:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                headers = {"Content-Type": "application/json"}
+                if JUDGE0_API_KEY:
+                    headers["X-Auth-Token"] = JUDGE0_API_KEY
+                response = await client.post(url, json=payload, headers=headers)
+                if response.status_code not in [200, 201]:
+                    raise HTTPException(status_code=500, detail="Judge0 request failed")
 
-            data = response.json()
-            return {
-                "stdout": b64decode(data.get("stdout")),
-                "stderr": b64decode(data.get("stderr")),
-                "compile_output": b64decode(data.get("compile_output")),
-                "status": data.get("status", {}).get("description", "Unknown"),
-            }
-        except httpx.RequestError as exc:
-            raise HTTPException(status_code=500, detail=f"Judge0 request failed: {str(exc)}")
+                data = response.json()
+                return {
+                    "stdout": b64decode(data.get("stdout")),
+                    "stderr": b64decode(data.get("stderr")),
+                    "compile_output": b64decode(data.get("compile_output")),
+                    "status": data.get("status", {}).get("description", "Unknown"),
+                }
+            except httpx.RequestError as exc:
+                raise HTTPException(status_code=500, detail=f"Judge0 request failed: {str(exc)}")
 
 
 async def _run_with_concurrency_limit(test_cases: List[TestCase], code: str, language: str, limit: int):

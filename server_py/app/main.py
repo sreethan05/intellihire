@@ -197,6 +197,7 @@ async def internal_notify(request: Request, req: NotifyRequest, _: bool = Depend
 @limiter.limit("60/minute")
 async def rank_candidate_endpoint(request: Request, body: RankCandidateRequest, _: Dict[str, Any] = Depends(get_current_user)):
     prediction = ranker.predict(body.model_dump())
+    prediction["experimental"] = True
     return prediction
 
 
@@ -246,10 +247,25 @@ async def health_check():
         pass
 
     all_healthy = postgres_healthy
+    degraded_services = []
+    if not groq_configured:
+        degraded_services.append("groq")
+    if not smtp_configured:
+        degraded_services.append("email")
+    if pipeline_status.get("healthy") is False:
+        degraded_services.append("pipeline")
+
+    if not all_healthy:
+        status = "unhealthy"
+    elif degraded_services:
+        status = "degraded"
+    else:
+        status = "healthy"
 
     return {
-        "status": "healthy" if all_healthy else "degraded",
-        "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+        "status": status,
+        "degraded_services": degraded_services,
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat() + "Z",
         "environment": NODE_ENV,
         "services": {
             "postgres": postgres_healthy,

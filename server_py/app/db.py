@@ -1,3 +1,46 @@
+"""
+Database access layer — a lightweight Supabase-style query builder over psycopg.
+
+⚠️ ARCHITECTURE NOTE — READ BEFORE EXTENDING
+=============================================
+This module (db.py) is a HAND-ROLLED query builder that reimplements a
+Supabase-style fluent API (from_().select().eq().insert().etc.) over raw
+psycopg. It is the single largest maintenance surface in the codebase
+(~691 lines) and the most bug-prone.
+
+STATUS: FROZEN
+--------------
+The public API of this module is frozen. Do NOT add new query-builder
+features here. New routes should use the repository layer
+(repositories/) with explicit SQL or SQLAlchemy 2.0 async.
+
+The long-term goal is to shrink this file to a thin connection-pool wrapper
+and migrate all query logic into repositories/.
+
+GRAMMAR (informal)
+-------------------
+select ::= from_(table) "." select(cols) [filters]* [orders]* [limit(n)] [single()|maybeSingle()]
+cols ::= "*" | col_list | col_list_with_embeds
+embed ::= "alias:fk_column(col, col, ...)"
+filter ::= eq(col, val) | neq | gt | gte | lt | lte | in_ | like | ilike | is_
+order ::= order(col, ascending=bool)
+insert ::= from_(table) "." insert(dict) [select()] [single()]
+update ::= from_(table) "." update(dict) [filters]* [select()] [single()]
+delete ::= from_(table) "." delete() [filters]*
+(soft-delete tables: "users", "exams", "questions" → sets deleted_at instead of DELETE)
+
+IDENTIFIER SAFETY
+-----------------
+All table/column names are validated via assert_identifier() (regex
+^[a-zA-Z_][a-zA-Z0-9_]*$) before being quoted. Values are always passed as
+parameterized arguments, never string-interpolated into SQL.
+
+KNOWN LIMITATIONS
+-----------------
+1. No JOIN support beyond the relation-graph embeds defined in RELATIONS.
+2. No support for aggregate functions (COUNT, SUM, etc.) in select() — use the count="exact" + head=True pattern instead.
+3. Transaction support is via transaction() which yields a raw psycopg cursor — mixing fluent queries inside a transaction requires manual SQL.
+"""
 import asyncio
 import os
 import re

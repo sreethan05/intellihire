@@ -10,13 +10,22 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional, Dict, Any
 from .db import db, transaction
 
-router = APIRouter(prefix="/api/auth", tags=["auth"])
-
 from psycopg.rows import dict_row
 from .config import JWT_SECRET, NODE_ENV
+from .rate_limit import limiter
+from .errors import error_response
+
+router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 ACCESS_TOKEN_TTL_SECONDS = 15 * 60
 REFRESH_TOKEN_TTL_DAYS = 30
+
+_TZ_UTC = datetime.timezone.utc
+
+
+def _now_utc() -> datetime.datetime:
+    """Return a timezone-aware UTC datetime (replaces deprecated utcnow)."""
+    return datetime.datetime.now(_TZ_UTC)
 
 class LoginRequest(BaseModel):
     email: Optional[str] = None
@@ -30,7 +39,7 @@ def generate_token(user: Dict[str, Any]) -> str:
         "id": str(user["id"]),
         "email": user["email"],
         "role": user["role"],
-        "exp": datetime.datetime.utcnow() + datetime.timedelta(seconds=ACCESS_TOKEN_TTL_SECONDS)
+        "exp": _now_utc() + datetime.timedelta(seconds=ACCESS_TOKEN_TTL_SECONDS)
     }
     return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
 
@@ -99,6 +108,19 @@ async def get_current_user(request: Request) -> Dict[str, Any]:
         raise HTTPException(status_code=401, detail="Unauthorized")
     try:
         decoded = verify_token(token)
+        # Re-fetch the user from DB so that role changes or account suspension
+        # take effect within the access-token window rather than only on expiry.
+        res = await db.from_("users").select(
+            "id, email, role, status"
+        ).eq("id", decoded["id"]).maybeSingle()
+        user_row = res.data if res else None
+        if not user_row:
+            raise HTTPException(status_code=401, detail="User no longer exists")
+        if user_row.get("status") == "suspended":
+            raise HTTPException(status_code=403, detail="Account suspended")
+        # Merge DB-truth role/email back so downstream code sees current values.
+        decoded["role"] = user_row["role"]
+        decoded["email"] = user_row["email"]
         return decoded
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
@@ -111,9 +133,10 @@ def require_roles(roles: list):
     return dependency
 
 @router.post("/login")
+@limiter.limit("5/minute")
 async def login(req: LoginRequest, response: Response, request: Request):
     if not req.email or not req.password:
-        return JSONResponse(status_code=400, content={"error": "Email and password are required"})
+        return error_response("Email and password are required", status_code=400, code="MISSING_CREDENTIALS")
 
     identifier = req.email.strip()
     is_roll = bool(len(identifier) >= 5 and len(identifier) <= 20 and identifier.isalnum())
@@ -131,7 +154,7 @@ async def login(req: LoginRequest, response: Response, request: Request):
         users = res.data
         
     if res.error or not users or len(users) == 0:
-        return JSONResponse(status_code=401, content={"error": "Invalid credentials"})
+        return error_response("Invalid credentials", status_code=401, code="INVALID_CREDENTIALS")
         
     user = users[0]
     
@@ -145,7 +168,7 @@ async def login(req: LoginRequest, response: Response, request: Request):
         valid = False
         
     if not valid:
-        return JSONResponse(status_code=401, content={"error": "Invalid credentials"})
+        return error_response("Invalid credentials", status_code=401, code="INVALID_CREDENTIALS")
 
     token = generate_token(user)
     
@@ -178,6 +201,7 @@ async def login(req: LoginRequest, response: Response, request: Request):
     }
 
 @router.post("/refresh")
+@limiter.limit("10/minute")
 async def refresh(request: Request, response: Response):
     current_ref_token = request.cookies.get("refresh_token")
     if not current_ref_token:
@@ -210,13 +234,10 @@ async def refresh(request: Request, response: Response):
             # Parse expires_at (it could be offset naive or aware depending on database)
             expires_at = row["expires_at"]
             if isinstance(expires_at, str):
-                # Try parsing isoformat
                 expires_at = datetime.datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
-            # Make sure it's offset naive or compare properly
-            if expires_at.tzinfo:
-                now = datetime.datetime.now(datetime.timezone.utc)
-            else:
-                now = datetime.datetime.utcnow()
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=_TZ_UTC)
+            now = _now_utc()
                 
             if expires_at <= now:
                 cur.execute("UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = %s", [row["refresh_token_id"]])
@@ -224,7 +245,7 @@ async def refresh(request: Request, response: Response):
                 
             next_ref_token = generate_refresh_token()
             next_hash = hash_refresh_token(next_ref_token)
-            next_expires = (datetime.datetime.utcnow() + datetime.timedelta(days=30)).isoformat()
+            next_expires = (_now_utc() + datetime.timedelta(days=30)).isoformat()
             
             cur.execute(
                 "UPDATE refresh_tokens SET revoked_at = NOW(), last_used_at = NOW(), replaced_by_token_hash = %s WHERE id = %s",
@@ -255,12 +276,15 @@ async def refresh(request: Request, response: Response):
 
     try:
         rotated = await transaction(run_rotation)
-    except Exception:
-        rotated = None
+    except Exception as exc:
+        from .logger import logger
+        logger.error(f"Refresh-token rotation failed: {exc}")
+        # Do NOT clear cookies on infra failures — the session may still be valid.
+        raise HTTPException(status_code=503, detail="Session refresh temporarily unavailable")
         
     if not rotated:
         clear_session_cookies(response)
-        raise HTTPException(status_code=401, detail="Session could not be refreshed")
+        raise HTTPException(status_code=401, detail="Session could not be refreshed — token reused or revoked")
         
     access_tok = generate_token(rotated["user"])
     csrf_token = set_session_cookies(response, access_tok, rotated["refreshToken"])
@@ -285,7 +309,7 @@ async def logout(request: Request, response: Response):
     current_ref_token = request.cookies.get("refresh_token")
     if current_ref_token:
         h = hash_refresh_token(current_ref_token)
-        await db.from_("refresh_tokens").update({"revoked_at": datetime.datetime.utcnow().isoformat()}).eq("token_hash", h).eq("revoked_at", None)
+        await db.from_("refresh_tokens").update({"revoked_at": _now_utc().isoformat()}).eq("token_hash", h).eq("revoked_at", None)
         
     clear_session_cookies(response)
     return {"success": True}

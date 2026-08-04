@@ -1,4 +1,5 @@
 import datetime
+import re
 from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -23,6 +24,23 @@ class ProctoringEventRequest(BaseModel):
 
 class OverrideSnapshotRequest(BaseModel):
     violation_severity: str
+
+
+# Sliding window for violation counting: only violations within this window
+# contribute to severity escalation. Prevents a candidate who tab-switched
+# twice in minute 1 and once in minute 59 from hitting "critical".
+VIOLATION_WINDOW_MINUTES = 15
+
+# Tags/attributes that are stripped from client-supplied proctoring messages
+# before storage to reduce stored-XSS risk when rendered back to recruiters.
+_MSG_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _sanitize_message(msg: Optional[str]) -> Optional[str]:
+    """Strip HTML tags from client-supplied proctoring messages."""
+    if not msg:
+        return msg
+    return _MSG_TAG_RE.sub("", msg)[:2000]
 
 
 def _severity_for_event(event_type: str, violation_count: int, explicit: Optional[str] = None) -> str:
@@ -87,9 +105,18 @@ async def log_event(
     if req.message == "OVERRIDE_UNLOCK":
         raise HTTPException(status_code=400, detail="Reserved proctoring event message")
 
-    prior_violations = await db.from_("proctoring_snapshots").select("id", count="exact", head=True).eq(
+    # Sliding-window violation count: only count violations within the last
+    # VIOLATION_WINDOW_MINUTES, so old violations don't escalate severity forever.
+    window_start = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
+        minutes=VIOLATION_WINDOW_MINUTES
+    )
+    prior_violations = await db.from_("proctoring_snapshots").select(
+        "id", count="exact", head=True
+    ).eq(
         "attempt_id", req.attempt_id
-    ).eq("event_type", "violation")
+    ).eq(
+        "event_type", "violation"
+    ).gte("captured_at", window_start.isoformat())
     violation_count = (prior_violations.count or 0) + 1 if req.event_type == "violation" else 0
     severity = _severity_for_event(req.event_type, violation_count)
     payload = {
@@ -99,7 +126,7 @@ async def log_event(
         "event_type": req.event_type,
         "violation_count": violation_count,
         "violation_severity": severity,
-        "message": req.message,
+        "message": _sanitize_message(req.message),
         "snapshot_data": req.snapshot_data,
         "typing_speed_wpm": int(req.typing_speed_wpm or 0),
     }
@@ -202,9 +229,19 @@ async def get_active_monitoring(
         attempt_rows = [attempt for attempt in attempt_rows if attempt.get("candidate_id") in allowed]
 
     active = []
+    # Batch-fetch all proctoring snapshots for all active attempts in one query
+    # (avoids N+1 — previously one DB round-trip per attempt).
+    attempt_ids = [attempt["id"] for attempt in attempt_rows]
+    all_events: dict = {}
+    if attempt_ids:
+        events_res = await db.from_("proctoring_snapshots").select("*").in_("attempt_id", attempt_ids).order("captured_at", ascending=False)
+        for event in (events_res.data or []):
+            aid = event.get("attempt_id")
+            if aid not in all_events:
+                all_events[aid] = []
+            all_events[aid].append(event)
     for attempt in attempt_rows:
-        events_res = await db.from_("proctoring_snapshots").select("*").eq("attempt_id", attempt["id"]).order("captured_at", ascending=False)
-        events = events_res.data or []
+        events = all_events.get(attempt["id"], [])
         latest = _latest_event(events)
         latest_override = next((event for event in events if event.get("event_type") == "admin_override"), None)
         violations = [event for event in events if event.get("event_type") == "violation"]
@@ -226,7 +263,7 @@ async def get_active_monitoring(
 
 
 @router.post("/attempt/{attemptId}/override")
-async def override_attempt(attemptId: str, user: Dict[str, Any] = Depends(require_roles(["recruiter", "admin"]))):
+async def override_attempt(attemptId: str, request: Request, user: Dict[str, Any] = Depends(require_roles(["recruiter", "admin"]))):
     attempt = await _assert_attempt_access(attemptId, user)
     payload = {
         "attempt_id": attemptId,
@@ -240,7 +277,14 @@ async def override_attempt(attemptId: str, user: Dict[str, Any] = Depends(requir
     res = await db.from_("proctoring_snapshots").insert(payload).select().single()
     if res.error:
         raise HTTPException(status_code=400, detail=res.error.message)
-    await record_audit_event(actor_id=user["id"], action="PROCTORING_ATTEMPT_OVERRIDE", resource="attempt", resource_id=attemptId, payload={"candidate_id": attempt["candidate_id"]})
+    await record_audit_event(
+        actor_id=user["id"],
+        action="PROCTORING_ATTEMPT_OVERRIDE",
+        resource="attempt",
+        resource_id=attemptId,
+        payload={"candidate_id": attempt["candidate_id"]},
+        request_id=getattr(request.state, "request_id", None),
+    )
     return {"success": True, "event": res.data}
 
 
@@ -248,6 +292,7 @@ async def override_attempt(attemptId: str, user: Dict[str, Any] = Depends(requir
 async def override_snapshot(
     snapshotId: str,
     req: OverrideSnapshotRequest,
+    request: Request,
     user: Dict[str, Any] = Depends(require_roles(["recruiter", "admin"])),
 ):
     if req.violation_severity not in {"low", "medium", "high", "critical"}:
@@ -264,5 +309,12 @@ async def override_snapshot(
     }).eq("id", snapshotId).select().single()
     if update_res.error:
         raise HTTPException(status_code=400, detail=update_res.error.message)
-    await record_audit_event(actor_id=user["id"], action="PROCTORING_SNAPSHOT_OVERRIDE", resource="proctoring_snapshot", resource_id=snapshotId, payload={"violation_severity": req.violation_severity})
+    await record_audit_event(
+        actor_id=user["id"],
+        action="PROCTORING_SNAPSHOT_OVERRIDE",
+        resource="proctoring_snapshot",
+        resource_id=snapshotId,
+        payload={"violation_severity": req.violation_severity},
+        request_id=getattr(request.state, "request_id", None),
+    )
     return {"snapshot": update_res.data}

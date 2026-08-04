@@ -6,6 +6,25 @@
  * or gaze tracking system — it detects whether a face-like region is present
  * in the frame and whether lighting conditions are adequate.
  *
+ * ⚠️ FAIRNESS & ACCURACY LIMITATION
+ * =================================
+ * This worker performs lightweight face-presence detection using skin-tone
+ * region analysis. It is NOT a full face recognition or gaze tracking
+ * system and has known limitations:
+ *
+ * - BIAS: The YCbCr skin-tone ranges below are calibrated primarily for
+ *   lighter skin tones and may under-detect darker skin tones, leading
+ *   to false "face not present" flags for some candidates. The ranges
+ *   have been widened to mitigate this, but the heuristic is inherently
+ *   imperfect. For production-grade proctoring, integrate face-api.js
+ *   or a server-side ML model with diverse training data.
+ * - DEFEATABILITY: A printed photograph held up to the camera will pass
+ *   this check. Do not rely on this as the sole anti-cheat signal.
+ * - LIGHTING: Low-light or overexposed conditions reduce accuracy.
+ *
+ * Recruiters reviewing proctoring data should be made aware of these
+ * limitations before interpreting "face not present" flags.
+ *
  * For production-grade proctoring, consider integrating face-api.js or
  * a server-side ML model for true gaze tracking.
  */
@@ -21,14 +40,16 @@ export interface FrameAnalysisResult {
 }
 
 // Skin tone detection ranges (YCbCr color space)
+// Widened Y floor (80→40) and Cb range to reduce bias against darker skin
+// tones. This is still a crude heuristic — see the fairness note above.
 function isSkinTone(r: number, g: number, b: number): boolean {
   // Convert RGB to YCbCr
   const y = 0.299 * r + 0.587 * g + 0.114 * b;
   const cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
   const cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
 
-  // Standard skin tone ranges in YCbCr
-  return y > 80 && cb >= 85 && cb <= 135 && cr >= 135 && cr <= 180;
+  // Widened skin tone ranges in YCbCr for diverse skin tones
+  return y > 40 && cb >= 77 && cb <= 140 && cr >= 130 && cr <= 185;
 }
 
 self.onmessage = (event: MessageEvent<{ imageData: ImageData; timestamp: number }>) => {

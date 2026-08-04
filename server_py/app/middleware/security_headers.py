@@ -9,11 +9,13 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
-        # Tightened CSP: removed unsafe-eval, restricted connect-src
+        # Tightened CSP: no unsafe-inline or unsafe-eval for scripts.
+        # Vite injects scripts via <script type="module" src=...>, which does
+        # not require unsafe-inline. Inline scripts (if any) should use nonces.
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
             "connect-src 'self' wss: https:; "
-            "script-src 'self' 'unsafe-inline'; "
+            "script-src 'self'; "
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data: blob:; "
             "font-src 'self' data:; "

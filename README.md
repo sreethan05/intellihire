@@ -11,6 +11,22 @@
 
 ---
 
+## ⚠️ Status & Known Limitations
+
+IntelliHire is an ambitious project that implements a full talent-assessment
+platform. The following features are experimental or have known limitations
+that should be understood before production use:
+
+| Area | Status | Notes |
+|------|--------|-------|
+| ML Candidate Ranker | Experimental | Trained on synthetic data with a hand-crafted decision boundary — not real hiring outcomes. Predictions reflect assumed feature weights. Use for R&D only. |
+| Proctoring Face Detection | Heuristic | Client-side skin-tone analysis (YCbCr). Not true face recognition or gaze tracking. A printed photo defeats it. Skin-tone ranges are widened but still biased toward lighter skin — interpret "face not present" flags with caution. |
+| AI Voice Interviews | Experimental | Depends on Groq LLM availability. Quality of AI-generated interview questions and evaluations varies. |
+| Custom Query Builder (db.py) | Frozen | A hand-rolled Supabase-style query builder. Functional but the largest maintenance surface. New code should use the repository layer. Long-term plan: migrate to SQLAlchemy 2.0 async. |
+| Code Execution | External dependency | Uses Judge0 (shared public instance in dev, private instance required in prod). No in-house sandbox. |
+
+---
+
 ## 📋 Table of Contents
 
 1. [Executive Overview & Platform Architecture](#-executive-overview--platform-architecture)
