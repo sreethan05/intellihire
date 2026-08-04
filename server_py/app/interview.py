@@ -1,5 +1,6 @@
 import datetime
 import re
+from urllib.parse import quote, urlencode
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -340,14 +341,51 @@ async def get_summaries(
     res = await query
     return {"interviews": res.data or []}
 
-@router.get("/{interviewId}")
-async def get_details(interviewId: str, user: Dict[str, Any] = Depends(get_current_user)):
-    res = await db.from_("ai_interviews").select("*, jobs(*)").eq("id", interviewId).single()
+    return {"interview": res.data}
+
+
+def generate_google_calendar_link(title: str, start_time: str, end_time: str, description: str = "") -> str:
+    """Generate a Google Calendar 'Add to Calendar' link."""
+    try:
+        from datetime import datetime
+        dt_start = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
+        dt_end = datetime.fromisoformat(end_time.replace("Z", "+00:00"))
+        dates = f"{dt_start.strftime('%Y%m%dT%H%M%SZ')}/{dt_end.strftime('%Y%m%dT%H%M%SZ')}"
+        params = {
+            "action": "TEMPLATE",
+            "text": title,
+            "dates": dates,
+            "details": description,
+            "ctz": "Asia/Kolkata",
+        }
+        return f"https://calendar.google.com/calendar/render?{urlencode(params)}"
+    except Exception:
+        return ""
+
+
+@router.get("/{interviewId}/calendar-link")
+async def get_calendar_link(interviewId: str, user: Dict[str, Any] = Depends(get_current_user)):
+    """Generate a Google Calendar link for a scheduled interview."""
+    res = await db.from_("ai_interviews").select("*, jobs(title, company_name)").eq("id", interviewId).single()
     if res.error or not res.data:
         raise HTTPException(status_code=404, detail="Interview not found")
-    if user["role"] == "candidate" and res.data["candidate_id"] != user["id"]:
-        raise HTTPException(status_code=403, detail="Forbidden")
-    return {"interview": res.data}
+
+    interview = res.data
+    job = interview.get("jobs") or {}
+    title = f"AI Interview: {job.get('title') or 'Placement Interview'} ({job.get('company_name') or 'IntelliHire'})"
+    start_time = interview.get("scheduled_start") or interview.get("started_at")
+    end_time = interview.get("scheduled_end")
+    if not start_time:
+        raise HTTPException(status_code=400, detail="Interview is not scheduled yet")
+    if not end_time:
+        try:
+            dt = datetime.datetime.fromisoformat(start_time.replace("Z", "+00:00"))
+            end_time = (dt + datetime.timedelta(minutes=30)).isoformat()
+        except Exception:
+            end_time = start_time
+
+    link = generate_google_calendar_link(title, start_time, end_time, f"Join your AI Interview at {job.get('company_name') or 'IntelliHire'}")
+    return {"url": link}
 
 async def build_stage_questions(candidate_id: str, attempt: dict, job: dict = None) -> List[str]:
     intro = default_intro_questions

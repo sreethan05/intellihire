@@ -483,3 +483,49 @@ async def get_predictive_shortlist(user: Dict[str, Any] = Depends(require_roles(
         })
         
     return {"candidates": ranked, "total": total}
+
+
+@router.get("/drives/{driveId}/eligible-count")
+async def get_eligible_count(
+    driveId: str,
+    user: Dict[str, Any] = Depends(require_roles(["recruiter", "admin"]))
+):
+    """Get a live count of eligible candidates for a drive, before it goes live."""
+    drive_res = await db.from_("jobs").select("*").eq("id", driveId).single()
+    if drive_res.error or not drive_res.data:
+        raise HTTPException(status_code=404, detail="Drive not found")
+
+    if user["role"] == "recruiter" and drive_res.data.get("created_by") != user["id"]:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    drive = drive_res.data
+    drive["allowed_branches"] = drive.get("allowed_branches") or []
+    drive["company_description"] = drive.get("company_description") or ""
+
+    eligible = await find_eligible_candidates(drive)
+
+    branch_counts = {}
+    branch_cgpa = {}
+    for c in eligible:
+        branch = c.get("branch") or "Unknown"
+        branch_counts[branch] = branch_counts.get(branch, 0) + 1
+        if branch not in branch_cgpa:
+            branch_cgpa[branch] = []
+        branch_cgpa[branch].append(float(c.get("cgpa") or 0))
+
+    branch_breakdown = []
+    for branch, count in sorted(branch_counts.items(), key=lambda x: -x[1]):
+        cgpa_list = branch_cgpa[branch]
+        branch_breakdown.append({
+            "branch": branch,
+            "count": count,
+            "avgCgpa": round(sum(cgpa_list) / len(cgpa_list), 2) if cgpa_list else 0,
+            "minCgpa": min(cgpa_list) if cgpa_list else 0,
+            "maxCgpa": max(cgpa_list) if cgpa_list else 0,
+        })
+
+    return {
+        "driveId": driveId,
+        "totalEligible": len(eligible),
+        "branchBreakdown": branch_breakdown,
+    }

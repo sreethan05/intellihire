@@ -1,8 +1,88 @@
 import re
 import math
+import ast
+import tokenize
+import io
+from difflib import SequenceMatcher
 from typing import Set, List, Dict, Any
 from .db import db
 from .logger import logger
+
+def tokenize_python_code(code: str) -> list:
+    """Extract AST-based token stream from Python code for structural comparison.
+    Resilient to variable renaming, comment changes, and whitespace.
+    """
+    try:
+        tree = ast.parse(code)
+        tokens = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef):
+                tokens.append(f"FUNC:{node.name}")
+                tokens.append(f"ARGS:{len(node.args.args)}")
+            elif isinstance(node, ast.For):
+                tokens.append("FOR")
+            elif isinstance(node, ast.While):
+                tokens.append("WHILE")
+            elif isinstance(node, ast.If):
+                tokens.append("IF")
+            elif isinstance(node, ast.Return):
+                tokens.append("RETURN")
+            elif isinstance(node, ast.Assign):
+                tokens.append("ASSIGN")
+            elif isinstance(node, ast.AugAssign):
+                tokens.append("AUGASSIGN")
+            elif isinstance(node, ast.Call):
+                tokens.append("CALL")
+            elif isinstance(node, ast.List):
+                tokens.append("LIST")
+            elif isinstance(node, ast.Dict):
+                tokens.append("DICT")
+            elif isinstance(node, ast.Subscript):
+                tokens.append("SUBSCRIPT")
+            elif isinstance(node, (ast.Add, ast.Sub, ast.Mult, ast.Div)):
+                tokens.append(f"OP:{type(node).__name__}")
+        return tokens
+    except SyntaxError:
+        return []
+
+def normalize_code_structure(code: str, language: str = "python") -> str:
+    """Normalize code by removing comments, docstrings, and standardizing whitespace."""
+    code = re.sub(r'#.*$', '', code, flags=re.MULTILINE)
+    code = re.sub(r'//.*$', '', code, flags=re.MULTILINE)
+    if language in ("python", "python3"):
+        try:
+            tree = ast.parse(code)
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.FunctionDef, ast.ClassDef, ast.Module)):
+                    if node.body and isinstance(node.body[0], ast.Expr) and isinstance(node.body[0].value, ast.Constant):
+                        node.body[0].value.value = ""
+            code = ast.unparse(tree)
+        except Exception:
+            pass
+    code = re.sub(r'\s+', ' ', code).strip()
+    return code
+
+def get_ast_similarity_score(code1: str, code2: str, language: str = "python") -> int:
+    """AST-based structural similarity for Python code.
+    Falls back to cosine similarity for non-Python languages.
+    """
+    if language in ("python", "python3"):
+        tokens1 = tokenize_python_code(code1)
+        tokens2 = tokenize_python_code(code2)
+        if tokens1 and tokens2:
+            set1 = set(tokens1)
+            set2 = set(tokens2)
+            intersection = set1 & set2
+            union = set1 | set2
+            if union:
+                jaccard = len(intersection) / len(union)
+                seq_matcher = SequenceMatcher(None, tokens1, tokens2)
+                seq_ratio = seq_matcher.ratio()
+                blended = 0.6 * jaccard + 0.4 * seq_ratio
+                return round(blended * 100)
+    norm1 = normalize_code_structure(code1, language)
+    norm2 = normalize_code_structure(code2, language)
+    return round(calculate_cosine_similarity(norm1, norm2, False) * 100)
 
 PROGRAMMING_KEYWORDS = {
     "def", "function", "fn", "var", "let", "const", "class", "return", "if", "else", "elif", "for", "while", "do",
@@ -106,15 +186,19 @@ def calculate_levenshtein_similarity(str1: str, str2: str) -> float:
     max_len = max(len1, len2)
     return 1.0 - (distance / max_len)
 
-def get_similarity_score(code1: str, code2: str) -> int:
+def get_similarity_score(code1: str, code2: str, language: str = "python") -> int:
+    """Enhanced similarity scoring with AST-based structural comparison."""
+    ast_score = get_ast_similarity_score(code1, code2, language)
     cosine_full = calculate_cosine_similarity(code1, code2, False)
     cosine_keywords = calculate_cosine_similarity(code1, code2, True)
     lev_sim = calculate_levenshtein_similarity(code1, code2)
-    
     full_score = 0.6 * cosine_full + 0.4 * lev_sim
     struct_score = 0.7 * cosine_keywords + 0.3 * lev_sim
-    
-    return round(max(full_score, struct_score) * 100)
+    traditional = max(full_score, struct_score) * 100
+    if language in ("python", "python3"):
+        return round(0.6 * ast_score + 0.4 * traditional)
+    else:
+        return round(traditional)
 
 async def run_plagiarism_check(attempt_id: str) -> None:
     try:
@@ -152,7 +236,7 @@ async def run_plagiarism_check(attempt_id: str) -> None:
                 if not other_sub.get("code") or not other_sub["code"].strip():
                     continue
                     
-                similarity = get_similarity_score(sub["code"], other_sub["code"])
+                similarity = get_similarity_score(sub["code"], other_sub["code"], sub.get("language") or "python")
                 if similarity >= 85:
                     other_candidate_name = other_sub.get("attempts", {}).get("users", {}).get("name") if other_sub.get("attempts") else "Other Candidate"
                     q_title = sub.get("coding_questions", {}).get("title") or "Coding Challenge"

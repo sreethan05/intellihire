@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { io, Socket } from "socket.io-client";
+import { toast } from "sonner";
 
 const WS_URL = import.meta.env.VITE_API_URL?.replace("/api", "") || "http://localhost:5000";
 
@@ -11,11 +12,19 @@ interface ProctoringEvent {
   timestamp: string;
 }
 
+export interface RecruiterActionEvent {
+  action: "warn" | "pause" | "resume" | "disqualify";
+  message: string;
+  recruiterName: string;
+  timestamp?: string;
+}
+
 export function useProctorSocket() {
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [lastSnapshot, setLastSnapshot] = useState<ProctoringEvent | null>(null);
   const [lastViolation, setLastViolation] = useState<ProctoringEvent | null>(null);
+  const [lastRecruiterAction, setLastRecruiterAction] = useState<RecruiterActionEvent | null>(null);
 
   const connect = useCallback((_token?: string | null) => {
     if (socketRef.current) return;
@@ -46,6 +55,19 @@ export function useProctorSocket() {
     // Listen for incoming violation events (for recruiters monitoring)
     socket.on("proctor:violation", (data: ProctoringEvent) => {
       setLastViolation(data);
+    });
+
+    socket.on("proctor:recruiter-action", (data: RecruiterActionEvent) => {
+      setLastRecruiterAction(data);
+      if (data.action === "warn") {
+        toast.warning(`Recruiter Warning: ${data.message}`);
+      } else if (data.action === "pause") {
+        toast.error(`Exam paused by ${data.recruiterName}: ${data.message}`);
+      } else if (data.action === "resume") {
+        toast.success("Exam resumed by recruiter.");
+      } else if (data.action === "disqualify") {
+        toast.error(`Exam disqualified: ${data.message}`);
+      }
     });
 
     socketRef.current = socket;
@@ -108,6 +130,7 @@ export function useProctorSocket() {
     isConnected,
     lastSnapshot,
     lastViolation,
+    lastRecruiterAction,
     connect,
     disconnect,
     joinAttempt,

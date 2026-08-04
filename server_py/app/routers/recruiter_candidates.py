@@ -230,3 +230,108 @@ async def get_candidate_analytics(candidateId: str, user: Dict[str, Any] = Depen
             "updatedAt": p.get("updated_at")
         } for p in (pipe_res.data or [])]
     }
+
+
+@router.get("/candidates/{candidateId}/resume-analysis")
+async def get_resume_analysis(
+    candidateId: str,
+    user: Dict[str, Any] = Depends(require_roles(["recruiter", "admin"]))
+):
+    """Fetch parsed resume skills and ATS analysis for a candidate."""
+    profile_res = await db.from_("candidate_profiles").select("resume_url, resume_ats_analysis, skills, github_url, linkedin_url, bio, projects, cgpa, branch, graduation_year, roll_number").eq("user_id", candidateId).maybeSingle()
+    if not profile_res.data:
+        raise HTTPException(status_code=404, detail="Candidate profile not found")
+
+    profile = profile_res.data
+    ats = profile.get("resume_ats_analysis")
+    skills = profile.get("skills") or []
+
+    attempts_res = await db.from_("attempts").select("score, status, exams:exam_id(title, total_marks)").eq("candidate_id", candidateId).order("started_at", ascending=False)
+    attempts = attempts_res.data or []
+
+    exam_summary = []
+    for a in attempts:
+        exam = a.get("exams") or {}
+        exam_summary.append({
+            "title": exam.get("title") or "Unknown",
+            "score": a.get("score") or 0,
+            "total": exam.get("total_marks") or 100,
+            "status": a.get("status"),
+        })
+
+    return {
+        "candidateId": candidateId,
+        "resumeUrl": profile.get("resume_url"),
+        "atsAnalysis": ats,
+        "skills": skills,
+        "profile": {
+            "branch": profile.get("branch"),
+            "cgpa": profile.get("cgpa"),
+            "graduationYear": profile.get("graduation_year"),
+            "rollNumber": profile.get("roll_number"),
+            "githubUrl": profile.get("github_url"),
+            "linkedinUrl": profile.get("linkedin_url"),
+            "bio": profile.get("bio"),
+            "projects": profile.get("projects") or [],
+        },
+        "examHistory": exam_summary,
+    }
+
+
+@router.get("/candidates/compare")
+async def compare_candidates(
+    candidateIds: str = "",
+    user: Dict[str, Any] = Depends(require_roles(["recruiter", "admin"]))
+):
+    """Compare multiple candidates side-by-side: scores, skills, interviews, proctoring."""
+    ids = [cid.strip() for cid in candidateIds.split(",") if cid.strip()]
+    if not ids or len(ids) < 2:
+        raise HTTPException(status_code=400, detail="Provide at least 2 candidate IDs")
+
+    if len(ids) > 5:
+        raise HTTPException(status_code=400, detail="Maximum 5 candidates can be compared")
+
+    results = []
+    for cid in ids:
+        prof_res = await db.from_("candidate_profiles").select("branch, cgpa, graduation_year, skills, resume_url, documents_verified, placement_ready").eq("user_id", cid).maybeSingle()
+        profile = prof_res.data or {}
+
+        user_res = await db.from_("users").select("name, email, roll_number").eq("id", cid).single()
+        u = user_res.data or {}
+
+        att_res = await db.from_("attempts").select("score, status, exams:exam_id(title, total_marks, pass_marks)").eq("candidate_id", cid).order("started_at", ascending=False)
+        attempts = att_res.data or []
+        avg_score = sum(float(a.get("score") or 0) for a in attempts) / len(attempts) if attempts else 0
+        exams_passed = sum(1 for a in attempts if float(a.get("score") or 0) >= float((a.get("exams") or {}).get("pass_marks") or 0))
+
+        iv_res = await db.from_("ai_interviews").select("score, status, communication_score, technical_score").eq("candidate_id", cid).eq("status", "completed")
+        interviews = iv_res.data or []
+        avg_iv = sum(float(i.get("score") or 0) for i in interviews) / len(interviews) if interviews else 0
+
+        proc_res = await db.from_("proctoring_snapshots").select("id").eq("candidate_id", cid).eq("event_type", "violation")
+        violation_count = len(proc_res.data or [])
+
+        pipe_res = await db.from_("candidate_status").select("status, jobs:job_id(title, company_name)").eq("candidate_id", cid)
+        pipeline = pipe_res.data or []
+
+        results.append({
+            "candidateId": cid,
+            "name": u.get("name"),
+            "email": u.get("email"),
+            "rollNumber": u.get("roll_number"),
+            "branch": profile.get("branch"),
+            "cgpa": profile.get("cgpa"),
+            "graduationYear": profile.get("graduation_year"),
+            "skills": profile.get("skills") or [],
+            "documentsVerified": profile.get("documents_verified"),
+            "placementReady": profile.get("placement_ready"),
+            "examCount": len(attempts),
+            "avgExamScore": round(avg_score, 2),
+            "examsPassed": exams_passed,
+            "interviewCount": len(interviews),
+            "avgInterviewScore": round(avg_iv, 2),
+            "proctoringViolations": violation_count,
+            "pipeline": [{"title": (p.get("jobs") or {}).get("title"), "company": (p.get("jobs") or {}).get("company_name"), "status": p.get("status")} for p in pipeline],
+        })
+
+    return {"comparison": results}

@@ -1,4 +1,5 @@
 import os
+import datetime
 import socketio
 import jwt
 from .db import db
@@ -38,6 +39,11 @@ class ProctorViolationPayload(BaseModel):
 
 class ProctorLeavePayload(BaseModel):
     attemptId: str = Field(..., min_length=1)
+
+class RecruiterActionPayload(BaseModel):
+    attemptId: str = Field(..., min_length=1)
+    action: str = Field(..., pattern="^(warn|pause|resume|disqualify)$")
+    message: str = Field("", max_length=500)
 
 def get_cookie(cookie_header: str, name: str) -> str:
     if not cookie_header:
@@ -252,6 +258,52 @@ async def on_proctor_leave(sid, data: Any):
         return
 
     sio.leave_room(sid, f"attempt:{validated.attemptId}")
+
+@sio.on("proctor:recruiter-action")
+async def on_recruiter_action(sid, data: Any):
+    """Recruiter sends a real-time action (warn/pause/resume/disqualify)
+    to a candidate's exam session."""
+    try:
+        validated = RecruiterActionPayload.model_validate(data)
+    except ValidationError as e:
+        await sio.emit("error", {"message": f"Invalid payload: {str(e)}"}, to=sid)
+        return
+
+    async with sio.session(sid) as session:
+        user = session.get("user")
+    if not user or user.get("role") not in ["recruiter", "admin"]:
+        await sio.emit("error", {"message": "Unauthorized: recruiter/admin only"}, to=sid)
+        return
+
+    attempt_id = validated.attemptId
+    if user.get("role") == "recruiter":
+        res = await db.from_("attempts").select("recruiter_id").eq("id", attempt_id).single()
+        if res.error or not res.data or res.data.get("recruiter_id") != user.get("id"):
+            await sio.emit("error", {"message": "Unauthorized: not your attempt"}, to=sid)
+            return
+
+    room = f"attempt:{attempt_id}"
+    await sio.emit("proctor:recruiter-action", {
+        "action": validated.action,
+        "message": validated.message,
+        "recruiterName": user.get("name") or "Recruiter",
+        "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+    }, room=room)
+
+    try:
+        await db.from_("proctoring_snapshots").insert({
+            "attempt_id": attempt_id,
+            "exam_id": None,
+            "candidate_id": None,
+            "event_type": "violation",
+            "violation_severity": "high" if validated.action == "disqualify" else "medium",
+            "message": f"Recruiter action: {validated.action} - {validated.message}",
+        })
+    except Exception:
+        pass
+
+    logger.info(f"[WebSocket] Recruiter action '{validated.action}' sent to attempt {attempt_id}")
+
 
 async def send_realtime_notification(user_id: str, payload: Dict[str, Any]):
     room = f"user:{user_id}"

@@ -337,3 +337,60 @@ async def get_portfolio(slug: str, request: Request):
         "strengths": insights["strengths"],
         "weaknesses": insights["weaknesses"]
     }
+
+
+class SavePracticeRequest(BaseModel):
+    problem_title: str
+    language: str
+    code: str
+    passed: bool
+    execution_time_ms: Optional[int] = None
+
+@router.post("/practice/save")
+async def save_practice_attempt(
+    req: SavePracticeRequest,
+    user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Save a practice sandbox attempt for tracking candidate progress."""
+    res = await db.from_("action_items").insert({
+        "user_id": user["id"],
+        "role": "candidate",
+        "type": "practice_attempt",
+        "title": req.problem_title,
+        "description": f"Language: {req.language} | Passed: {req.passed} | Time: {req.execution_time_ms or 0}ms",
+        "priority": "normal" if req.passed else "high",
+        "entity_type": "practice",
+        "metadata": {
+            "language": req.language,
+            "passed": req.passed,
+            "execution_time_ms": req.execution_time_ms,
+            "code_length": len(req.code),
+        }
+    }).select().single()
+    return {"message": "Practice attempt saved", "item": res.data}
+
+@router.get("/practice/history")
+async def get_practice_history(
+    user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Fetch practice sandbox history for the candidate."""
+    res = await db.from_("action_items").select("*").eq("user_id", user["id"]).eq("type", "practice_attempt").order("created_at", ascending=False)
+    items = res.data or []
+    total = len(items)
+    passed = sum(1 for i in items if "Passed: True" in (i.get("description") or ""))
+    languages = {}
+    for item in items:
+        meta = item.get("metadata") or {}
+        lang = meta.get("language", "unknown")
+        if lang not in languages:
+            languages[lang] = {"total": 0, "passed": 0}
+        languages[lang]["total"] += 1
+        if meta.get("passed"):
+            languages[lang]["passed"] += 1
+    return {
+        "totalAttempts": total,
+        "totalPassed": passed,
+        "successRate": round((passed / total) * 100) if total > 0 else 0,
+        "languages": languages,
+        "history": items[:20],
+    }

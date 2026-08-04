@@ -155,7 +155,7 @@ async def update_code_score(req: UpdateCodeScoreRequest, user: Dict[str, Any] = 
     else:
         for tc in test_cases:
             try:
-                result = await run_with_judge0(code, req.language or "python", tc.get("input") or "")
+                result = await run_with_judge0(code, req.language or "python", tc.get("input") or "", timeout=5)
                 actual = (result.get("stdout") or "").strip()
                 expected = (tc.get("expected_output") or "").strip()
                 if actual == expected:
@@ -243,7 +243,7 @@ async def grade_attempt_background(attempt_id: str, user: dict, exam_id: str, su
             passed = 0
             for tc in test_cases:
                 try:
-                    result = await run_with_judge0(sub["code"], sub["language"], tc.get("input") or "")
+                    result = await run_with_judge0(sub["code"], sub["language"], tc.get("input") or "", timeout=5)
                     actual = result["stdout"].strip()
                     expected = (tc.get("expected_output") or "").strip()
                     if actual == expected:

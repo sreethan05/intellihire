@@ -1,4 +1,6 @@
 import datetime
+import csv
+import io
 from typing import Dict, Any, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -28,6 +30,12 @@ class LinkMcqRequest(BaseModel):
 class LinkCodingRequest(BaseModel):
     exam_id: str
     coding_question_ids: List[str]
+
+class ImportMcqRequest(BaseModel):
+    questions: List[Dict[str, Any]]
+
+class ImportCodingRequest(BaseModel):
+    questions: List[Dict[str, Any]]
 
 class AddMcqQuestion(BaseModel):
     question_text: str
@@ -369,3 +377,103 @@ async def get_exam_details(examId: str, user: Dict[str, Any] = Depends(require_r
         "mcqQuestions": mcq_res.data or [],
         "codingQuestions": coding_res.data or []
     }
+
+
+@router.post("/bank/import-mcq-csv")
+async def import_mcq_csv(
+    req: ImportMcqRequest,
+    user: Dict[str, Any] = Depends(require_roles(["recruiter", "admin"]))
+):
+    """Bulk import MCQ questions from CSV-parsed JSON."""
+    inserted = []
+    errors = []
+    for i, q in enumerate(req.questions):
+        try:
+            payload = {
+                "question_text": q.get("question_text") or q.get("question") or "",
+                "option_a": q.get("option_a") or q.get("a") or "",
+                "option_b": q.get("option_b") or q.get("b") or "",
+                "option_c": q.get("option_c") or q.get("c") or "",
+                "option_d": q.get("option_d") or q.get("d") or "",
+                "correct_option": (q.get("correct_option") or q.get("answer") or "A").upper(),
+                "marks": int(q.get("marks") or 1),
+                "topic": q.get("topic") or "general",
+                "difficulty": q.get("difficulty") or "medium",
+                "created_by": user["id"],
+            }
+            if not payload["question_text"] or not payload["option_a"]:
+                errors.append({"row": i, "error": "Missing required fields"})
+                continue
+            res = await db.from_("questions").insert(payload).select().single()
+            if not res.error and res.data:
+                inserted.append(res.data)
+        except Exception as e:
+            errors.append({"row": i, "error": str(e)})
+    return {"message": f"{len(inserted)} questions imported", "inserted": len(inserted), "errors": errors}
+
+
+@router.post("/bank/import-coding-csv")
+async def import_coding_csv(
+    req: ImportCodingRequest,
+    user: Dict[str, Any] = Depends(require_roles(["recruiter", "admin"]))
+):
+    """Bulk import coding questions from CSV-parsed JSON."""
+    inserted = []
+    errors = []
+    for i, q in enumerate(req.questions):
+        try:
+            test_cases_raw = q.get("test_cases") or "[]"
+            if isinstance(test_cases_raw, str):
+                import json
+                test_cases = json.loads(test_cases_raw)
+            else:
+                test_cases = test_cases_raw
+            payload = {
+                "title": q.get("title") or "",
+                "description": q.get("description") or "",
+                "difficulty": q.get("difficulty") or "medium",
+                "starter_code": q.get("starter_code") or "",
+                "test_cases": test_cases,
+                "marks": int(q.get("marks") or 10),
+                "created_by": user["id"],
+            }
+            if not payload["title"] or not payload["description"]:
+                errors.append({"row": i, "error": "Missing title or description"})
+                continue
+            res = await db.from_("coding_questions").insert(payload).select().single()
+            if not res.error and res.data:
+                inserted.append(res.data)
+        except Exception as e:
+            errors.append({"row": i, "error": str(e)})
+    return {"message": f"{len(inserted)} coding questions imported", "inserted": len(inserted), "errors": errors}
+
+
+@router.get("/bank/export-mcq")
+async def export_mcq_csv(user: Dict[str, Any] = Depends(require_roles(["recruiter", "admin"]))):
+    """Export all MCQ questions as CSV."""
+    res = await db.from_("questions").select("question_text, option_a, option_b, option_c, option_d, correct_option, marks, topic, difficulty").or_(f"created_by.eq.{user['id']},created_by.is.null").order("created_at", ascending=False)
+    questions = res.data or []
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["question_text", "option_a", "option_b", "option_c", "option_d", "correct_option", "marks", "topic", "difficulty"])
+    for q in questions:
+        writer.writerow([q.get("question_text"), q.get("option_a"), q.get("option_b"), q.get("option_c"), q.get("option_d"), q.get("correct_option"), q.get("marks"), q.get("topic"), q.get("difficulty")])
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=mcq_questions.csv"})
+
+
+@router.get("/bank/export-coding")
+async def export_coding_csv(user: Dict[str, Any] = Depends(require_roles(["recruiter", "admin"]))):
+    """Export all coding questions as CSV."""
+    res = await db.from_("coding_questions").select("title, description, difficulty, starter_code, test_cases, marks").or_(f"created_by.eq.{user['id']},created_by.is.null").order("created_at", ascending=False)
+    questions = res.data or []
+    import json
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["title", "description", "difficulty", "starter_code", "test_cases", "marks"])
+    for q in questions:
+        tc = q.get("test_cases")
+        tc_str = json.dumps(tc) if isinstance(tc, (list, dict)) else (tc or "[]")
+        writer.writerow([q.get("title"), q.get("description"), q.get("difficulty"), q.get("starter_code") or "", tc_str, q.get("marks")])
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=coding_questions.csv"})

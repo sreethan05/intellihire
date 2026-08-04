@@ -85,6 +85,8 @@ export const recruiterApi = {
     api.get(`/proctoring/attempts/${attemptId}/timeline`),
   overrideProctoringSnapshot: (snapshotId: string, violation_severity: string) =>
     api.post(`/proctoring/snapshots/${snapshotId}/override`, { violation_severity }),
+  getResumeAnalysis: (candidateId: string) => api.get(`/recruiter/candidates/${candidateId}/resume-analysis`),
+  getEligibleCount: (driveId: string) => api.get(`/recruiter/drives/${driveId}/eligible-count`),
   uploadOffer: (candidateId: string, jobId: string, file: File) => {
     const formData = new FormData();
     formData.append("offerLetter", file);
@@ -156,6 +158,10 @@ export const examApi = {
     api.post("/exam/bank/link-coding", data),
   saveBankMcqs: (questions: Array<Record<string, unknown>>) => api.post("/exam/bank/add-mcqs", { questions }),
   saveBankCoding: (question: Record<string, unknown>) => api.post("/exam/bank/add-coding", { question }),
+  importMcqCsv: (questions: Array<Record<string, unknown>>) => api.post("/exam/bank/import-mcq-csv", { questions }),
+  importCodingCsv: (questions: Array<Record<string, unknown>>) => api.post("/exam/bank/import-coding-csv", { questions }),
+  exportMcqCsv: () => api.get("/exam/bank/export-mcq", { responseType: "blob" }),
+  exportCodingCsv: () => api.get("/exam/bank/export-coding", { responseType: "blob" }),
 };
 
 export const candidateApi = {
@@ -188,6 +194,9 @@ export const candidateApi = {
     api.post(`/candidate/offers/${jobId}/respond`, { response, notes }),
   getActivityFeed: () => api.get("/candidate/activity"),
   getOffers: () => api.get("/candidate/offers"),
+  savePracticeAttempt: (data: { problem_title: string; language: string; code: string; passed: boolean; execution_time_ms?: number }) =>
+    api.post("/candidate/practice/save", data),
+  getPracticeHistory: () => api.get("/candidate/practice/history"),
 };
 
 export const resultApi = {
@@ -240,6 +249,8 @@ export const proctoringApi = {
   getActiveMonitoring: (examId: string, collegeId?: string | null) =>
     api.get(`/proctoring/exam/${examId}/active-monitoring`, { params: collegeId ? { collegeId } : undefined }),
   overrideAttempt: (attemptId: string) => api.post(`/proctoring/attempt/${attemptId}/override`),
+  sendRecruiterAction: (attemptId: string, action: "warn" | "pause" | "resume" | "disqualify", message: string) =>
+    api.post("/proctoring/recruiter-action", { attemptId, action, message }),
 };
 
 export const compilerApi = {
@@ -279,6 +290,7 @@ export const interviewApi = {
     api.get("/interview/summaries", { params: collegeId ? { collegeId } : undefined }),
   getAnswers: (interviewId: string) => api.get(`/interview/${interviewId}/answers`),
   get: (interviewId: string) => api.get(`/interview/${interviewId}`),
+  getCalendarLink: (interviewId: string) => api.get(`/interview/${interviewId}/calendar-link`),
 };
 
 export const assetApi = {

@@ -110,7 +110,7 @@ def b64decode(s: Optional[str]) -> str:
         return s
 
 
-async def run_with_judge0(code: str, language: str, stdin: str = ""):
+async def run_with_judge0(code: str, language: str, stdin: str = "", timeout: int = 5):
     lang_id = LANGUAGE_MAP.get(language.lower())
     if not lang_id:
         raise HTTPException(status_code=400, detail=f"Unsupported language: {language}")
@@ -125,6 +125,8 @@ async def run_with_judge0(code: str, language: str, stdin: str = ""):
         "source_code": b64encode(code),
         "language_id": lang_id,
         "stdin": b64encode(stdin),
+        "cpu_time_limit": timeout,
+        "cpu_extra_time": 1,
     }
 
     async with httpx.AsyncClient(timeout=30.0) as client:
