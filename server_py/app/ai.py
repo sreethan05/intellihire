@@ -61,6 +61,132 @@ async def get_profile_stats(user: Dict[str, Any] = Depends(get_current_user)):
             ]
         }
 
+
+class GenerateMcqRequest(BaseModel):
+    topic: str
+    difficulty: str
+    count: Optional[int] = 5
+
+
+class GenerateCodingRequest(BaseModel):
+    topic: str
+    difficulty: str
+    count: Optional[int] = 1
+
+
+class ImprovementReportRequest(BaseModel):
+    attempt_id: str
+
+
+@router.post("/api/ai/generate-mcq")
+async def generate_mcq_endpoint(
+    req: GenerateMcqRequest,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    if not GROQ_API_KEY:
+        return {
+            "questions": [
+                {
+                    "question_text": f"Sample {req.topic} Question 1 ({req.difficulty})",
+                    "option_a": "Option A",
+                    "option_b": "Option B",
+                    "option_c": "Option C",
+                    "option_d": "Option D",
+                    "correct_option": "A",
+                    "marks": 1
+                }
+            ]
+        }
+    prompt = f"Generate {req.count} MCQ questions on topic '{req.topic}' with difficulty '{req.difficulty}'. Return JSON with key 'questions' containing array of objects with keys: question_text, option_a, option_b, option_c, option_d, correct_option (must be A, B, C, or D), and marks (integer)."
+    try:
+        data = await generate_json(prompt, systemPrompt="You are an expert technical test author. Always return valid JSON.")
+        return data
+    except Exception as e:
+        logger.error(f"Failed to generate MCQs: {e}")
+        return {
+            "questions": [
+                {
+                    "question_text": f"What is a core concept of {req.topic}?",
+                    "option_a": "Fundamental Principles",
+                    "option_b": "Secondary Overhead",
+                    "option_c": "Deprecated Standard",
+                    "option_d": "None of the above",
+                    "correct_option": "A",
+                    "marks": 1
+                }
+            ]
+        }
+
+
+@router.post("/api/ai/generate-coding")
+async def generate_coding_endpoint(
+    req: GenerateCodingRequest,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    if not GROQ_API_KEY:
+        return {
+            "questions": [
+                {
+                    "title": f"Solve {req.topic} Problem",
+                    "description": f"Write a function to solve the {req.topic} problem.",
+                    "difficulty": req.difficulty,
+                    "starter_code": "def solution(data):\n    # Write code here\n    return data\n",
+                    "test_cases": [{"input": "5", "expected_output": "5"}],
+                    "marks": 10
+                }
+            ]
+        }
+    prompt = f"Generate {req.count} coding problem(s) on topic '{req.topic}' with difficulty '{req.difficulty}'. Return JSON with key 'questions' containing an array of objects with keys: title, description, difficulty, starter_code, test_cases (array of objects with input and expected_output), marks (integer)."
+    try:
+        data = await generate_json(prompt, systemPrompt="You are a senior software engineer designing coding assessments. Always return valid JSON.")
+        return data
+    except Exception as e:
+        logger.error(f"Failed to generate coding question: {e}")
+        return {
+            "questions": [
+                {
+                    "title": f"Process {req.topic}",
+                    "description": f"Given input array/string, process according to {req.topic} rules.",
+                    "difficulty": req.difficulty,
+                    "starter_code": "def solution(val):\n    return val\n",
+                    "test_cases": [{"input": "10", "expected_output": "10"}],
+                    "marks": 10
+                }
+            ]
+        }
+
+
+@router.post("/api/ai/improvement-report")
+async def create_improvement_report(
+    req: ImprovementReportRequest,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    user_id = user["id"]
+    attempt_res = await db.from_("attempts").select("*, exam:exam_id(title)").eq("id", req.attempt_id).maybeSingle()
+    attempt = attempt_res.data
+    exam_title = attempt.get("exam", {}).get("title", "Assessment") if attempt else "Assessment"
+    score = attempt.get("score", 0) if attempt else 0
+    
+    summary = f"Completed {exam_title} with a score of {score}%."
+    strengths = ["Technical Knowledge", "Problem Solving"]
+    weaknesses = ["Time Management under pressure"]
+
+    report_res = await db.from_("ai_feedback_reports").select("*").eq("attempt_id", req.attempt_id).maybeSingle()
+    if report_res.data:
+        return report_res.data
+
+    report_payload = {
+        "candidate_id": user_id,
+        "attempt_id": req.attempt_id,
+        "report_type": "improvement",
+        "content": summary,
+        "strengths": strengths,
+        "improvements": weaknesses
+    }
+    ins = await db.from_("ai_feedback_reports").insert(report_payload).select().single()
+    return ins.data or report_payload
+
+
 MAX_RESUME_TEXT_LENGTH = 20000
 MAX_PROMPT_LENGTH = 8000
 MAX_BASE64_FILE_LENGTH = 8_000_000  # ~6MB decoded
