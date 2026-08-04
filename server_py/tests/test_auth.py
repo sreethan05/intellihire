@@ -49,12 +49,18 @@ def test_generate_tokens_and_hashes():
     assert len(hashed) == 64  # SHA-256 hex is 64 chars
 
 @pytest.mark.asyncio
-async def test_get_current_user_valid():
+async def test_get_current_user_valid(mocker):
     user = {"id": "123", "email": "test@intellihire.com", "role": "candidate"}
     token = generate_token(user)
     
     mock_request = MagicMock()
     mock_request.cookies = {"access_token": token}
+
+    mock_db_res = MagicMock()
+    mock_db_res.data = user
+    mock_chain = MagicMock()
+    mock_chain.select.return_value.eq.return_value.maybeSingle = mocker.AsyncMock(return_value=mock_db_res)
+    mocker.patch("app.auth_router.db.from_", return_value=mock_chain)
     
     current_user = await get_current_user(mock_request)
     assert current_user["id"] == "123"

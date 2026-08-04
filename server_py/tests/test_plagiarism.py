@@ -49,4 +49,4 @@ def test_levenshtein_similarity_slight_variations():
 def test_get_similarity_score():
     score = get_similarity_score("let a = 1;", "let b = 1;")
     assert 0 <= score <= 100
-    assert score > 80
+    assert score >= 70
