@@ -4,8 +4,7 @@
 -- 2. TPO       : tpo@intellihire.com       (password: admin123)
 -- 3. Recruiter : recruiter@intellihire.com (password: admin123)
 -- 4. Candidate : candidate@intellihire.com (password: admin123)
-
-BEGIN;
+-- NOTE: No BEGIN/COMMIT — the migration runner wraps this in its own transaction.
 
 -- 1. Truncate dependent session, log, attempt, and activity tables
 TRUNCATE TABLE refresh_tokens CASCADE;
@@ -39,7 +38,7 @@ VALUES
     '6eacac4f-ffc4-4859-a657-196ba2cd939b',
     'Super Admin',
     'admin@intellihire.com',
-    '$2b$10$HbZw6q4fwUv/QEupu7KiFupJc1Com7X4WRAqJ6rjjA.YDQoQ4Snne', -- admin123
+    '$2b$10$HbZw6q4fwUv/QEupu7KiFupJc1Com7X4WRAqJ6rjjA.YDQoQ4Snne',
     'admin',
     NULL,
     true,
@@ -49,7 +48,7 @@ VALUES
     'a1b2c3d4-e5f6-4a5b-8c7d-9e8f7a6b5c4d',
     'College TPO',
     'tpo@intellihire.com',
-    '$2b$10$HbZw6q4fwUv/QEupu7KiFupJc1Com7X4WRAqJ6rjjA.YDQoQ4Snne', -- admin123
+    '$2b$10$HbZw6q4fwUv/QEupu7KiFupJc1Com7X4WRAqJ6rjjA.YDQoQ4Snne',
     'tpo',
     NULL,
     true,
@@ -59,7 +58,7 @@ VALUES
     'b2c3d4e5-f6a7-4b5c-8d9e-0f1a2b3c4d5e',
     'Lead Recruiter',
     'recruiter@intellihire.com',
-    '$2b$10$HbZw6q4fwUv/QEupu7KiFupJc1Com7X4WRAqJ6rjjA.YDQoQ4Snne', -- admin123
+    '$2b$10$HbZw6q4fwUv/QEupu7KiFupJc1Com7X4WRAqJ6rjjA.YDQoQ4Snne',
     'recruiter',
     NULL,
     true,
@@ -69,7 +68,7 @@ VALUES
     'c3d4e5f6-a7b8-4c5d-8e9f-0a1b2c3d4e5f',
     'Alex Candidate',
     'candidate@intellihire.com',
-    '$2b$10$HbZw6q4fwUv/QEupu7KiFupJc1Com7X4WRAqJ6rjjA.YDQoQ4Snne', -- admin123
+    '$2b$10$HbZw6q4fwUv/QEupu7KiFupJc1Com7X4WRAqJ6rjjA.YDQoQ4Snne',
     'candidate',
     'CS2026001',
     true,
@@ -79,7 +78,7 @@ ON CONFLICT (email) DO UPDATE SET
   password_hash = EXCLUDED.password_hash,
   role = EXCLUDED.role;
 
--- 3. Reassign existing created_by references on exams, jobs, questions, coding_questions, and colleges to Super Admin / Lead Recruiter
+-- 3. Reassign existing created_by references
 UPDATE exams SET created_by = 'b2c3d4e5-f6a7-4b5c-8d9e-0f1a2b3c4d5e' WHERE created_by IS NOT NULL AND created_by NOT IN ('6eacac4f-ffc4-4859-a657-196ba2cd939b', 'a1b2c3d4-e5f6-4a5b-8c7d-9e8f7a6b5c4d', 'b2c3d4e5-f6a7-4b5c-8d9e-0f1a2b3c4d5e', 'c3d4e5f6-a7b8-4c5d-8e9f-0a1b2c3d4e5f');
 UPDATE jobs SET created_by = 'b2c3d4e5-f6a7-4b5c-8d9e-0f1a2b3c4d5e' WHERE created_by IS NOT NULL AND created_by NOT IN ('6eacac4f-ffc4-4859-a657-196ba2cd939b', 'a1b2c3d4-e5f6-4a5b-8c7d-9e8f7a6b5c4d', 'b2c3d4e5-f6a7-4b5c-8d9e-0f1a2b3c4d5e', 'c3d4e5f6-a7b8-4c5d-8e9f-0a1b2c3d4e5f');
 UPDATE questions SET created_by = '6eacac4f-ffc4-4859-a657-196ba2cd939b' WHERE created_by IS NOT NULL AND created_by NOT IN ('6eacac4f-ffc4-4859-a657-196ba2cd939b', 'a1b2c3d4-e5f6-4a5b-8c7d-9e8f7a6b5c4d', 'b2c3d4e5-f6a7-4b5c-8d9e-0f1a2b3c4d5e', 'c3d4e5f6-a7b8-4c5d-8e9f-0a1b2c3d4e5f');
@@ -106,5 +105,3 @@ VALUES (
   2026,
   'CS2026001'
 ) ON CONFLICT (user_id) DO NOTHING;
-
-COMMIT;

@@ -13,8 +13,53 @@ import httpx
 from .auth_router import get_current_user
 from .rate_limit import limiter
 from .logger import logger
+from .db import db
 
 router = APIRouter(tags=["ai"])
+
+
+@router.get("/api/ai/profile-stats")
+async def get_profile_stats(user: Dict[str, Any] = Depends(get_current_user)):
+    """Return role-based profile stats for the Layout sidebar."""
+    role = user.get("role", "candidate")
+    user_id = user["id"]
+
+    if role == "admin":
+        users_res = await db.from_("users").select("id", count="exact")
+        exams_res = await db.from_("exams").select("id", count="exact")
+        return {
+            "title": "Platform Overview",
+            "stats": [
+                {"label": "Total Users", "value": str(users_res.count or 0)},
+                {"label": "Total Exams", "value": str(exams_res.count or 0)},
+            ]
+        }
+    elif role == "recruiter":
+        exams_res = await db.from_("exams").select("id", count="exact").eq("created_by", user_id)
+        drives_res = await db.from_("jobs").select("id", count="exact").eq("created_by", user_id)
+        return {
+            "title": "Recruiter Stats",
+            "stats": [
+                {"label": "Your Exams", "value": str(exams_res.count or 0)},
+                {"label": "Your Drives", "value": str(drives_res.count or 0)},
+            ]
+        }
+    elif role == "tpo":
+        students_res = await db.from_("candidate_profiles").select("id", count="exact")
+        return {
+            "title": "TPO Overview",
+            "stats": [
+                {"label": "Total Students", "value": str(students_res.count or 0)},
+            ]
+        }
+    else:
+        attempts_res = await db.from_("attempts").select("id", count="exact").eq("candidate_id", user_id)
+        return {
+            "title": "Your Progress",
+            "stats": [
+                {"label": "Exams Taken", "value": str(attempts_res.count or 0)},
+            ]
+        }
 
 MAX_RESUME_TEXT_LENGTH = 20000
 MAX_PROMPT_LENGTH = 8000
