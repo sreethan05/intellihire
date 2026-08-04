@@ -215,6 +215,14 @@ export const resultApi = {
   getResults: (examId: string, collegeId?: string | null) =>
     api.get(`/result/${examId}`, { params: collegeId ? { collegeId } : undefined }),
   getAttempt: (attemptId: string) => api.get(`/result/attempt/${attemptId}`),
+  getAttemptReview: (attemptId: string) => api.get(`/result/attempt/${attemptId}/review`),
+  overrideMcqMarks: (data: {
+    attempt_id: string;
+    question_id: string;
+    is_correct: boolean;
+    marks_obtained: number;
+  }) => api.post("/result/override-mcq", data),
+  regradeAttempt: (attemptId: string) => api.post(`/result/regrade/${attemptId}`),
 };
 
 export const proctoringApi = {

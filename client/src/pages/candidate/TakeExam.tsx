@@ -58,12 +58,7 @@ function getCodingStarterCode(question: ExamCodingQuestion["question"]) {
   return starterCode;
 }
 
-function shuffleList<T>(items: T[]) {
-  return [...items]
-    .map((item) => ({ item, sort: Math.random() }))
-    .sort((left, right) => left.sort - right.sort)
-    .map(({ item }) => item);
-}
+
 
 export default function TakeExam() {
   const { examId } = useParams<{ examId: string }>();
@@ -102,9 +97,10 @@ export default function TakeExam() {
 
     candidateApi.getExam(examId)
       .then(({ data }) => {
-        const shouldShuffle = Boolean(data.exam?.shuffle_questions);
-        const loadedMcqQuestions = shouldShuffle ? shuffleList(data.mcqQuestions || []) : data.mcqQuestions || [];
-        const loadedCodingQuestions = shouldShuffle ? shuffleList(data.codingQuestions || []) : data.codingQuestions || [];
+        // Questions are now shuffled server-side — no client-side shuffle needed.
+        // This prevents candidates from predicting or manipulating question order via DevTools.
+        const loadedMcqQuestions = data.mcqQuestions || [];
+        const loadedCodingQuestions = data.codingQuestions || [];
 
         setExam(data.exam);
         setMcqQuestions(loadedMcqQuestions);

@@ -26,7 +26,7 @@ interface HeatmapDay {
 }
 
 export default function CandidateExamAnalytics() {
-  const [activeTab, setActiveTab] = useState<"overview" | "topics" | "coding" | "interviews">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "topics" | "coding" | "interviews" | "gaps">("overview");
   const [loading, setLoading] = useState(true);
 
   // States for all analytics data
@@ -153,6 +153,7 @@ export default function CandidateExamAnalytics() {
           { id: "topics", label: "Topic Mastery Radar", icon: BarChart3 },
           { id: "coding", label: "Coding Analytics", icon: Languages },
           { id: "interviews", label: "AI Interview Breakdown", icon: MessageSquareText },
+          { id: "gaps", label: "Skill Gaps & Recommendations", icon: Target },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -754,6 +755,180 @@ export default function CandidateExamAnalytics() {
               </div>
             )}
 
+          </div>
+        </div>
+      )}
+
+      {activeTab === "gaps" && (
+        <div className="space-y-6">
+          {/* Skill Gap Summary Card */}
+          <div style={panelStyle} className="bg-white">
+            <div className="mb-4">
+              <h3 className="text-sm font-extrabold text-slate-800">Skill Gap Analysis</h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Your weakest topics identified with personalized recommendations to improve.
+              </p>
+            </div>
+
+            {topicMastery.topics?.length === 0 ? (
+              <div className="py-16 text-center text-xs text-slate-400 font-semibold bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                Complete an exam to see your skill gaps and personalized recommendations.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Weakest Topics Highlighted */}
+                {topicMastery.topics
+                  ?.filter((t: any) => t.accuracy < 60)
+                  .sort((a: any, b: any) => a.accuracy - b.accuracy)
+                  .map((topic: any) => {
+                    const peerObj = topicMastery.peerAverage?.find((p: any) => p.topic === topic.topic);
+                    const peerAcc = peerObj?.accuracy || 50;
+                    const gap = peerAcc - topic.accuracy;
+                    return (
+                      <div key={topic.topic} className="border border-rose-100 rounded-xl p-4 bg-rose-50/30 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-extrabold text-slate-900 text-sm">{topic.topic}</div>
+                            <div className="text-[10px] text-slate-400 mt-0.5">
+                              Your accuracy: {topic.accuracy}% · Peer avg: {peerAcc}%
+                              {gap > 0 && <span className="text-rose-500 font-bold"> · {gap.toFixed(0)}% behind peers</span>}
+                            </div>
+                          </div>
+                          <span className="rounded-full bg-rose-50 border border-rose-100 px-2.5 py-0.5 text-[10px] font-bold text-rose-600 uppercase">
+                            Needs Work
+                          </span>
+                        </div>
+                        {/* Progress bar */}
+                        <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-700"
+                            style={{
+                              width: `${topic.accuracy}%`,
+                              background: topic.accuracy < 40 ? "#ef4444" : topic.accuracy < 60 ? "#f59e0b" : "#10b981",
+                            }}
+                          />
+                        </div>
+                        {/* Recommendation */}
+                        <div className="flex items-start gap-2 bg-white rounded-lg p-2.5 border border-slate-100 text-xs text-slate-600">
+                          <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                          <span>
+                            <strong>Recommendation:</strong> Practice {topic.topic} problems in the sandbox.
+                            Focus on {topic.difficulty || "medium"} difficulty level. You've answered{" "}
+                            {topic.attempted || 0} questions with {(100 - topic.accuracy).toFixed(0)}% error rate.
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                {/* Strong Topics */}
+                {topicMastery.topics
+                  ?.filter((t: any) => t.accuracy >= 60)
+                  .sort((a: any, b: any) => b.accuracy - a.accuracy)
+                  .slice(0, 3)
+                  .map((topic: any) => (
+                    <div key={topic.topic} className="border border-emerald-100 rounded-xl p-4 bg-emerald-50/30 flex items-center justify-between">
+                      <div>
+                        <div className="font-extrabold text-slate-900 text-sm">{topic.topic}</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">Accuracy: {topic.accuracy}%</div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                        <span className="text-[10px] font-bold text-emerald-600 uppercase">Strong</span>
+                      </div>
+                    </div>
+                  ))}
+
+                {/* No weak topics */}
+                {topicMastery.topics?.every((t: any) => t.accuracy >= 60) && (
+                  <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-100 rounded-xl p-4">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                    <span className="text-sm font-bold text-emerald-700">
+                      Great job! You're performing above 60% in all topics. Keep practicing to maintain your edge.
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Coding Skill Gaps */}
+          <div style={panelStyle} className="bg-white">
+            <div className="mb-4">
+              <h3 className="text-sm font-extrabold text-slate-800">Coding Language Proficiency</h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Success rate by programming language across all coding submissions.
+              </p>
+            </div>
+            <div className="space-y-3">
+              {codingAnalytics.languages?.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-400 font-semibold">
+                  No coding submissions yet. Try the practice sandbox!
+                </div>
+              ) : (
+                codingAnalytics.languages?.map((lang: any) => (
+                  <div key={lang.language} className="flex items-center gap-4">
+                    <span className="text-xs font-bold text-slate-700 w-20">{lang.language}</span>
+                    <div className="flex-1 bg-slate-100 rounded-full h-3 overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{
+                          width: `${lang.successRate || 0}%`,
+                          background: lang.successRate < 40 ? "#ef4444" : lang.successRate < 70 ? "#f59e0b" : "#10b981",
+                        }}
+                      />
+                    </div>
+                    <span className="text-xs font-extrabold text-slate-800 w-12 text-right">
+                      {lang.successRate || 0}%
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Interview Skill Gaps */}
+          <div style={panelStyle} className="bg-white">
+            <div className="mb-4">
+              <h3 className="text-sm font-extrabold text-slate-800">Interview Dimension Gaps</h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Weakest interview dimensions that need improvement.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {(() => {
+                const avgs = interviewAnalytics.averages || {};
+                const dims = [
+                  { label: "Technical", key: "technical", icon: "💻" },
+                  { label: "Communication", key: "communication", icon: "💬" },
+                  { label: "Relevance", key: "relevance", icon: "🎯" },
+                  { label: "Speaking Pace", key: "speaking", icon: "🎤" },
+                  { label: "Pronunciation", key: "pronunciation", icon: "🗣️" },
+                  { label: "Intro/Confidence", key: "intro", icon: "✨" },
+                ];
+                return dims.map((dim) => {
+                  const score = avgs[dim.key] || 0;
+                  const isWeak = score < 60;
+                  return (
+                    <div
+                      key={dim.key}
+                      className={`rounded-xl border p-3 text-center ${
+                        isWeak ? "border-rose-100 bg-rose-50/30" : "border-emerald-100 bg-emerald-50/30"
+                      }`}
+                    >
+                      <div className="text-lg mb-1">{dim.icon}</div>
+                      <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">{dim.label}</div>
+                      <div className={`text-xl font-black ${isWeak ? "text-rose-500" : "text-emerald-600"}`}>
+                        {score}
+                      </div>
+                      {isWeak && (
+                        <div className="text-[9px] text-rose-400 font-semibold mt-1">Below average</div>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
+            </div>
           </div>
         </div>
       )}

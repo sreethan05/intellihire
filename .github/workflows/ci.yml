@@ -18,6 +18,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: client/package-lock.json
 
       - name: Install Client Dependencies
         run: npm --prefix client install
@@ -47,17 +49,23 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: pip
+          cache-dependency-path: server_py/requirements.txt
 
       - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r server_py/requirements.txt
+          pip install pytest-cov bandit
 
-      - name: Run Pytest Suite
-        run: python -m pytest server_py/tests
+      - name: Install pytest-cov
+        run: pip install pytest-cov
 
-      - name: Scan Python source with Bandit
-        run: bandit -q -r server_py/app -s B101,B104,B105 || true
+      - name: Run Pytest Suite with Coverage
+        run: python -m pytest server_py/tests --cov=server_py/app --cov-report=term-missing --cov-fail-under=60
+
+      - name: Scan Python source with Bandit (fail on HIGH/CRITICAL)
+        run: bandit -q -r server_py/app -s B101,B104,B105 -ll
 
   dependency-audit:
     name: Dependency Audit
@@ -70,9 +78,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: client/package-lock.json
 
       - name: Install client dependencies
         run: npm --prefix client install
 
-      - name: Audit client dependencies
-        run: npm --prefix client audit --audit-level=critical || true
+      - name: Audit client dependencies (fail on critical)
+        run: npm --prefix client audit --audit-level=critical

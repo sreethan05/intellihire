@@ -1,3 +1,4 @@
+import random
 from typing import Dict, Any
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -28,6 +29,15 @@ async def get_exam(examId: str, user: Dict[str, Any] = Depends(get_current_user)
     mcq_res = await db.from_("exam_questions").select("*, questions:question_id(id, question_text, option_a, option_b, option_c, option_d, marks, topic, difficulty, subtopic, concept_tags, bloom_level, estimated_time_sec)").eq("exam_id", examId)
     coding_res = await db.from_("exam_coding_questions").select("*, coding_questions:coding_question_id(*)").eq("exam_id", examId)
     
+    # Server-side shuffling: questions are shuffled on the server using a
+    # per-exam seed so the order is deterministic per exam but unpredictable
+    # to candidates. This prevents DevTools manipulation of client-side shuffle.
+    should_shuffle = bool(exam_res.data.get("shuffle_questions"))
+    if should_shuffle:
+        # Use exam_id as seed for deterministic per-exam ordering
+        seed = int(examId.replace("-", "")[:8], 16) if len(examId) > 8 else 42
+        rng = random.Random(seed)
+
     mcq_mapped = []
     for q in (mcq_res.data or []):
         mcq_mapped.append({
@@ -36,7 +46,7 @@ async def get_exam(examId: str, user: Dict[str, Any] = Depends(get_current_user)
             "marks": q.get("marks"),
             "question": q.get("questions")
         })
-        
+
     coding_mapped = []
     for q in (coding_res.data or []):
         coding_mapped.append({
@@ -45,7 +55,12 @@ async def get_exam(examId: str, user: Dict[str, Any] = Depends(get_current_user)
             "marks": q.get("marks"),
             "question": q.get("coding_questions")
         })
-        
+
+    # Shuffle on server side if enabled
+    if should_shuffle:
+        rng.shuffle(mcq_mapped)
+        rng.shuffle(coding_mapped)
+
     return {
         "exam": exam_res.data,
         "mcqQuestions": mcq_mapped,

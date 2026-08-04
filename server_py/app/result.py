@@ -35,6 +35,15 @@ class UpdateCodeScoreRequest(BaseModel):
     code: Optional[str] = ""
     language: Optional[str] = "python"
 
+class OverrideMcqRequest(BaseModel):
+    attempt_id: str
+    question_id: str
+    is_correct: bool
+    marks_obtained: float
+
+class RegradeRequest(BaseModel):
+    attempt_id: str
+
 class SubmitExamRequest(BaseModel):
     attempt_id: str
 
@@ -322,6 +331,120 @@ async def grade_attempt_background(attempt_id: str, user: dict, exam_id: str, su
         await run_plagiarism_check(attempt_id)
     except Exception as e:
         logger.error(f"Background grading error: {str(e)}")
+
+@router.get("/attempt/{attemptId}/review")
+async def get_attempt_review(
+    attemptId: str,
+    user: Dict[str, Any] = Depends(require_roles(["recruiter", "admin"]))
+):
+    """Detailed review of a candidate's attempt including correct answers,
+    selected answers, and marks breakdown. Recruiter/Admin only.
+    """
+    att_res = await db.from_("attempts").select("*, exams:exam_id(*), users:candidate_id(name, email)").eq("id", attemptId).single()
+    if att_res.error or not att_res.data:
+        raise HTTPException(status_code=404, detail="Attempt not found")
+
+    if user["role"] == "recruiter" and att_res.data.get("recruiter_id") != user["id"]:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    # Fetch MCQ answers with full question details (including correct_option)
+    ans_res = await db.from_("answers").select(
+        "*, questions:question_id(id, question_text, option_a, option_b, option_c, option_d, correct_option, marks, topic, difficulty)"
+    ).eq("attempt_id", attemptId)
+
+    # Fetch coding submissions with full question details
+    subs_res = await db.from_("coding_submissions").select(
+        "*, coding_questions:coding_question_id(id, title, description, marks, test_cases, difficulty)"
+    ).eq("attempt_id", attemptId)
+
+    # Fetch proctoring summary
+    proc_res = await db.from_("proctoring_snapshots").select(
+        "event_type, violation_severity, message, captured_at"
+    ).eq("attempt_id", attemptId).order("captured_at", ascending=False)
+
+    violations = [e for e in (proc_res.data or []) if e.get("event_type") == "violation"]
+
+    return {
+        "attempt": att_res.data,
+        "mcqAnswers": ans_res.data or [],
+        "codingSubmissions": subs_res.data or [],
+        "proctoringViolations": violations,
+        "proctoringSummary": {
+            "totalEvents": len(proc_res.data or []),
+            "totalViolations": len(violations),
+        }
+    }
+
+@router.post("/override-mcq")
+async def override_mcq_marks(
+    req: OverrideMcqRequest,
+    user: Dict[str, Any] = Depends(require_roles(["recruiter", "admin"]))
+):
+    """Allow recruiter/admin to override marks for a specific MCQ answer.
+    Useful for accepting partially correct answers or fixing grading errors.
+    """
+    att_res = await db.from_("attempts").select("candidate_id, status, recruiter_id").eq("id", req.attempt_id).single()
+    if att_res.error or not att_res.data:
+        raise HTTPException(status_code=404, detail="Attempt not found")
+
+    if user["role"] == "recruiter" and att_res.data.get("recruiter_id") != user["id"]:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    # Update the answer
+    up_res = await db.from_("answers").update({
+        "is_correct": req.is_correct,
+        "marks_obtained": req.marks_obtained,
+    }).eq("attempt_id", req.attempt_id).eq("question_id", req.question_id).select().single()
+
+    if up_res.error:
+        raise HTTPException(status_code=400, detail="Failed to override marks")
+
+    # Recalculate total score
+    ans_res = await db.from_("answers").select("marks_obtained").eq("attempt_id", req.attempt_id)
+    sub_res = await db.from_("coding_submissions").select("score").eq("attempt_id", req.attempt_id)
+    mcq_total = sum(float(a.get("marks_obtained") or 0.0) for a in (ans_res.data or []))
+    cod_total = sum(float(s.get("score") or 0.0) for s in (sub_res.data or []))
+    new_total = mcq_total + cod_total
+
+    await db.from_("attempts").update({"score": new_total}).eq("id", req.attempt_id)
+
+    return {
+        "message": "Marks overridden successfully",
+        "answer": up_res.data,
+        "newTotalScore": new_total,
+    }
+
+@router.post("/regrade/{attemptId}")
+async def regrade_attempt(
+    attemptId: str,
+    user: Dict[str, Any] = Depends(require_roles(["recruiter", "admin"]))
+):
+    """Re-run grading for an attempt. Useful when grading failed mid-way
+    or when test cases were updated after initial grading.
+    """
+    att_res = await db.from_("attempts").select("candidate_id, status, recruiter_id, exam_id").eq("id", attemptId).single()
+    if att_res.error or not att_res.data:
+        raise HTTPException(status_code=404, detail="Attempt not found")
+
+    if user["role"] == "recruiter" and att_res.data.get("recruiter_id") != user["id"]:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    # Set back to grading status
+    await db.from_("attempts").update({"status": "grading"}).eq("id", attemptId)
+
+    # Trigger regrading in background
+    exam_id = att_res.data["exam_id"]
+    # Fetch user info for the candidate
+    cand_res = await db.from_("users").select("id, name, email").eq("id", att_res.data["candidate_id"]).single()
+    candidate = cand_res.data or {"id": att_res.data["candidate_id"], "name": "Candidate", "email": ""}
+
+    now_str = datetime.datetime.utcnow().isoformat() + "Z"
+    task = asyncio.create_task(grade_attempt_background(attemptId, candidate, exam_id, now_str))
+    _background_grading_tasks.add(task)
+    task.add_done_callback(_background_grading_tasks.discard)
+
+    return {"message": "Regrading started. The attempt score will be updated shortly."}
+
 
 @router.get("/attempt/{attemptId}")
 async def get_attempt(attemptId: str, user: Dict[str, Any] = Depends(get_current_user)):
