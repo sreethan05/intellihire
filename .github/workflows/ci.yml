@@ -36,6 +36,20 @@ jobs:
   backend-pytest:
     name: FastAPI Backend Pytest
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: intellihire
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       JWT_SECRET: "ci-secret-key-for-testing-purposes-only-1234567890"
       DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/intellihire"
@@ -58,8 +72,13 @@ jobs:
           pip install -r server_py/requirements.txt
           pip install pytest-cov bandit
 
-      - name: Install pytest-cov
-        run: pip install pytest-cov
+      - name: Apply Database Schemas
+        env:
+          PGPASSWORD: postgres
+        run: |
+          for sql in database/*.sql; do
+            psql -h localhost -U postgres -d intellihire -f "$sql"
+          done
 
       - name: Run Pytest Suite with Coverage
         run: python -m pytest server_py/tests --cov=server_py/app --cov-report=term-missing --cov-fail-under=60
@@ -90,6 +109,25 @@ jobs:
   e2e-playwright:
     name: Playwright E2E (smoke)
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: intellihire
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      JWT_SECRET: "ci-secret-key-for-testing-purposes-only-1234567890"
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/intellihire"
+      NODE_ENV: "test"
+      PYTHONPATH: "server_py"
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -99,9 +137,32 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: client/package-lock.json
+          cache-dependency-path: package-lock.json
 
-      - name: Install client dependencies
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: server_py/requirements.txt
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r server_py/requirements.txt
+
+      - name: Apply Database Schemas
+        env:
+          PGPASSWORD: postgres
+        run: |
+          for sql in database/*.sql; do
+            psql -h localhost -U postgres -d intellihire -f "$sql"
+          done
+
+      - name: Install Root Dependencies
+        run: npm install
+
+      - name: Install Client Dependencies
         run: npm --prefix client install
 
       - name: Install Playwright browsers
