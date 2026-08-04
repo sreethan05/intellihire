@@ -496,3 +496,103 @@ async def get_recruiter_coding_languages(user: Dict[str, Any] = Depends(require_
         })
         
     return {"languages": languages, "totalSubmissions": len(subs)}
+
+
+@router.get("/hiring-metrics")
+async def get_hiring_metrics(
+    collegeId: Optional[str] = None,
+    user: Dict[str, Any] = Depends(require_roles(["recruiter", "admin"]))
+):
+    """Recruiter hiring funnel metrics: time-to-hire, offer acceptance rate,
+    pipeline conversion rates, and per-drive breakdown.
+    """
+    from psycopg.rows import dict_row
+
+    with get_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT id, title, company_name, created_at FROM jobs WHERE created_by = %s", [user["id"]])
+            drives = [dict(r) for r in cur.fetchall()]
+
+            drive_ids = [d["id"] for d in drives]
+            if not drive_ids:
+                return {
+                    "totalDrives": 0, "totalCandidates": 0, "totalOffers": 0,
+                    "offerAcceptanceRate": 0, "avgTimeToHireDays": 0,
+                    "pipelineConversion": {}, "driveBreakdown": [],
+                }
+
+            # Pipeline counts
+            cur.execute("""
+                SELECT status, COUNT(*) as count
+                FROM candidate_status
+                WHERE job_id = ANY(%s)
+                GROUP BY status
+            """, [drive_ids])
+            pipeline_counts = {r["status"]: r["count"] for r in cur.fetchall()}
+
+            total_registered = sum(pipeline_counts.values())
+            total_offered = pipeline_counts.get("offered", 0)
+            total_shortlisted = pipeline_counts.get("shortlisted", 0)
+            total_passed = pipeline_counts.get("passed", 0)
+            total_exam_taken = pipeline_counts.get("exam_taken", 0)
+            total_rejected = pipeline_counts.get("rejected", 0)
+
+            # Offer acceptance rate
+            cur.execute("""
+                SELECT COUNT(*) as total,
+                       COUNT(offer_accepted_at) as accepted,
+                       COUNT(offer_declined_at) as declined
+                FROM candidate_status
+                WHERE job_id = ANY(%s) AND status = 'offered'
+            """, [drive_ids])
+            offer_row = cur.fetchone() or {}
+            total_offers = offer_row.get("total", 0)
+            accepted = offer_row.get("accepted", 0)
+            declined = offer_row.get("declined", 0)
+            offer_acceptance_rate = round((accepted / total_offers) * 100, 1) if total_offers > 0 else 0
+
+            # Average time-to-hire
+            cur.execute("""
+                SELECT AVG(EXTRACT(EPOCH FROM (cs.offer_accepted_at - j.created_at)) / 86400) as avg_days
+                FROM candidate_status cs
+                JOIN jobs j ON j.id = cs.job_id
+                WHERE cs.job_id = ANY(%s) AND cs.offer_accepted_at IS NOT NULL
+            """, [drive_ids])
+            avg_row = cur.fetchone() or {}
+            avg_time_to_hire = round(float(avg_row.get("avg_days") or 0), 1)
+
+            # Per-drive breakdown
+            drive_breakdown = []
+            for d in drives:
+                cur.execute("""
+                    SELECT status, COUNT(*) as count
+                    FROM candidate_status WHERE job_id = %s GROUP BY status
+                """, [d["id"]])
+                statuses = {r["status"]: r["count"] for r in cur.fetchall()}
+                drive_breakdown.append({
+                    "driveId": str(d["id"]), "title": d["title"], "company": d["company_name"],
+                    "registered": sum(statuses.values()), "offered": statuses.get("offered", 0),
+                    "rejected": statuses.get("rejected", 0), "shortlisted": statuses.get("shortlisted", 0),
+                })
+
+            return {
+                "totalDrives": len(drives),
+                "totalCandidates": total_registered,
+                "totalOffers": total_offers,
+                "totalAccepted": accepted,
+                "totalDeclined": declined,
+                "offerAcceptanceRate": offer_acceptance_rate,
+                "avgTimeToHireDays": avg_time_to_hire,
+                "pipelineConversion": {
+                    "registered": total_registered, "examTaken": total_exam_taken,
+                    "passed": total_passed, "shortlisted": total_shortlisted,
+                    "offered": total_offered, "rejected": total_rejected,
+                },
+                "conversionRates": {
+                    "examRate": round((total_exam_taken / total_registered) * 100, 1) if total_registered > 0 else 0,
+                    "passRate": round((total_passed / total_exam_taken) * 100, 1) if total_exam_taken > 0 else 0,
+                    "shortlistRate": round((total_shortlisted / total_passed) * 100, 1) if total_passed > 0 else 0,
+                    "offerRate": round((total_offered / total_shortlisted) * 100, 1) if total_shortlisted > 0 else 0,
+                },
+                "driveBreakdown": drive_breakdown,
+            }

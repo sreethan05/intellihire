@@ -572,3 +572,98 @@ async def get_real_time_activity(user: Dict[str, Any] = Depends(require_roles(["
             "cameraOffline": camera_offline
         }
     }
+
+
+@router.get("/system-health/ready")
+async def get_system_readiness(user: Dict[str, Any] = Depends(require_roles(["admin"]))):
+    """Readiness check: verifies Postgres, Redis, Judge0, and key services
+    are reachable. Returns per-dependency status.
+    """
+    from psycopg.rows import dict_row
+    import httpx
+    from ..config import REDIS_URL, JUDGE0_API_URL, JUDGE0_API_KEY, GROQ_API_KEY, SMTP_HOST
+
+    health = {
+        "overall": "healthy",
+        "checks": {},
+        "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+    }
+
+    # 1. PostgreSQL check
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+                cur.fetchone()
+        health["checks"]["postgres"] = {"status": "healthy"}
+    except Exception as e:
+        health["checks"]["postgres"] = {"status": "unhealthy", "error": str(e)}
+        health["overall"] = "degraded"
+
+    # 2. Redis check
+    try:
+        from ..utils import redis_client
+        if redis_client:
+            redis_client.ping()
+            health["checks"]["redis"] = {"status": "healthy"}
+        else:
+            health["checks"]["redis"] = {"status": "degraded", "error": "Redis client not initialized"}
+    except Exception as e:
+        health["checks"]["redis"] = {"status": "degraded", "error": str(e)}
+
+    # 3. Judge0 check
+    try:
+        if JUDGE0_API_URL:
+            headers = {}
+            if JUDGE0_API_KEY:
+                headers["X-RapidAPI-Key"] = JUDGE0_API_KEY
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get(f"{JUDGE0_API_URL}/about", headers=headers)
+                if resp.status_code == 200:
+                    health["checks"]["judge0"] = {"status": "healthy"}
+                else:
+                    health["checks"]["judge0"] = {"status": "degraded", "error": f"HTTP {resp.status_code}"}
+                    health["overall"] = "degraded"
+        else:
+            health["checks"]["judge0"] = {"status": "not_configured"}
+            health["overall"] = "degraded"
+    except Exception as e:
+        health["checks"]["judge0"] = {"status": "unhealthy", "error": str(e)[:200]}
+        health["overall"] = "degraded"
+
+    # 4. SMTP check
+    if SMTP_HOST:
+        health["checks"]["smtp"] = {"status": "configured", "host": SMTP_HOST}
+    else:
+        health["checks"]["smtp"] = {"status": "not_configured"}
+
+    # 5. Groq API check
+    if GROQ_API_KEY:
+        health["checks"]["groq"] = {"status": "configured"}
+    else:
+        health["checks"]["groq"] = {"status": "not_configured"}
+
+    # 6. Active exam sessions + grading queue
+    try:
+        with get_connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute("SELECT COUNT(*) as count FROM attempts WHERE status IN ('in_progress', 'grading')")
+                row = cur.fetchone()
+                health["checks"]["active_exams"] = {"status": "healthy", "count": row["count"] if row else 0}
+
+                cur.execute("SELECT COUNT(*) as count FROM users WHERE role = 'candidate'")
+                row = cur.fetchone()
+                health["checks"]["total_candidates"] = {"status": "healthy", "count": row["count"] if row else 0}
+
+                cur.execute("SELECT COUNT(*) as count FROM attempts WHERE status = 'grading'")
+                row = cur.fetchone()
+                grading_count = row["count"] if row else 0
+                if grading_count > 10:
+                    health["checks"]["grading_queue"] = {"status": "warning", "count": grading_count}
+                    health["overall"] = "degraded"
+                else:
+                    health["checks"]["grading_queue"] = {"status": "healthy", "count": grading_count}
+    except Exception:
+        pass
+
+    return health

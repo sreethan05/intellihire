@@ -394,3 +394,147 @@ async def get_practice_history(
         "languages": languages,
         "history": items[:20],
     }
+
+
+# ============================================================
+# Badge / Gamification System
+# ============================================================
+
+BADGE_DEFINITIONS = [
+    {"name": "First Exam Passed", "description": "Successfully passed your first exam", "icon": "🎯",
+     "condition": lambda stats: stats["exams_passed"] >= 1},
+    {"name": "Top 10% Score", "description": "Achieved a top 10% score on any exam", "icon": "🏆",
+     "condition": lambda stats: stats["top_10_percent"]},
+    {"name": "Perfect Coding Round", "description": "Passed all test cases on a coding question", "icon": "💻",
+     "condition": lambda stats: stats["perfect_coding"]},
+    {"name": "5 Exams Completed", "description": "Completed 5 exams total", "icon": "📚",
+     "condition": lambda stats: stats["exams_completed"] >= 5},
+    {"name": "Proctoring Pro", "description": "Completed an exam with zero violations", "icon": "🛡️",
+     "condition": lambda stats: stats["clean_exam"]},
+    {"name": "Interview Star", "description": "Scored 80+ on an AI interview", "icon": "⭐",
+     "condition": lambda stats: stats["best_interview"] >= 80},
+    {"name": "Streak Master", "description": "Maintained a 7-day practice streak", "icon": "🔥",
+     "condition": lambda stats: stats["max_streak"] >= 7},
+    {"name": "Speed Coder", "description": "Solved a coding problem in under 5 minutes", "icon": "⚡",
+     "condition": lambda stats: stats["fastest_solve"]},
+]
+
+
+async def compute_candidate_stats(user_id: str) -> dict:
+    """Compute candidate statistics for badge evaluation."""
+    att_res = await db.from_("attempts").select("score, status, exams:exam_id(total_marks, pass_marks)").eq("candidate_id", user_id)
+    attempts = att_res.data or []
+    exams_completed = len(attempts)
+    exams_passed = sum(1 for a in attempts if float(a.get("score") or 0) >= float((a.get("exams") or {}).get("pass_marks") or 0))
+
+    # Top 10% check
+    top_10_percent = False
+    if attempts:
+        for a in attempts:
+            exam_id = a.get("exam_id")
+            if not exam_id:
+                continue
+            all_res = await db.from_("attempts").select("score").eq("exam_id", str(exam_id)).order("score", ascending=False)
+            all_scores = [float(r.get("score") or 0) for r in (all_res.data or [])]
+            if all_scores and a.get("score"):
+                rank = sum(1 for s in all_scores if s > float(a["score"]))
+                percentile = (1 - rank / len(all_scores)) * 100 if all_scores else 0
+                if percentile >= 90:
+                    top_10_percent = True
+                    break
+
+    # Perfect coding submission
+    perfect_coding = False
+    for a in attempts:
+        cs_res = await db.from_("coding_submissions").select("score, status, coding_questions:coding_question_id(marks)").eq("attempt_id", a["id"])
+        for sub in (cs_res.data or []):
+            q = sub.get("coding_questions") or {}
+            max_marks = float(q.get("marks") or 10)
+            if float(sub.get("score") or 0) >= max_marks:
+                perfect_coding = True
+
+    # Clean exam (zero violations)
+    clean_exam = False
+    proc_res = await db.from_("proctoring_snapshots").select("attempt_id, event_type").eq("candidate_id", user_id).eq("event_type", "violation")
+    violation_attempts = set(p.get("attempt_id") for p in (proc_res.data or []))
+    for a in attempts:
+        if a["id"] not in violation_attempts and a.get("status") == "completed":
+            clean_exam = True
+            break
+
+    # Interview score
+    iv_res = await db.from_("ai_interviews").select("score").eq("candidate_id", user_id).eq("status", "completed")
+    interviews = iv_res.data or []
+    best_interview = max(float(i.get("score") or 0) for i in interviews) if interviews else 0
+
+    # Practice streak
+    streak_res = await db.from_("action_items").select("created_at").eq("user_id", user_id).eq("type", "practice_attempt").order("created_at", ascending=False)
+    practice_items = streak_res.data or []
+    max_streak = 0
+    if practice_items:
+        from datetime import datetime
+        dates = set()
+        for item in practice_items:
+            dt_str = item.get("created_at")
+            if dt_str:
+                try:
+                    dt = datetime.fromisoformat(str(dt_str).replace("Z", "+00:00"))
+                    dates.add(dt.date())
+                except Exception:
+                    pass
+        sorted_dates = sorted(dates, reverse=True)
+        current_streak = 1
+        for i in range(1, len(sorted_dates)):
+            if (sorted_dates[i - 1] - sorted_dates[i]).days == 1:
+                current_streak += 1
+            else:
+                max_streak = max(max_streak, current_streak)
+                current_streak = 1
+        max_streak = max(max_streak, current_streak)
+
+    return {
+        "exams_completed": exams_completed, "exams_passed": exams_passed,
+        "top_10_percent": top_10_percent, "perfect_coding": perfect_coding,
+        "clean_exam": clean_exam, "best_interview": best_interview,
+        "max_streak": max_streak, "fastest_solve": False,
+    }
+
+
+@router.get("/badges")
+async def get_candidate_badges(user: Dict[str, Any] = Depends(get_current_user)):
+    """Get all badges for the current candidate — both earned and locked."""
+    existing_res = await db.from_("badges").select("*").eq("candidate_id", user["id"])
+    existing = {b["name"]: b for b in (existing_res.data or [])}
+
+    stats = await compute_candidate_stats(user["id"])
+
+    newly_awarded = []
+    for badge_def in BADGE_DEFINITIONS:
+        if badge_def["name"] not in existing and badge_def["condition"](stats):
+            award_res = await db.from_("badges").insert({
+                "candidate_id": user["id"],
+                "name": badge_def["name"],
+                "description": badge_def["description"],
+            }).select().single()
+            if award_res.data:
+                existing[badge_def["name"]] = award_res.data
+                newly_awarded.append(badge_def["name"])
+
+    all_badges = []
+    for badge_def in BADGE_DEFINITIONS:
+        earned = existing.get(badge_def["name"])
+        all_badges.append({
+            "name": badge_def["name"],
+            "description": badge_def["description"],
+            "icon": badge_def["icon"],
+            "earned": earned is not None,
+            "awardedAt": earned.get("awarded_at") if earned else None,
+        })
+
+    return {
+        "badges": all_badges,
+        "totalEarned": sum(1 for b in all_badges if b["earned"]),
+        "totalAvailable": len(all_badges),
+        "newlyAwarded": newly_awarded,
+        "stats": stats,
+    }

@@ -197,6 +197,9 @@ export const candidateApi = {
   savePracticeAttempt: (data: { problem_title: string; language: string; code: string; passed: boolean; execution_time_ms?: number }) =>
     api.post("/candidate/practice/save", data),
   getPracticeHistory: () => api.get("/candidate/practice/history"),
+  joinWaitlist: (examId: string) => api.post("/candidate/waitlist/join", { exam_id: examId }),
+  getWaitlistStatus: (examId: string) => api.get(`/candidate/waitlist/${examId}/status`),
+  cancelWaitlist: (examId: string) => api.post(`/candidate/waitlist/${examId}/cancel`),
 };
 
 export const resultApi = {
@@ -298,6 +301,10 @@ export const assetApi = {
   getBadges: () => api.get("/assets/badges"),
 };
 
+export const badgeApi = {
+  getCandidateBadges: () => api.get("/candidate/badges"),
+};
+
 export const candidateAnalyticsApi = {
   getTopicMastery: () => api.get("/candidate/topic-mastery"),
   getCodingAnalytics: () => api.get("/candidate/coding-analytics"),
@@ -326,6 +333,8 @@ export const recruiterAnalyticsApi = {
     api.get("/recruiter/predictive-shortlist", {
       params: { ...(collegeId ? { collegeId } : {}), ...(jobId ? { jobId } : {}) },
     }),
+  getHiringMetrics: (collegeId?: string | null) =>
+    api.get("/recruiter/hiring-metrics", { params: collegeId ? { collegeId } : undefined }),
 };
 
 export const tpoAnalyticsApi = {
@@ -333,12 +342,14 @@ export const tpoAnalyticsApi = {
   getReadinessHeatmap: () => api.get("/tpo/readiness-heatmap"),
   getCompanyPerformance: () => api.get("/tpo/company-performance"),
   getUploadTracking: () => api.get("/tpo/upload-tracking"),
+  getPlacementDashboard: () => api.get("/tpo/placement-dashboard"),
 };
 
 export const adminAnalyticsApi = {
   getPlatformGrowth: () => api.get("/admin/platform-growth"),
   getSystemHealth: () => api.get("/admin/system-health"),
   getRealTimeActivity: () => api.get("/admin/real-time-activity"),
+  getSystemReadiness: () => api.get("/admin/system-health/ready"),
 };
 
 export const hubApi = {

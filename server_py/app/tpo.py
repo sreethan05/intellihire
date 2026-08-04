@@ -693,3 +693,80 @@ async def get_upload_tracking(user: Dict[str, Any] = Depends(require_roles(["tpo
         
     return {"uploads": formatted, "trend": trend}
 
+
+@router.get("/placement-dashboard")
+async def get_placement_dashboard(user: Dict[str, Any] = Depends(require_roles(["tpo"]))):
+    """Company-wise placement dashboard: offers by company, average package,
+    branch-wise placement, and year-over-year trends.
+    """
+    college_id = await get_tpo_college(user["id"])
+
+    from psycopg.rows import dict_row
+
+    with get_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            # Company-wise placement counts
+            cur.execute("""
+                SELECT j.company_name, j.title as job_title,
+                       COUNT(cs.id) as total_candidates,
+                       COUNT(CASE WHEN cs.status = 'offered' THEN 1 END) as offered,
+                       COUNT(CASE WHEN cs.offer_accepted_at IS NOT NULL THEN 1 END) as accepted,
+                       AVG(j.salary_min) FILTER (WHERE j.salary_min IS NOT NULL) as avg_package
+                FROM candidate_status cs
+                JOIN jobs j ON j.id = cs.job_id
+                WHERE j.college_id = %s
+                GROUP BY j.company_name, j.title
+                ORDER BY offered DESC
+            """, [college_id])
+            companies = [dict(r) for r in cur.fetchall()]
+
+            # Branch-wise placement
+            cur.execute("""
+                SELECT cp.branch,
+                       COUNT(DISTINCT cs.candidate_id) as total_candidates,
+                       COUNT(CASE WHEN cs.status = 'offered' THEN 1 END) as offered
+                FROM candidate_status cs
+                JOIN jobs j ON j.id = cs.job_id
+                JOIN candidate_profiles cp ON cp.user_id = cs.candidate_id
+                WHERE j.college_id = %s
+                GROUP BY cp.branch
+                ORDER BY offered DESC
+            """, [college_id])
+            branches = [dict(r) for r in cur.fetchall()]
+
+            # Overall stats
+            cur.execute("""
+                SELECT COUNT(DISTINCT cs.candidate_id) as total_placed,
+                       COUNT(DISTINCT j.id) as total_companies,
+                       AVG(j.salary_min) FILTER (WHERE j.salary_min IS NOT NULL) as avg_package,
+                       MAX(j.salary_max) as max_package
+                FROM candidate_status cs
+                JOIN jobs j ON j.id = cs.job_id
+                WHERE j.college_id = %s AND cs.status = 'offered'
+            """, [college_id])
+            overall = cur.fetchone() or {}
+
+            # Year-wise trends
+            cur.execute("""
+                SELECT EXTRACT(YEAR FROM cs.offer_accepted_at) as year,
+                       COUNT(*) as offers
+                FROM candidate_status cs
+                JOIN jobs j ON j.id = cs.job_id
+                WHERE j.college_id = %s AND cs.offer_accepted_at IS NOT NULL
+                GROUP BY year
+                ORDER BY year DESC
+            """, [college_id])
+            trends = [dict(r) for r in cur.fetchall()]
+
+            return {
+                "overall": {
+                    "totalPlaced": overall.get("total_placed", 0),
+                    "totalCompanies": overall.get("total_companies", 0),
+                    "avgPackage": round(float(overall.get("avg_package") or 0), 2),
+                    "maxPackage": round(float(overall.get("max_package") or 0), 2),
+                },
+                "companies": companies,
+                "branches": branches,
+                "yearlyTrends": trends,
+            }
+
