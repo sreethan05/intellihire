@@ -675,6 +675,10 @@ class db:
 
 
 async def transaction(func):
+    """Run a function inside a DB transaction with automatic commit/rollback."""
+    import functools
+
+    @functools.wraps(func)
     def run_in_tx():
         with get_connection() as conn:
             try:

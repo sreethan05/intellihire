@@ -89,20 +89,8 @@ app.add_middleware(SlowAPIMiddleware)
 # uses credentialed (cookie-based) requests. A wildcard origin combined with
 # allow_credentials=True lets any website make authenticated requests on a
 # logged-in visitor's behalf.
-allowed_origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
-if APP_URL and APP_URL not in allowed_origins:
-    allowed_origins.append(APP_URL)
-
-if CORS_ALLOWED_ORIGINS:
-    for origin in CORS_ALLOWED_ORIGINS.split(","):
-        origin = origin.strip()
-        if origin and origin not in allowed_origins:
-            allowed_origins.append(origin)
+from .config import get_allowed_origins
+allowed_origins = get_allowed_origins()
 
 app.add_middleware(
     CORSMiddleware,

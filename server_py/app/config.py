@@ -81,3 +81,21 @@ S3_REGION = settings.S3_REGION
 S3_ACCESS_KEY_ID = settings.S3_ACCESS_KEY_ID
 S3_SECRET_ACCESS_KEY = settings.S3_SECRET_ACCESS_KEY
 CORS_ALLOWED_ORIGINS = settings.CORS_ALLOWED_ORIGINS
+
+
+def get_allowed_origins() -> list:
+    """Single source of truth for CORS-allowed origins."""
+    origins = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
+    if APP_URL and APP_URL not in origins:
+        origins.append(APP_URL)
+    if CORS_ALLOWED_ORIGINS:
+        for origin in CORS_ALLOWED_ORIGINS.split(","):
+            origin = origin.strip()
+            if origin and origin not in origins:
+                origins.append(origin)
+    return origins

@@ -117,6 +117,7 @@ async def get_attempt_events(attemptId: str, user: Dict[str, Any] = Depends(get_
     return {"events": events_res.data or []}
 
 
+
 @router.get("/attempts/{attemptId}/timeline")
 async def get_attempt_timeline(attemptId: str, user: Dict[str, Any] = Depends(get_current_user)):
     attempt = await _assert_attempt_access(attemptId, user)
@@ -151,9 +152,19 @@ async def get_exam_summary(
         attempt_rows = [attempt for attempt in attempt_rows if attempt.get("candidate_id") in allowed]
 
     summary = []
+    # Batch-fetch all proctoring snapshots for all attempts in one query
+    attempt_ids = [attempt["id"] for attempt in attempt_rows]
+    all_events: dict = {}
+    if attempt_ids:
+        events_res = await db.from_("proctoring_snapshots").select("*").in_("attempt_id", attempt_ids).order("captured_at", ascending=False)
+        for event in (events_res.data or []):
+            aid = event.get("attempt_id")
+            if aid not in all_events:
+                all_events[aid] = []
+            all_events[aid].append(event)
+
     for attempt in attempt_rows:
-        events_res = await db.from_("proctoring_snapshots").select("*").eq("attempt_id", attempt["id"]).order("captured_at", ascending=False)
-        events = events_res.data or []
+        events = all_events.get(attempt["id"], [])
         violations = [event for event in events if event.get("event_type") == "violation"]
         latest_violation = violations[0] if violations else None
         candidate = attempt.get("users") or {}

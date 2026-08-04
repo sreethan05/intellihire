@@ -1,7 +1,7 @@
 import datetime
 import json
 import asyncio
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Set
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
@@ -14,6 +14,9 @@ from .websocket import sio
 from .logger import logger
 
 router = APIRouter(prefix="/api/result", tags=["result"])
+
+# Track background grading tasks to prevent silent GC discarding
+_background_grading_tasks: Set[asyncio.Task] = set()
 
 class SubmitMcqRequest(BaseModel):
     attempt_id: str
@@ -29,7 +32,6 @@ class SubmitCodeRequest(BaseModel):
 class UpdateCodeScoreRequest(BaseModel):
     attempt_id: str
     coding_question_id: str
-    score: float
     code: Optional[str] = ""
     language: Optional[str] = "python"
 
@@ -98,27 +100,74 @@ async def submit_code(req: SubmitCodeRequest, user: Dict[str, Any] = Depends(get
 
 @router.post("/update-code-score")
 async def update_code_score(req: UpdateCodeScoreRequest, user: Dict[str, Any] = Depends(get_current_user)):
+    """Run candidate code server-side via Judge0 and store the computed score."""
     att_res = await db.from_("attempts").select("candidate_id, status").eq("id", req.attempt_id).single()
     if att_res.error or not att_res.data:
         raise HTTPException(status_code=404, detail="Attempt not found")
-        
+
     attempt = att_res.data
     if attempt["candidate_id"] != user["id"]:
         raise HTTPException(status_code=403, detail="Forbidden")
     if attempt["status"] == "completed":
         raise HTTPException(status_code=400, detail="Exam already submitted")
-        
-    ins_res = await db.from_("coding_submissions").upsert({
+
+    # Fetch the coding question to get test cases and max marks
+    q_res = await db.from_("coding_questions").select("test_cases, marks").eq("id", req.coding_question_id).single()
+    if q_res.error or not q_res.data:
+        raise HTTPException(status_code=404, detail="Coding question not found")
+
+    question = q_res.data
+    test_cases = question.get("test_cases") or []
+    if isinstance(test_cases, str):
+        try:
+            test_cases = json.loads(test_cases)
+        except Exception:
+            test_cases = []
+
+    max_marks = float(question.get("marks") or 10.0)
+    code = (req.code or "").strip()
+
+    if not code:
+        await db.from_("coding_submissions").upsert({
+            "attempt_id": req.attempt_id,
+            "coding_question_id": req.coding_question_id,
+            "code": "",
+            "language": req.language or "python",
+            "score": 0.0,
+            "status": "tested"
+        }, on_conflict="attempt_id,coding_question_id")
+        return {"message": "No code to evaluate", "submission": {"score": 0, "status": "tested"}}
+
+    passed = 0
+    total_tc = len(test_cases) if test_cases else 1
+
+    if not test_cases:
+        final_score = round(max_marks)
+    else:
+        for tc in test_cases:
+            try:
+                result = await run_with_judge0(code, req.language or "python", tc.get("input") or "")
+                actual = (result.get("stdout") or "").strip()
+                expected = (tc.get("expected_output") or "").strip()
+                if actual == expected:
+                    passed += 1
+            except Exception:
+                pass
+            await asyncio.sleep(0.3)
+        score_pct = passed / total_tc
+        final_score = round(score_pct * max_marks)
+
+    await db.from_("coding_submissions").upsert({
         "attempt_id": req.attempt_id,
         "coding_question_id": req.coding_question_id,
-        "code": req.code or "",
+        "code": code,
         "language": req.language or "python",
-        "score": req.score,
+        "score": final_score,
         "status": "tested"
     }, on_conflict="attempt_id,coding_question_id")
-    
+
     sel_res = await db.from_("coding_submissions").select("*").eq("attempt_id", req.attempt_id).eq("coding_question_id", req.coding_question_id).single()
-    return {"message": "Code score updated", "submission": sel_res.data}
+    return {"message": "Code evaluated server-side", "submission": sel_res.data, "passed": passed, "total": total_tc}
 
 @router.post("/submit-exam")
 async def submit_exam(req: SubmitExamRequest, user: Dict[str, Any] = Depends(get_current_user)):
@@ -133,8 +182,10 @@ async def submit_exam(req: SubmitExamRequest, user: Dict[str, Any] = Depends(get
         raise HTTPException(status_code=400, detail="Exam already submitted")
         
     now_str = datetime.datetime.utcnow().isoformat() + "Z"
+    # Use 'grading' status to prevent concurrent reads from seeing a
+    # completed-but-ungraded attempt with a stale/zero score.
     up_res = await db.from_("attempts").update({
-        "status": "completed",
+        "status": "grading",
         "submitted_at": now_str
     }).eq("id", req.attempt_id).select().single()
     
@@ -142,7 +193,14 @@ async def submit_exam(req: SubmitExamRequest, user: Dict[str, Any] = Depends(get
         raise HTTPException(status_code=400, detail=up_res.error.get("message") or "Failed to submit exam")
         
     # Queue background grading
-    asyncio.create_task(grade_attempt_background(req.attempt_id, user, up_res.data["exam_id"], now_str))
+    task = asyncio.create_task(grade_attempt_background(req.attempt_id, user, up_res.data["exam_id"], now_str))
+    _background_grading_tasks.add(task)
+    task.add_done_callback(_background_grading_tasks.discard)
+    
+    return {
+        "message": "Exam submitted successfully. Grading is processing in the background.",
+        "attempt": up_res.data
+    }
     
     return {
         "message": "Exam submitted successfully. Grading is processing in the background.",

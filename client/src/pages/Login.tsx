@@ -61,8 +61,12 @@ export default function Login() {
     try {
       const { data } = await authApi.login(email, password);
       login(data.token, data.user);
-    } catch (err: any) {
-      setError(err.response?.data?.error || "Invalid credentials. Please try again.");
+    } catch (err: unknown) {
+      const message = typeof err === "object" && err !== null && "response" in err &&
+        typeof (err as { response?: { data?: { error?: string } } }).response?.data?.error === "string"
+        ? (err as { response?: { data?: { error?: string } } }).response?.data?.error || "Invalid credentials. Please try again."
+        : "Invalid credentials. Please try again.";
+      setError(message);
     } finally {
       setLoading(false);
     }

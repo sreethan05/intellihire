@@ -4,23 +4,10 @@ import jwt
 from .db import db
 from typing import Any, Dict
 
-from .config import APP_URL, JWT_SECRET, CORS_ALLOWED_ORIGINS
+from .config import JWT_SECRET, get_allowed_origins
 from .logger import logger
 
-allowed_origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
-if APP_URL and APP_URL not in allowed_origins:
-    allowed_origins.append(APP_URL)
-
-if CORS_ALLOWED_ORIGINS:
-    for origin in CORS_ALLOWED_ORIGINS.split(","):
-        origin = origin.strip()
-        if origin and origin not in allowed_origins:
-            allowed_origins.append(origin)
+allowed_origins = get_allowed_origins()
 
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=allowed_origins)
 socket_app = socketio.ASGIApp(sio)
@@ -74,15 +61,10 @@ async def connect(sid, environ):
             
     cookie_token = get_cookie(cookie_header, "access_token")
     
-    # Handshake auth token support
-    auth = environ.get("asgi.scope", {}).get("query_string", b"").decode("utf-8")
-    auth_token = ""
-    if "token=" in auth:
-        for p in auth.split("&"):
-            if p.startswith("token="):
-                auth_token = p.split("=")[1]
-                
-    token = cookie_token or auth_token
+    # Query-string token fallback removed for security.
+    # Tokens in URLs are logged by proxies/load balancers and persist in
+    # browser history. Only cookie-based auth is accepted for WebSockets.
+    token = cookie_token
     if not token:
         logger.warning(f"[WebSocket] Rejected connection {sid} - authentication required")
         return False

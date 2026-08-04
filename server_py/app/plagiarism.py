@@ -127,6 +127,17 @@ async def run_plagiarism_check(attempt_id: str) -> None:
         cur_att_res = await db.from_("attempts").select("*, users:candidate_id(name)").eq("id", attempt_id).single()
         cur_candidate_name = cur_att_res.data.get("users", {}).get("name") if cur_att_res.data else "Candidate"
         
+        # Batch-fetch all other submissions for all coding questions at once
+        all_question_ids = [sub["coding_question_id"] for sub in current_submissions if sub.get("code") and sub["code"].strip()]
+        all_other_subs: dict = {}
+        if all_question_ids:
+            batch_res = await db.from_("coding_submissions").select("*, attempts:attempt_id(*, users:candidate_id(name))").in_("coding_question_id", all_question_ids).neq("attempt_id", attempt_id)
+            for other_sub in (batch_res.data or []):
+                qid = other_sub.get("coding_question_id")
+                if qid not in all_other_subs:
+                    all_other_subs[qid] = []
+                all_other_subs[qid].append(other_sub)
+
         for sub in current_submissions:
             if not sub.get("code") or not sub["code"].strip():
                 continue
@@ -134,9 +145,8 @@ async def run_plagiarism_check(attempt_id: str) -> None:
             # Clear existing plagiarism flags for this specific submission
             await db.from_("plagiarism_flags").delete().eq("attempt_id", attempt_id).eq("coding_submission_id", sub["id"])
             
-            # Fetch all other submissions for the same coding question
-            oth_subs_res = await db.from_("coding_submissions").select("*, attempts:attempt_id(*, users:candidate_id(name))").eq("coding_question_id", sub["coding_question_id"]).neq("attempt_id", attempt_id)
-            other_submissions = oth_subs_res.data or []
+            # Use batch-fetched other submissions for this coding question
+            other_submissions = all_other_subs.get(sub["coding_question_id"], [])
             
             for other_sub in other_submissions:
                 if not other_sub.get("code") or not other_sub["code"].strip():

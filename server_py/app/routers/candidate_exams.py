@@ -24,7 +24,8 @@ async def get_exam(examId: str, user: Dict[str, Any] = Depends(get_current_user)
     if exam_res.error or not exam_res.data:
         raise HTTPException(status_code=404, detail="Exam not found")
         
-    mcq_res = await db.from_("exam_questions").select("*, questions:question_id(*)").eq("exam_id", examId)
+    # Exclude correct_option from MCQ questions to prevent answer key leakage
+    mcq_res = await db.from_("exam_questions").select("*, questions:question_id(id, question_text, option_a, option_b, option_c, option_d, marks, topic, difficulty, subtopic, concept_tags, bloom_level, estimated_time_sec)").eq("exam_id", examId)
     coding_res = await db.from_("exam_coding_questions").select("*, coding_questions:coding_question_id(*)").eq("exam_id", examId)
     
     mcq_mapped = []

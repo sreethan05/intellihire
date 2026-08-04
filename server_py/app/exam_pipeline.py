@@ -1,5 +1,7 @@
 import asyncio
+import math
 import random
+random.seed(42)  # Deterministic exam generation for fairness/audit
 import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -361,12 +363,13 @@ def apply_coding_variation(question: dict, depth: int) -> Tuple[dict, str]:
             
         description = re.sub(r"(\d{1,3})(\D)", replace_num_desc, description)
         
-        # Adjust test case inputs slightly
+        # Adjust test case inputs and expected outputs consistently
         new_test_cases = []
         for tc in test_cases:
             tc_copy = dict(tc)
             input_val = str(tc_copy.get("input", ""))
-            
+            expected_val = str(tc_copy.get("expected_output", ""))
+
             def replace_num_input(match):
                 num = match.group(1)
                 suffix = match.group(2)
@@ -374,8 +377,10 @@ def apply_coding_variation(question: dict, depth: int) -> Tuple[dict, str]:
                 if 1 < n < 20:
                     return f"{n + 1}{suffix}"
                 return match.group(0)
-                
+
+            # Apply the same numeric transformation to BOTH input AND expected output
             tc_copy["input"] = re.sub(r"(\d{1,2})(\D)", replace_num_input, input_val)
+            tc_copy["expected_output"] = re.sub(r"(\d{1,2})(\D)", replace_num_input, expected_val)
             new_test_cases.append(tc_copy)
         test_cases = new_test_cases
         note = "varied-coding-v1"
@@ -481,7 +486,6 @@ async def select_mcq_questions(config: dict) -> List[dict]:
             subtopic_groups[subtopic].append(s)
             
         subtopics = list(subtopic_groups.keys())
-        import math
         per_subtopic = math.ceil(count / len(subtopics))
         
         for subtopic in subtopics:
@@ -687,12 +691,10 @@ async def generate_exam(config: dict) -> dict:
     difficulty = config.get("difficulty", "medium")
     
     if question_type in ("mcq", "mixed"):
-        import math
         mcq_count = math.ceil(count * 0.7) if question_type == "mixed" else count
         mcq_questions = await select_mcq_questions({**config, "count": mcq_count})
         
     if question_type in ("coding", "mixed"):
-        import math
         coding_count = math.floor(count * 0.3) if question_type == "mixed" else count
         if question_type == "mixed" and coding_count == 0 and count > 0:
             coding_count = 1
@@ -736,7 +738,6 @@ async def generate_exam(config: dict) -> dict:
         else:
             estimated_time += 15
             
-    import math
     result = {
         "questions": mcq_questions,
         "codingQuestions": coding_questions,

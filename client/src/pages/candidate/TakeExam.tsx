@@ -618,11 +618,10 @@ export default function TakeExam() {
     });
 
     if (attemptId && data?.score !== undefined) {
-      const rawScore = Math.round((data.score / 100) * codingQuestion.marks);
+      // Score is now computed server-side - we only send code + language.
       await resultApi.updateCodeScore({
         attempt_id: attemptId,
         coding_question_id: codingQuestion.coding_question_id,
-        score: rawScore,
         code: submission.code,
         language: submission.language,
       });

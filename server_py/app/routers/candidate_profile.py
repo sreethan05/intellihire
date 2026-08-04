@@ -11,6 +11,7 @@ from ..auth_router import get_current_user
 from ..db import db
 from ..upload_validation import read_validated_pdf
 from ..utils import storage_root, hash_password
+from ..validation import get_password_validation_error
 
 router = APIRouter(prefix="/api/candidate", tags=["candidate_profile"])
 
@@ -33,17 +34,6 @@ class OnboardingRequest(BaseModel):
     domain_preference: str
     marksheet_url: Optional[str] = None
     resume_url: Optional[str] = None
-
-def get_password_validation_error(password: str) -> str:
-    if len(password) < 8:
-        return "Password must be at least 8 characters long."
-    if not any(char.isupper() for char in password):
-        return "Password must contain at least one uppercase letter."
-    if not any(char.islower() for char in password):
-        return "Password must contain at least one lowercase letter."
-    if not any(char.isdigit() for char in password):
-        return "Password must contain at least one digit."
-    return ""
 
 def check_ats_parseability(text: str, meta: dict = None) -> dict:
     meta = meta or {}

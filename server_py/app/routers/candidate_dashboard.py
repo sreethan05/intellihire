@@ -1,8 +1,10 @@
 import datetime
 import re
 from typing import Dict, Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
+
+from ..rate_limit import limiter
 
 from ..auth_router import get_current_user
 from ..db import db
@@ -285,7 +287,8 @@ async def get_job_pipeline(user: Dict[str, Any] = Depends(get_current_user)):
     return {"pipeline": pipeline, "stages": stages}
 
 @router.get("/portfolio/{slug}")
-async def get_portfolio(slug: str):
+@limiter.limit("30/minute")
+async def get_portfolio(slug: str, request: Request):
     is_uuid = bool(re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", slug, re.IGNORECASE))
     
     query = db.from_("candidate_profiles").select("id, user_id, photo_url, branch, cgpa, graduation_year, skills, resume_url, documents_verified, public_portfolio_slug, github_url, linkedin_url, portfolio_url, bio, projects, semester_grades, user:user_id(name), college:college_id(name, code)")

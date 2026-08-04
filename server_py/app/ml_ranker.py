@@ -210,6 +210,6 @@ class CandidateJobFitRanker:
             },
         }
 
-# Global singleton ranker instance
+# Global singleton ranker instance.
+# Training is deferred to first predict() call to avoid slow startup.
 ranker = CandidateJobFitRanker()
-ranker.train()

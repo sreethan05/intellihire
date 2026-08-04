@@ -74,8 +74,8 @@ export const recruiterApi = {
   getDriveEligibleCandidates: (driveId: string) => api.get(`/recruiter/drives/${driveId}/eligible-candidates`),
   assignDriveExam: (driveId: string, exam_id: string) => api.post(`/recruiter/drives/${driveId}/assign-exam`, { exam_id }),
   getDriveAiConfig: (driveId: string) => api.get(`/recruiter/drives/${driveId}/ai-config`),
-  saveDriveAiConfig: (driveId: string, aiConfig: any) => api.post(`/recruiter/drives/${driveId}/ai-config`, { aiConfig }),
-  testDriveAiConfig: (driveId: string, data: { question: string; answer: string; aiConfig: any }) =>
+  saveDriveAiConfig: (driveId: string, aiConfig: Record<string, unknown>) => api.post(`/recruiter/drives/${driveId}/ai-config`, { aiConfig }),
+  testDriveAiConfig: (driveId: string, data: { question: string; answer: string; aiConfig: Record<string, unknown> }) =>
     api.post(`/recruiter/drives/${driveId}/test-evaluation`, data),
   compareCandidates: (candidateIds: string[]) =>
     api.get("/recruiter/candidates/compare", { params: { candidateIds: candidateIds.join(",") } }),
@@ -154,8 +154,8 @@ export const examApi = {
     api.post("/exam/bank/link-mcq", data),
   linkBankCoding: (data: { exam_id: string; coding_question_ids: string[] }) =>
     api.post("/exam/bank/link-coding", data),
-  saveBankMcqs: (questions: any[]) => api.post("/exam/bank/add-mcqs", { questions }),
-  saveBankCoding: (question: any) => api.post("/exam/bank/add-coding", { question }),
+  saveBankMcqs: (questions: Array<Record<string, unknown>>) => api.post("/exam/bank/add-mcqs", { questions }),
+  saveBankCoding: (question: Record<string, unknown>) => api.post("/exam/bank/add-coding", { question }),
 };
 
 export const candidateApi = {
@@ -171,7 +171,7 @@ export const candidateApi = {
     marksheet_url?: string;
     resume_url?: string;
   }) => api.post("/candidate/onboarding", data),
-  updateProfile: (data: any) => api.put("/candidate/profile", data),
+  updateProfile: (data: Record<string, unknown>) => api.put("/candidate/profile", data),
   uploadResume: (file: File) => {
     const formData = new FormData();
     formData.append("resume", file);
@@ -207,7 +207,6 @@ export const resultApi = {
   updateCodeScore: (data: {
     attempt_id: string;
     coding_question_id: string;
-    score: number;
     code: string;
     language: string;
   }) => api.post("/result/update-code-score", data),

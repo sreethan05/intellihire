@@ -152,7 +152,7 @@ async def login(req: LoginRequest, response: Response, request: Request):
     # Create refresh session
     refresh_tok = generate_refresh_token()
     token_hash = hash_refresh_token(refresh_tok)
-    expires_at = (datetime.datetime.utcnow() + datetime.timedelta(days=30)).isoformat()
+    expires_at = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)).isoformat()
     
     ip = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")

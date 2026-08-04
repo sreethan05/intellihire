@@ -260,7 +260,7 @@ async def assign_exam(req: AssignExamRequest, user: Dict[str, Any] = Depends(req
             if u.get("email"):
                 app_url = "http://localhost:3000"
                 body = f"Hello {u.get('name') or 'Candidate'},\n\nYou have been assigned a new exam: {exam_title}.\n\nGo to: {app_url}/candidate/my-exams to start."
-                send_email_async(u["email"], "New Exam Assigned", body)
+                await send_email_async(u["email"], "New Exam Assigned", body)
                 
     return {"message": message, "assignments": upserted}
 
