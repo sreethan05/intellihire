@@ -66,7 +66,7 @@ def set_session_cookies(response: Response, access_token: str, refresh_token: st
         max_age=ACCESS_TOKEN_TTL_SECONDS,
         httponly=True,
         secure=secure_flag,
-        samesite="strict",
+        samesite="lax",
         path="/"
     )
     
@@ -76,7 +76,7 @@ def set_session_cookies(response: Response, access_token: str, refresh_token: st
         max_age=REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60,
         httponly=True,
         secure=secure_flag,
-        samesite="strict",
+        samesite="lax",
         path="/"
     )
     
@@ -86,7 +86,7 @@ def set_session_cookies(response: Response, access_token: str, refresh_token: st
         max_age=REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60,
         httponly=False,
         secure=secure_flag,
-        samesite="strict",
+        samesite="lax",
         path="/"
     )
     
@@ -96,10 +96,10 @@ def set_session_cookies(response: Response, access_token: str, refresh_token: st
 
 def clear_session_cookies(response: Response):
     secure_flag = is_production()
-    response.delete_cookie("access_token", path="/", httponly=True, samesite="strict", secure=secure_flag)
-    response.delete_cookie("refresh_token", path="/", httponly=True, samesite="strict", secure=secure_flag)
-    response.delete_cookie("token", path="/", httponly=True, samesite="strict", secure=secure_flag)
-    response.delete_cookie("csrf_token", path="/", samesite="strict", secure=secure_flag)
+    response.delete_cookie("access_token", path="/", httponly=True, samesite="lax", secure=secure_flag)
+    response.delete_cookie("refresh_token", path="/", httponly=True, samesite="lax", secure=secure_flag)
+    response.delete_cookie("token", path="/", httponly=True, samesite="lax", secure=secure_flag)
+    response.delete_cookie("csrf_token", path="/", samesite="lax", secure=secure_flag)
 
 # Authentication dependency
 async def get_current_user(request: Request) -> Dict[str, Any]:
@@ -108,20 +108,20 @@ async def get_current_user(request: Request) -> Dict[str, Any]:
         raise HTTPException(status_code=401, detail="Unauthorized")
     try:
         decoded = verify_token(token)
-        # Re-fetch the user from DB so that role changes or account suspension
+        # Re-fetch the user from DB so that role changes
         # take effect within the access-token window rather than only on expiry.
         res = await db.from_("users").select(
-            "id, email, role, status"
+            "id, email, role"
         ).eq("id", decoded["id"]).maybeSingle()
         user_row = res.data if res else None
         if not user_row:
             raise HTTPException(status_code=401, detail="User no longer exists")
-        if user_row.get("status") == "suspended":
-            raise HTTPException(status_code=403, detail="Account suspended")
         # Merge DB-truth role/email back so downstream code sees current values.
         decoded["role"] = user_row["role"]
         decoded["email"] = user_row["email"]
         return decoded
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
 
