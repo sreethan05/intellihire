@@ -1,12 +1,15 @@
 import os
 import datetime
 import bcrypt
-from fastapi import APIRouter, Request, Response, HTTPException, Depends
+from fastapi import APIRouter, Request, Response, HTTPException, Depends, UploadFile, File
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from .db import db, get_connection, transaction
 from .auth_router import get_current_user, require_roles
 from .utils import hash_password, check_password
+from .pipeline import parse_file, ParserError, normalize_dataframe, ingest_students
+from .repositories import bulk_import_repo
+
 
 router = APIRouter(prefix="/api/tpo", tags=["tpo"])
 
@@ -769,4 +772,157 @@ async def get_placement_dashboard(user: Dict[str, Any] = Depends(require_roles([
                 "branches": branches,
                 "yearlyTrends": trends,
             }
+
+
+class ResolveConflictRequest(BaseModel):
+    resolution: str
+
+
+@router.post("/bulk-import/upload")
+async def bulk_import_upload(
+    file: UploadFile = File(...),
+    user: Dict[str, Any] = Depends(require_roles(["tpo"])),
+):
+    college_id = await get_tpo_college(user["id"])
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Missing filename")
+
+    file_bytes = await file.read()
+    if not file_bytes:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+    try:
+        batch_id, file_hash = await bulk_import_repo.create_batch(
+            college_id=college_id,
+            uploaded_by=user["id"],
+            filename=file.filename,
+            file_bytes=file_bytes,
+        )
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail=str(err))
+    except Exception as err:
+        raise HTTPException(status_code=500, detail=f"Failed to initiate import batch: {err}")
+
+    try:
+        df, columns = parse_file(file_bytes, file.filename)
+        records = normalize_dataframe(df)
+    except ParserError as err:
+        await bulk_import_repo.fail_batch(batch_id, str(err))
+        raise HTTPException(status_code=400, detail=str(err))
+    except Exception as err:
+        await bulk_import_repo.fail_batch(batch_id, f"Parsing error: {err}")
+        raise HTTPException(status_code=400, detail=f"Parsing error: {err}")
+
+    room = f"user:{user['id']}"
+    created, updated, conflicts_count, conflicts = await ingest_students(
+        records=records,
+        college_id=college_id,
+        creator_id=user["id"],
+        batch_id=batch_id,
+        room=room,
+    )
+
+    return {
+        "message": f"Bulk import complete: {created} created, {updated} updated, {conflicts_count} conflicts staged.",
+        "batch_id": batch_id,
+        "file_hash": file_hash,
+        "created": created,
+        "updated": updated,
+        "conflicts": conflicts_count,
+        "conflicts_list": conflicts,
+    }
+
+
+@router.get("/bulk-import/batches")
+async def get_bulk_import_batches(
+    page: int = 1,
+    limit: int = 20,
+    user: Dict[str, Any] = Depends(require_roles(["tpo"])),
+):
+    college_id = await get_tpo_college(user["id"])
+    return await bulk_import_repo.list_batches(college_id, page=page, limit=limit)
+
+
+@router.get("/bulk-import/batches/{batch_id}")
+async def get_bulk_import_batch(
+    batch_id: str,
+    user: Dict[str, Any] = Depends(require_roles(["tpo"])),
+):
+    college_id = await get_tpo_college(user["id"])
+    batch = await bulk_import_repo.get_batch(batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    if batch["college_id"] != college_id:
+        raise HTTPException(status_code=403, detail="Batch does not belong to your college")
+    return {"batch": batch}
+
+
+@router.get("/bulk-import/batches/{batch_id}/conflicts")
+async def get_bulk_import_conflicts(
+    batch_id: str,
+    status: Optional[str] = None,
+    page: int = 1,
+    limit: int = 50,
+    user: Dict[str, Any] = Depends(require_roles(["tpo"])),
+):
+    college_id = await get_tpo_college(user["id"])
+    batch = await bulk_import_repo.get_batch(batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    if batch["college_id"] != college_id:
+        raise HTTPException(status_code=403, detail="Batch does not belong to your college")
+
+    return await bulk_import_repo.list_conflicts(
+        batch_id=batch_id,
+        resolution_status=status,
+        page=page,
+        limit=limit,
+    )
+
+
+@router.post("/bulk-import/conflicts/{conflict_id}/resolve")
+async def resolve_bulk_import_conflict(
+    conflict_id: str,
+    req: ResolveConflictRequest,
+    user: Dict[str, Any] = Depends(require_roles(["tpo"])),
+):
+    college_id = await get_tpo_college(user["id"])
+    try:
+        res = await bulk_import_repo.resolve_conflict(
+            conflict_id=conflict_id,
+            resolution=req.resolution,
+            resolver_id=user["id"],
+            college_id=college_id,
+            creator_id=user["id"],
+        )
+        return res
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail=str(err))
+    except Exception as err:
+        raise HTTPException(status_code=500, detail=f"Failed to resolve conflict: {err}")
+
+
+@router.post("/bulk-import/batches/{batch_id}/rollback")
+async def rollback_bulk_import_batch(
+    batch_id: str,
+    user: Dict[str, Any] = Depends(require_roles(["tpo"])),
+):
+    college_id = await get_tpo_college(user["id"])
+    batch = await bulk_import_repo.get_batch(batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    if batch["college_id"] != college_id:
+        raise HTTPException(status_code=403, detail="Batch does not belong to your college")
+
+    try:
+        counts = await bulk_import_repo.rollback_batch(batch_id, user["id"])
+        return {
+            "message": f"Batch {batch_id} rolled back successfully",
+            "stats": counts,
+        }
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail=str(err))
+    except Exception as err:
+        raise HTTPException(status_code=500, detail=f"Rollback failed: {err}")
+
 

@@ -108,7 +108,25 @@ export const tpoApi = {
   getDashboardSummary: () => api.get("/tpo/dashboard/summary"),
   verifyStudentBatch: (studentIds: string[], documents_verified: boolean) =>
     api.post("/tpo/verify/batch", { studentIds, documents_verified }),
+  bulkImportUpload: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post("/tpo/bulk-import/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" }
+    });
+  },
+  getBulkImportBatches: (page = 1, limit = 20) =>
+    api.get("/tpo/bulk-import/batches", { params: { page, limit } }),
+  getBulkImportBatch: (batchId: string) =>
+    api.get(`/tpo/bulk-import/batches/${batchId}`),
+  getBulkImportConflicts: (batchId: string, status?: string, page = 1, limit = 50) =>
+    api.get(`/tpo/bulk-import/batches/${batchId}/conflicts`, { params: { status, page, limit } }),
+  resolveBulkImportConflict: (conflictId: string, resolution: "ACCEPT" | "REJECT") =>
+    api.post(`/tpo/bulk-import/conflicts/${conflictId}/resolve`, { resolution }),
+  rollbackBulkImportBatch: (batchId: string) =>
+    api.post(`/tpo/bulk-import/batches/${batchId}/rollback`),
 };
+
 
 export const examApi = {
   createExam: (data: {

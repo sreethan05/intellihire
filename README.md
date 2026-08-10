@@ -1,4 +1,4 @@
-# 🚀 IntelliHire Enterprise Platform: Master Technical Documentation
+# 🚀 IntelliHire Enterprise Platform:
 
 [![CI Pipeline Status](https://img.shields.io/github/actions/workflow/status/sreethan05/intellihire/ci.yml?branch=main&style=flat-square&logo=github)](https://github.com/sreethan05/intellihire/actions)
 [![Python Version](https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)

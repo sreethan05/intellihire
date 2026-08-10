@@ -57,3 +57,5 @@ from .candidate_repo import (
     get_attempts_by_exam_ids,
     get_leaderboard_attempts,
 )
+from . import bulk_import_repo
+
