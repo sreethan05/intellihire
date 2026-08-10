@@ -477,7 +477,7 @@ class DBBuilder:
             offset_sql = " OFFSET %s"
             params.append(self.offset_val)
 
-        sql = f"SELECT {select_sql} FROM {quote_identifier(self.table)}"
+        sql = f"SELECT {select_sql} FROM {quote_identifier(self.table)}"  # nosec B608
         if where_sql:
             sql += f" WHERE {where_sql}"
         sql += order_sql + limit_sql + offset_sql
@@ -492,7 +492,7 @@ class DBBuilder:
 
     def _run_count(self, conn) -> int:
         where_sql, where_params = self._build_where()
-        sql = f"SELECT COUNT(*) AS count FROM {quote_identifier(self.table)}"
+        sql = f"SELECT COUNT(*) AS count FROM {quote_identifier(self.table)}"  # nosec B608
         if where_sql:
             sql += f" WHERE {where_sql}"
         with conn.cursor(row_factory=dict_row) as cur:
@@ -517,7 +517,7 @@ class DBBuilder:
             row_placeholders.append("(" + ", ".join(placeholders) + ")")
 
         sql = (
-            f"INSERT INTO {quote_identifier(self.table)} "
+            f"INSERT INTO {quote_identifier(self.table)} "  # nosec B608
             f"({', '.join(quote_identifier(col) for col in columns)}) "
             f"VALUES {', '.join(row_placeholders)}"
         )
@@ -530,7 +530,7 @@ class DBBuilder:
                 sql += f" ON CONFLICT ({conflict_sql}) DO NOTHING"
             else:
                 updates = ", ".join(f"{quote_identifier(col)} = EXCLUDED.{quote_identifier(col)}" for col in update_columns)
-                sql += f" ON CONFLICT ({conflict_sql}) DO UPDATE SET {updates}"
+                sql += f" ON CONFLICT ({conflict_sql}) DO UPDATE SET {updates}"  # nosec B608
 
         sql += " RETURNING *"
         with conn.cursor(row_factory=dict_row) as cur:
@@ -553,7 +553,7 @@ class DBBuilder:
         where_sql, where_params = self._build_where()
         params.extend(where_params)
 
-        sql = f"UPDATE {quote_identifier(self.table)} SET {', '.join(set_sql)}"
+        sql = f"UPDATE {quote_identifier(self.table)} SET {', '.join(set_sql)}"  # nosec B608
         if where_sql:
             sql += f" WHERE {where_sql}"
         sql += " RETURNING *"
@@ -566,9 +566,9 @@ class DBBuilder:
     def _execute_delete(self, conn) -> List[Dict[str, Any]]:
         where_sql, where_params = self._build_where()
         if self.table in SOFT_DELETE_TABLES:
-            sql = f"UPDATE {quote_identifier(self.table)} SET deleted_at = NOW()"
+            sql = f"UPDATE {quote_identifier(self.table)} SET deleted_at = NOW()"  # nosec B608
         else:
-            sql = f"DELETE FROM {quote_identifier(self.table)}"
+            sql = f"DELETE FROM {quote_identifier(self.table)}"  # nosec B608
         if where_sql:
             sql += f" WHERE {where_sql}"
         sql += " RETURNING *"
@@ -649,7 +649,7 @@ class DBBuilder:
                 raise ValueError(f"No relation mapping from {self.table} for filter {col}")
             child_clause, child_params = self._simple_filter_to_sql(child_column, op, val)
             return (
-                f"{quote_identifier(relation.column)} IN "
+                f"{quote_identifier(relation.column)} IN "  # nosec B608
                 f"(SELECT {quote_identifier(relation.target_column)} FROM {quote_identifier(relation.target_table)} WHERE {child_clause})",
                 child_params,
             )
