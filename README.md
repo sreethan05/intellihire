@@ -339,76 +339,114 @@ IntelliHire provides robust CSV and Excel data export capabilities powered by cl
 intellihire/
 ├── .github/
 │   └── workflows/
-│       └── ci.yml                      # GitHub Actions CI Pipeline definition
+│       └── ci.yml                      # 4-stage GitHub Actions CI Pipeline (Lint, Pytest+Bandit, Audit, E2E)
 ├── client/                             # React 19 + TypeScript Vite Frontend Workspace
 │   ├── public/                         # Static assets (favicons, public logos)
 │   ├── src/
 │   │   ├── components/                 # Reusable UI components
-│   │   │   ├── layout/                 # Main Layout wrapper & navigation bars
-│   │   │   └── ui/                     # Base UI components (buttons, cards, inputs)
+│   │   │   ├── layout/                 # Main Layout wrapper, Navbar, & Sidebar
+│   │   │   └── ui/                     # Radix UI + Tailwind design system components
 │   │   ├── context/                    # React Context Providers
 │   │   │   ├── AuthContext.tsx         # User authentication & token state
 │   │   │   └── CollegeContext.tsx      # Campus selection state for recruiters
-│   │   ├── lib/                        # Client utilities
-│   │   │   ├── api.ts                  # Axios HTTP client configuration
+│   │   ├── lib/                        # Client utilities & API layer
+│   │   │   ├── api.ts                  # Axios HTTP client with auth interceptors
 │   │   │   ├── csvExport.ts            # CSV spreadsheet generation helper
 │   │   │   └── exportUtils.ts          # Advanced data formatting utility
 │   │   ├── pages/                      # Role-based page views
-│   │   │   ├── admin/                  # Admin overview, management, analytics
-│   │   │   ├── candidate/              # Candidate exams, sandbox, certificates
-│   │   │   ├── recruiter/              # Recruiter drives, creation, proctoring
-│   │   │   ├── tpo/                    # TPO reports, student roster, activity
-│   │   │   ├── Login.tsx               # Login page
-│   │   │   └── PublicCertificateVerify.tsx # Public certificate verification
-│   │   ├── App.tsx                     # Main router configuration & protected routes
-│   │   ├── index.css                   # Global Tailwind CSS & dark theme tokens
+│   │   │   ├── admin/                  # Admin overview, user management, audit logs
+│   │   │   ├── candidate/              # Exams, sandbox, certificates, AI interviews, onboarding
+│   │   │   ├── recruiter/              # Drives, active monitoring, AI studio, candidate analytics
+│   │   │   ├── tpo/                    # TPO dashboard, reports, bulk student roster & conflict resolution
+│   │   │   ├── HubPage.tsx             # Universal role redirection & quick launch hub
+│   │   │   ├── Login.tsx               # Authentication gateway
+│   │   │   ├── PublicCertificateVerify.tsx # Public cryptographic certificate verification
+│   │   │   └── PublicPortfolio.tsx     # Candidate public skills portfolio
+│   │   ├── App.tsx                     # Main router configuration & role guards
+│   │   ├── index.css                   # Global Tailwind CSS & dark theme design tokens
 │   │   └── main.tsx                    # React application entry point
-│   ├── package.json                    # Frontend package dependencies
+│   ├── package.json                    # Frontend package dependencies & scripts
 │   ├── tsconfig.json                   # Client TypeScript compiler settings
-│   └── vite.config.ts                  # Vite build & proxy settings
-├── database/                           # PostgreSQL SQL migrations & seed data
-│   ├── 01_schema.sql                   # Primary table definitions & constraints
-│   ├── 02_seed.sql                     # Seed users, colleges, and sample exams
-│   └── migrations/                     # Incremental schema evolution scripts
-├── e2e/                                # Playwright End-to-End Test Suite
-│   ├── admin.spec.ts                   # Admin workflows E2E tests
-│   ├── api.spec.ts                     # Backend API health & response E2E tests
-│   ├── candidate.spec.ts               # Candidate exam flow E2E tests
+│   └── vite.config.ts                  # Vite build, code splitting & proxy configuration
+├── database/                           # PostgreSQL SQL modular migrations (01 to 21)
+│   ├── 01_users_colleges.sql           # Base users, roles, and college entities
+│   ├── 02_questions.sql                # Question bank & tags
+│   ├── 03_exams.sql                    # Exams, schedules, and duration constraints
+│   ├── 04_jobs_pipeline.sql           # Placement drive jobs & candidate pipeline
+│   ├── 05_attempts_submissions.sql     # Candidate attempts, submissions, and answer logs
+│   ├── 06_proctoring.sql               # Live proctoring flags and webcam snapshots
+│   ├── 07_interviews_feedback.sql      # AI voice interviews, answers, and rubric evaluations
+│   ├── 08_platform_system.sql          # System notifications, certificates, and action items
+│   ├── 09_seed_data.sql                # Comprehensive development seed dataset
+│   ├── 10_indexes.sql ... 20_cleanup.sql # Performance indexing, audit logs, retention & refresh tokens
+│   └── 21_bulk_import.sql              # Bulk student import batches, staging & conflict resolution
+├── e2e/                                # Playwright End-to-End Test Suite (7 spec suites)
+│   ├── admin.spec.ts                   # Admin workflows & management E2E tests
+│   ├── api.spec.ts                     # Backend API health & response contract E2E tests
+│   ├── candidate.spec.ts               # Candidate exam flow & sandbox E2E tests
 │   ├── hub-smoke.spec.ts               # Multi-role dashboard smoke E2E tests
-│   ├── login.spec.ts                   # Login flow & session E2E tests
-│   └── recruiter.spec.ts               # Recruiter drive & exam builder E2E tests
+│   ├── login.spec.ts                   # Authentication flow & session persistence E2E tests
+│   ├── quality.spec.ts                 # Page health & visual smoke E2E tests
+│   └── recruiter.spec.ts               # Recruiter drive & assessment builder E2E tests
 ├── server_py/                          # Python FastAPI Backend Workspace
 │   ├── app/                            # Application package
-│   │   ├── ai.py                       # AI interview & assessment helper services
-│   │   ├── audit_logger.py             # System audit log tracking helper
-│   │   ├── auth.py                     # Authentication router & JWT handling
-│   │   ├── compiler.py                 # Remote code compilation sandbox client
-│   │   ├── config.py                   # Pydantic environment configuration
-│   │   ├── db.py                       # PostgreSQL connection pooling wrapper
-│   │   ├── main.py                     # FastAPI application initialization & routes
-│   │   ├── proctoring.py               # Proctoring flag analyzer & storage
-│   │   ├── websocket.py                # Python Socket.IO WebSocket handlers
-│   │   └── routers/                    # Endpoint routers
-│   │       ├── admin.py                # Admin user & system endpoints
-│   │       ├── candidate.py            # Candidate exam submission endpoints
-│   │       ├── recruiter.py            # Recruiter drive & proctoring endpoints
-│   │       └── tpo.py                  # TPO student management endpoints
-│   ├── tests/                          # Backend Pytest Test Suite (110 test cases)
-│   │   ├── conftest.py                 # Pytest fixtures & setup
-│   │   ├── test_auth.py                # Auth unit tests
-│   │   ├── test_candidate_service.py   # Candidate workflow tests
-│   │   └── test_recruiter_service.py   # Recruiter workflow tests
-│   ├── pytest.ini                      # Pytest configuration settings
+│   │   ├── middleware/                 # ASGI Middleware
+│   │   │   ├── audit_logger.py         # Request auditing middleware
+│   │   │   ├── csrf.py                 # CSRF protection middleware
+│   │   │   ├── error_handler.py        # Centralized exception handler
+│   │   │   ├── logger_middleware.py    # Structured HTTP request logger
+│   │   │   ├── request_id.py           # Correlation Request-ID injector
+│   │   │   └── security_headers.py     # HSTS, CSP, and security header injector
+│   │   ├── pipeline/                   # Bulk Ingestion & Normalization Engine
+│   │   │   ├── ingestion.py            # Async batch processor with conflict detection
+│   │   │   ├── normalizer.py           # Field cleaner (phone, roll no, branch, CGPA)
+│   │   │   └── parser.py               # Multi-format tabular data parser (CSV, Excel)
+│   │   ├── repositories/               # Direct Database Access Layer
+│   │   │   ├── bulk_import_repo.py     # Batch and conflict state repository
+│   │   │   ├── candidate_repo.py       # Candidate profile and attempt queries
+│   │   │   ├── interview_repo.py       # AI interview state repository
+│   │   │   └── recruiter_repo.py       # Recruiter drives and college queries
+│   │   ├── routers/                    # Modularized Sub-Routers
+│   │   │   ├── admin_analytics.py      # Admin system and performance analytics
+│   │   │   ├── admin_users.py          # Admin user CRUD and college provisioning
+│   │   │   ├── candidate_analytics.py  # Candidate performance charts & stats
+│   │   │   ├── candidate_dashboard.py  # Candidate home dashboard state
+│   │   │   ├── candidate_exams.py      # Candidate exam list and waitlist handlers
+│   │   │   ├── candidate_profile.py    # Candidate profile and resume management
+│   │   │   ├── recruiter_candidates.py # Recruiter candidate search and review
+│   │   │   ├── recruiter_dashboard.py  # Recruiter dashboard metrics
+│   │   │   └── recruiter_drives.py     # Recruiter drive management
+│   │   ├── ai.py                       # Groq LLM question generation & report evaluator
+│   │   ├── auth_router.py              # JWT authentication, refresh tokens, & RBAC guards
+│   │   ├── compiler.py                 # Remote code compilation sandbox client (Judge0)
+│   │   ├── config.py                   # Environment configuration & validation
+│   │   ├── db.py                       # PostgreSQL connection pooling & query executor
+│   │   ├── main.py                     # FastAPI application entry point
+│   │   ├── migration_runner.py         # Automated startup database migration runner
+│   │   ├── ml_ranker.py                # Candidate scoring & ranking ML engine
+│   │   ├── plagiarism.py               # Code plagiarism & similarity analyzer
+│   │   ├── proctoring.py               # Proctoring event analyzer & telemetry
+│   │   ├── queue_manager.py            # Redis / local in-process fallback task queue
+│   │   ├── tpo.py                      # TPO student management & bulk import endpoints
+│   │   └── websocket.py                # Python Socket.IO real-time event handlers
+│   ├── tests/                          # Backend Pytest Suite (138 test cases in 34 files)
+│   │   ├── conftest.py                 # Pytest test client & DB fixtures
+│   │   ├── test_auth.py                # Authentication & JWT unit tests
+│   │   ├── test_bulk_import_pipeline.py# Bulk import ETL unit tests
+│   │   ├── test_exam_pipeline.py       # Exam creation & grading pipeline tests
+│   │   └── ...                         # 30+ additional test suites covering all modules
+│   ├── pytest.ini                      # Pytest runner settings
 │   └── requirements.txt                # Python backend package dependencies
-├── scripts/                            # Helper runner scripts
+├── scripts/                            # Utility scripts
 │   └── run-uvicorn.js                  # Cross-platform Uvicorn launcher
 ├── Dockerfile                          # Multi-stage production container build
-├── docker-compose.yml                  # Docker Compose dev infrastructure
-├── package.json                        # Root workspace npm scripts
+├── docker-compose.yml                  # Local development PostgreSQL infrastructure
+├── package.json                        # Monorepo root npm orchestrator scripts
 └── README.md                           # Master technical documentation
 ```
 
 ---
+
 
 ## 📡 REST API Endpoint Specifications
 
@@ -540,6 +578,41 @@ Response (200 OK):
 }
 ```
 
+```http
+POST /api/tpo/bulk-import/upload
+Authorization: Bearer <JWT_TOKEN>
+Content-Type: multipart/form-data
+
+File: students_roster.csv
+dry_run: false
+
+Response (200 OK):
+{
+  "batch_id": "batch_9812",
+  "status": "completed",
+  "total_rows": 120,
+  "imported_count": 118,
+  "conflict_count": 2,
+  "errors": []
+}
+```
+
+```http
+POST /api/tpo/bulk-import/conflicts/{conflict_id}/resolve
+Authorization: Bearer <JWT_TOKEN>
+Content-Type: application/json
+
+{
+  "resolution_strategy": "overwrite"
+}
+
+Response (200 OK):
+{
+  "success": true,
+  "message": "Student record updated with resolved details."
+}
+```
+
 ---
 
 ### Admin Operations & System Auditing (`/api/admin/*`)
@@ -567,19 +640,69 @@ Response (200 OK):
 ### AI & Analytical Engine (`/api/ai/*`)
 
 ```http
-POST /api/ai/generate-questions
+POST /api/ai/generate-mcq
 Authorization: Bearer <JWT_TOKEN>
 Content-Type: application/json
 
 {
   "topic": "Data Structures & Algorithms",
-  "difficulty": "hard",
+  "difficulty": "medium",
   "count": 5
 }
 
 Response (200 OK):
 {
-  "questions": [...]
+  "questions": [
+    {
+      "question_text": "What is the time complexity of searching in a balanced AVL tree?",
+      "options": ["O(1)", "O(log n)", "O(n)", "O(n log n)"],
+      "correct_answer": 1,
+      "explanation": "AVL trees maintain balanced binary search tree invariants yielding O(log n) lookups."
+    }
+  ]
+}
+```
+
+```http
+POST /api/ai/generate-coding
+Authorization: Bearer <JWT_TOKEN>
+Content-Type: application/json
+
+{
+  "topic": "Dynamic Programming",
+  "difficulty": "hard"
+}
+
+Response (200 OK):
+{
+  "title": "Longest Common Subsequence",
+  "problem_statement": "Given two strings text1 and text2, return the length of their longest common subsequence.",
+  "template_code": "def longestCommonSubsequence(text1: str, text2: str) -> int:\n    pass",
+  "test_cases": [
+    {"input": "abcde\nace", "expected_output": "3", "is_hidden": false}
+  ]
+}
+```
+
+```http
+POST /api/ai/rank-candidates
+Authorization: Bearer <JWT_TOKEN>
+Content-Type: application/json
+
+{
+  "mcq_score_pct": 85.0,
+  "coding_score_pct": 90.0,
+  "time_taken_ratio": 0.65,
+  "proctor_trust_score": 98.0,
+  "code_efficiency_score": 88.0
+}
+
+Response (200 OK):
+{
+  "composite_score": 88.4,
+  "percentile_estimate": 94.2,
+  "recommendation": "Strong Hire",
+  "confidence": 0.91
 }
 ```
 
@@ -587,7 +710,7 @@ Response (200 OK):
 
 ## ⚡ Real-time WebSockets Engine (`/socket.io/*`)
 
-IntelliHire relies on an integrated Python-SocketIO server to coordinate real-time candidate proctoring and system notifications.
+IntelliHire relies on an integrated Python-SocketIO server with Redis pub/sub broadcasting and graceful local memory fallback to coordinate real-time candidate proctoring and system notifications.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────┐
@@ -606,10 +729,10 @@ IntelliHire relies on an integrated Python-SocketIO server to coordinate real-ti
 
 ## 🗄️ PostgreSQL Database Schema & Data Models
 
-The relational database architecture is defined in `database/01_schema.sql`:
+The relational database architecture is maintained via 21 modular migration scripts in [`database/`](file:///c:/Users/USER/OneDrive/Desktop/intellihire/database) managing 33 operational tables:
 
 ```sql
--- Users Table
+-- 1. Users Table (database/01_users_colleges.sql)
 CREATE TABLE IF NOT EXISTS users (
     id VARCHAR(64) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -617,41 +740,70 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255) NOT NULL,
     role VARCHAR(32) NOT NULL CHECK (role IN ('admin', 'tpo', 'recruiter', 'candidate')),
     profile_complete BOOLEAN DEFAULT FALSE,
+    college_id VARCHAR(64) REFERENCES colleges(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Students Profile Table
-CREATE TABLE IF NOT EXISTS students (
+-- 2. Candidate Profiles Table (database/01_users_colleges.sql)
+CREATE TABLE IF NOT EXISTS candidate_profiles (
     id VARCHAR(64) PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     roll_number VARCHAR(64) UNIQUE,
     branch VARCHAR(128),
     cgpa NUMERIC(4, 2),
     graduation_year INT,
+    resume_url TEXT,
+    skills TEXT[],
     documents_verified BOOLEAN DEFAULT FALSE,
-    college_id VARCHAR(64)
+    college_id VARCHAR(64) REFERENCES colleges(id) ON DELETE SET NULL
 );
 
--- Exams Table
+-- 3. Exams & Drives Table (database/03_exams.sql)
 CREATE TABLE IF NOT EXISTS exams (
     id VARCHAR(64) PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
+    description TEXT,
     duration_minutes INT NOT NULL,
     passing_score INT DEFAULT 60,
     created_by VARCHAR(64) REFERENCES users(id),
-    college_id VARCHAR(64),
+    college_id VARCHAR(64) REFERENCES colleges(id) ON DELETE CASCADE,
+    scheduled_start TIMESTAMP WITH TIME ZONE,
+    scheduled_end TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Exam Attempts Table
-CREATE TABLE IF NOT EXISTS exam_attempts (
+-- 4. Attempts Table (database/05_attempts_submissions.sql)
+CREATE TABLE IF NOT EXISTS attempts (
     id VARCHAR(64) PRIMARY KEY,
     exam_id VARCHAR(64) REFERENCES exams(id) ON DELETE CASCADE,
     candidate_id VARCHAR(64) REFERENCES users(id) ON DELETE CASCADE,
     score NUMERIC(5, 2) DEFAULT 0,
     status VARCHAR(32) DEFAULT 'in_progress',
     tab_switches INT DEFAULT 0,
+    trust_score NUMERIC(5, 2) DEFAULT 100.0,
     started_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    completed_at TIMESTAMP WITH TIME ZONE
+    submitted_at TIMESTAMP WITH TIME ZONE
+);
+
+-- 5. Proctoring Snapshots Table (database/06_proctoring.sql)
+CREATE TABLE IF NOT EXISTS proctoring_snapshots (
+    id VARCHAR(64) PRIMARY KEY,
+    attempt_id VARCHAR(64) REFERENCES attempts(id) ON DELETE CASCADE,
+    flag_type VARCHAR(64) NOT NULL,
+    confidence NUMERIC(4, 2),
+    image_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 6. Bulk Import Batches Table (database/21_bulk_import.sql)
+CREATE TABLE IF NOT EXISTS tpo_bulk_batches (
+    id VARCHAR(64) PRIMARY KEY,
+    tpo_id VARCHAR(64) REFERENCES users(id) ON DELETE CASCADE,
+    filename VARCHAR(255) NOT NULL,
+    status VARCHAR(32) DEFAULT 'processing',
+    total_records INT DEFAULT 0,
+    successful_records INT DEFAULT 0,
+    conflicted_records INT DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
@@ -748,7 +900,7 @@ npm run dev
 
 ## 🧪 Automated Quality Assurance & Testing Framework
 
-IntelliHire maintains an exhaustive automated testing suite across three distinct verification layers:
+IntelliHire maintains an exhaustive automated testing suite across four distinct verification layers:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────┐
@@ -756,31 +908,46 @@ IntelliHire maintains an exhaustive automated testing suite across three distinc
 ├───────────────────────┬──────────────────────────────────────────────────────────┤
 │ Client Type Checking  │ `npm --prefix client run check` (tsc -b)                 │
 │ Client Code Linting   │ `npm --prefix client run lint` (ESLint)                  │
-│ Backend Pytest Suite  │ `.\server_py\.venv\Scripts\python.exe -m pytest`         │
-│ Playwright E2E Suite  │ `npx playwright test` (17 full end-to-end flows)         │
+│ Client Unit Testing   │ `npm --prefix client test` (Vitest - 21 test cases)      │
+│ Backend Pytest Suite  │ `.\server_py\.venv\Scripts\python.exe -m pytest` (138)   │
+│ Security AST Scanning │ `bandit -q -r server_py/app -s B101,B104,B105 -ll`       │
+│ Playwright E2E Suite  │ `npx playwright test` (7 automated browser test suites)  │
 └───────────────────────┴──────────────────────────────────────────────────────────┘
 ```
 
-### 1. Client Static Analysis & Type Checking
+### 1. Client Static Analysis, Linting & Unit Testing
 
-Validates TypeScript type safety and linting constraints across all React components:
+Validates TypeScript type safety, ESLint rules, and Vitest component/hook unit tests:
 
 ```bash
+# TypeScript compiler type check
 npm --prefix client run check
+
+# ESLint code quality scan
 npm --prefix client run lint
+
+# Vitest client-side unit test suite (21 unit tests across 12 files)
+npm --prefix client test
 ```
 
 ### 2. Backend Pytest Unit & Integration Testing
 
-Executes 110+ comprehensive test cases covering authentication, database repositories, exam pipelines, plagiarism detection, and WebSocket routers:
+Executes **138 comprehensive test cases** across 34 test files covering authentication, database repositories, exam pipelines, bulk ingestion, plagiarism detection, rate limiting, and WebSocket events:
 
 ```bash
+# Run backend test suite
 .\server_py\.venv\Scripts\python.exe -m pytest server_py/tests
+
+# Run backend test suite with code coverage
+.\server_py\.venv\Scripts\python.exe -m pytest server_py/tests --cov=server_py/app --cov-report=term-missing --cov-fail-under=60
+
+# Run Bandit AST security scan
+bandit -q -r server_py/app -s B101,B104,B105 -ll
 ```
 
 ### 3. Playwright End-to-End (E2E) Browser Suite
 
-Spawns automated Chromium browser sessions verifying real user journeys across Admin, Recruiter, TPO, and Candidate workflows:
+Spawns automated Chromium browser sessions verifying real user journeys across Admin, Recruiter, TPO, and Candidate workflows across 7 test suites:
 
 ```bash
 npx playwright test
@@ -840,7 +1007,7 @@ on:
 
 jobs:
   client-check:
-    name: Client Lint & Type Check
+    name: Client Lint, Type Check & Vitest
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -849,24 +1016,81 @@ jobs:
           node-version: 20
           cache: 'npm'
           cache-dependency-path: 'client/package-lock.json'
-      - run: npm --prefix client ci
+      - run: npm --prefix client install
       - run: npm --prefix client run lint
       - run: npm --prefix client run check
+      - run: npm --prefix client run test -- --run
 
   backend-pytest:
-    name: FastAPI Backend Pytest
+    name: FastAPI Backend Pytest & Bandit Scan
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: intellihire
+        ports:
+          - 5432:5432
     env:
       JWT_SECRET: "ci-secret-key-for-testing-purposes-only-1234567890"
       DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/intellihire"
+      NODE_ENV: "test"
+      PYTHONPATH: "server_py"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
+          cache-dependency-path: 'server_py/requirements.txt'
+      - run: pip install -r server_py/requirements.txt pytest-cov bandit
+      - name: Apply Database Schemas
+        run: |
+          for sql in database/*.sql; do
+            psql -h localhost -U postgres -d intellihire -f "$sql"
+          done
+      - run: python -m pytest server_py/tests --cov=server_py/app --cov-report=term-missing --cov-fail-under=60
+      - run: bandit -q -r server_py/app -s B101,B104,B105 -ll
+
+  dependency-audit:
+    name: Dependency Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: 'client/package-lock.json'
+      - run: npm --prefix client install
+      - run: npm --prefix client audit --audit-level=critical
+
+  e2e-playwright:
+    name: Playwright E2E Smoke Suite
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: intellihire
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
       - run: pip install -r server_py/requirements.txt
-      - run: pytest server_py/tests
+      - run: npm install && npm --prefix client install
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test e2e/login.spec.ts e2e/hub-smoke.spec.ts e2e/api.spec.ts --reporter=list
 ```
 
 ---
