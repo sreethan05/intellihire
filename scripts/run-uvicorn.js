@@ -1,4 +1,4 @@
-import { spawn } from "child_process";
+import { spawn, execSync } from "child_process";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -12,14 +12,29 @@ const venvBinDir = isWin ? "Scripts" : "bin";
 const pythonName = isWin ? "python.exe" : "python";
 const pythonPath = path.join(serverPyDir, ".venv", venvBinDir, pythonName);
 
-let binToRun = pythonPath;
-if (!fs.existsSync(pythonPath)) {
-  binToRun = "python";
+function resolvePython() {
+  if (process.env.PYTHON) {
+    return process.env.PYTHON;
+  }
+  if (fs.existsSync(pythonPath)) {
+    return pythonPath;
+  }
+  const candidates = isWin ? ["python", "python3", "py"] : ["python3", "python"];
+  for (const candidate of candidates) {
+    try {
+      execSync(`${candidate} --version`, { stdio: "ignore" });
+      return candidate;
+    } catch {
+      // try next candidate
+    }
+  }
+  return isWin ? "python" : "python3";
 }
 
+const binToRun = resolvePython();
 const args = ["-m", "uvicorn", ...process.argv.slice(2)];
 
-console.log(`Launching: ${binToRun} ${args.join(" ")}`);
+console.log(`[run-uvicorn] Launching: ${binToRun} ${args.join(" ")}`);
 
 const child = spawn(binToRun, args, {
   cwd: projectRoot,

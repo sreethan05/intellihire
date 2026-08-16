@@ -128,6 +128,7 @@ jobs:
       DATABASE_URL: "postgresql://postgres:postgres@127.0.0.1:5432/intellihire"
       NODE_ENV: "test"
       PYTHONPATH: "server_py"
+      PYTHON: "python3"
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
