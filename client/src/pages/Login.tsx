@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
+import { useNavigate } from "react-router";
 import { useAuth } from "@/context/AuthContext";
 import { authApi } from "@/lib/api";
 import { AlertCircle } from "lucide-react";
@@ -38,6 +39,7 @@ const TABS = [
 type TabKey = (typeof TABS)[number]["key"];
 
 export default function Login() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabKey>("admin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -61,6 +63,13 @@ export default function Login() {
     try {
       const { data } = await authApi.login(email, password);
       login(data.token, data.user);
+      const role = data.user.role;
+      const target =
+        role === "admin" ? "/admin/overview" :
+        role === "tpo" ? "/tpo/overview" :
+        role === "recruiter" ? "/recruiter/overview" :
+        data.user.must_change_password || data.user.profile_complete === false ? "/candidate/onboarding" : "/candidate/overview";
+      navigate(target, { replace: true });
     } catch (err: unknown) {
       const message = typeof err === "object" && err !== null && "response" in err &&
         typeof (err as { response?: { data?: { error?: string } } }).response?.data?.error === "string"

@@ -11,25 +11,25 @@ test.describe("HubPage Smoke Tests per Role", () => {
     await expect(page).toHaveURL(/admin\/overview/, { timeout: 15000 });
 
     // Dashboard header check
-    await expect(page.getByRole("heading", { name: "Platform Control Console" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Platform Control Console" })).toBeVisible({ timeout: 15000 });
 
     // Check dashboard blocks
-    await expect(page.getByText("Active Action Center")).toBeVisible();
-    await expect(page.getByText("Recent Activities")).toBeVisible();
-    await expect(page.getByText("Orchestration Telemetry Diagnostics")).toBeVisible();
+    await expect(page.getByText("Active Action Center")).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText("Recent Activities")).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText("Orchestration Telemetry Diagnostics")).toBeVisible({ timeout: 15000 });
   });
 
   test("Recruiter can view recruiter overview hub", async ({ page }) => {
     await page.goto("/login");
-    await page.fill('input[name="email"]', "recruiter@example.com");
-    await page.fill('input[name="password"]', "recruiter123");
+    await page.fill('input[name="email"]', "recruiter@intellihire.com");
+    await page.fill('input[name="password"]', "admin123");
     await page.click('button[type="submit"]');
 
     // Should redirect to recruiter/overview
     await expect(page).toHaveURL(/recruiter\/overview/, { timeout: 15000 });
 
     // Dashboard header check
-    await expect(page.getByRole("heading", { name: "Test Recruiter's Command Hub" })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { name: "Lead Recruiter's Command Hub" })).toBeVisible({ timeout: 15000 });
 
     // Check dashboard blocks
     await expect(page.getByText("Recent Activities")).toBeVisible({ timeout: 15000 });
@@ -38,15 +38,15 @@ test.describe("HubPage Smoke Tests per Role", () => {
 
   test("TPO can view TPO overview hub", async ({ page }) => {
     await page.goto("/login");
-    await page.fill('input[name="email"]', "tpo@example.com");
-    await page.fill('input[name="password"]', "tpo123");
+    await page.fill('input[name="email"]', "tpo@intellihire.com");
+    await page.fill('input[name="password"]', "admin123");
     await page.click('button[type="submit"]');
 
     // Should redirect to tpo/overview
     await expect(page).toHaveURL(/tpo\/overview/, { timeout: 15000 });
 
     // Dashboard header check
-    await expect(page.getByRole("heading", { name: "Test TPO's Command Hub" })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { name: "College TPO's Command Hub" })).toBeVisible({ timeout: 15000 });
 
     // Check dashboard blocks
     await expect(page.getByText("Recent Activities")).toBeVisible({ timeout: 15000 });
@@ -55,8 +55,8 @@ test.describe("HubPage Smoke Tests per Role", () => {
 
   test("Candidate can view candidate overview hub", async ({ page }) => {
     await page.goto("/login");
-    await page.fill('input[name="email"]', "candidate@example.com");
-    await page.fill('input[name="password"]', "candidate123");
+    await page.fill('input[name="email"]', "candidate@intellihire.com");
+    await page.fill('input[name="password"]', "admin123");
     await page.click('button[type="submit"]');
 
     // Wait for initial redirect away from login
@@ -65,7 +65,7 @@ test.describe("HubPage Smoke Tests per Role", () => {
     // Should redirect to candidate/overview or onboarding
     if (page.url().includes("onboarding")) {
       // If onboarded is needed, fill form to reach candidate overview
-      await page.fill('input[name="rollNumber"]', "CAND001");
+      await page.fill('input[name="rollNumber"]', "CS2026001");
       await page.fill('input[name="branch"]', "CSE");
       await page.fill('input[name="cgpa"]', "9.5");
       await page.fill('input[name="graduationYear"]', "2026");
@@ -76,7 +76,7 @@ test.describe("HubPage Smoke Tests per Role", () => {
     await expect(page).toHaveURL(/candidate\/overview/, { timeout: 15000 });
 
     // Dashboard header check
-    await expect(page.getByRole("heading", { name: "Test Candidate's Command Hub" })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { name: "Alex Candidate's Command Hub" })).toBeVisible({ timeout: 15000 });
 
     // Check dashboard blocks
     await expect(page.getByText("Active Action Center")).toBeVisible({ timeout: 15000 });

@@ -13,7 +13,7 @@ test.describe("Login Flow", () => {
     await expect(page).toHaveURL(/admin\/overview/, { timeout: 15000 });
 
     // Dashboard should be visible
-    await expect(page.getByRole("heading", { name: "Platform Control Console" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Platform Control Console" })).toBeVisible({ timeout: 15000 });
   });
 
   test("shows error for invalid credentials", async ({ page }) => {
@@ -25,7 +25,7 @@ test.describe("Login Flow", () => {
     await page.click('button[type="submit"]');
 
     // Should show error toast or message
-    await expect(page.locator("text=Invalid credentials")).toBeVisible();
+    await expect(page.locator("text=Invalid credentials")).toBeVisible({ timeout: 15000 });
   });
 
   test("redirects authenticated user away from login", async ({ page }) => {

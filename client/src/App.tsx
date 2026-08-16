@@ -55,7 +55,21 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
+      <Route
+        path="/login"
+        element={
+          user ? (
+            <Navigate to={
+              user.role === "admin" ? "/admin/overview" :
+              user.role === "tpo" ? "/tpo/overview" :
+              user.role === "recruiter" ? "/recruiter/overview" :
+              user.must_change_password || user.profile_complete === false ? "/candidate/onboarding" : "/candidate/overview"
+            } replace />
+          ) : (
+            <Login />
+          )
+        }
+      />
       <Route
         path="/"
         element={
