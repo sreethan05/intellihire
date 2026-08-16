@@ -7,7 +7,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
-  reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "html",
+  reporter: process.env.CI ? [["list"], ["github"], ["html", { open: "never" }]] : "html",
   use: {
     baseURL: "http://127.0.0.1:3000",
     trace: "retain-on-failure",

@@ -170,7 +170,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run Playwright smoke suite
-        run: DEBUG=pw:webserver npx playwright test e2e/login.spec.ts e2e/hub-smoke.spec.ts e2e/api.spec.ts --reporter=list,html
+        run: npx playwright test e2e/login.spec.ts e2e/hub-smoke.spec.ts e2e/api.spec.ts
 
       - name: Upload Playwright Report
         if: always()
