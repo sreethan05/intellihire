@@ -13,10 +13,21 @@ NOTE: slowapi requires the route function to accept a `Request` parameter
 named exactly `request` — FastAPI already injects it, just make sure it's
 present in the signature of every rate-limited route.
 """
+import os
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+
+# Disable rate limiting in test or CI environments or when explicitly disabled
+is_rate_limiting_disabled = (
+    os.getenv("NODE_ENV") == "test"
+    or os.getenv("TESTING") == "true"
+    or os.getenv("DISABLE_RATE_LIMITS") == "true"
+    or bool(os.getenv("CI"))
+    or bool(os.getenv("PYTEST_CURRENT_TEST"))
+)
 
 # Keyed by client IP. If the app sits behind a proxy/load balancer, make sure
 # ProxyHeadersMiddleware (or equivalent) is configured so get_remote_address
 # sees the real client IP rather than the proxy's.
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=get_remote_address, enabled=not is_rate_limiting_disabled)
+

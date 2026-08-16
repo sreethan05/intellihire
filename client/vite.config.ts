@@ -10,6 +10,7 @@ export default defineConfig({
   base: '/',
   plugins: [react()],
   server: {
+    host: true,
     port: 3000,
     watch: {
       ignored: ['**/server_py/**', '**/.venv/**']

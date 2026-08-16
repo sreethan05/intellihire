@@ -25,6 +25,10 @@ export default defineConfig({
       url: "http://localhost:5000/api/health",
       reuseExistingServer: true,
       timeout: 120 * 1000,
+      env: {
+        DISABLE_RATE_LIMITS: "true",
+        NODE_ENV: "test",
+      },
     },
     {
       command: "npm --prefix client run dev",
