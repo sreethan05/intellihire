@@ -168,6 +168,34 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
+      - name: Pre-flight server check
+        run: |
+          echo "=== Starting backend server ==="
+          npm run server:py &
+          BACKEND_PID=$!
+          echo "Backend PID: $BACKEND_PID"
+
+          echo "=== Waiting for backend health ==="
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:5000/api/health > /dev/null 2>&1; then
+              echo "Backend healthy after ${i}s"
+              break
+            fi
+            sleep 2
+          done
+
+          curl -sf http://127.0.0.1:5000/api/health && echo "Backend OK" || echo "Backend FAILED"
+
+          echo "=== Testing login endpoint ==="
+          curl -sf -X POST http://127.0.0.1:5000/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{"email":"admin@intellihire.com","password":"admin123"}' \
+            -w "\nHTTP Status: %{http_code}\n" || echo "Login request failed"
+
+          echo "=== Stopping pre-flight backend ==="
+          kill $BACKEND_PID 2>/dev/null || true
+          sleep 2
+
       - name: Run Playwright smoke suite
         run: npx playwright test e2e/login.spec.ts e2e/hub-smoke.spec.ts e2e/api.spec.ts --reporter=list,html
 
@@ -176,5 +204,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: playwright-report/
+          path: |
+            playwright-report/
+            test-results/
           retention-days: 7

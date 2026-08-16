@@ -24,7 +24,14 @@ console.log(`Launching: ${binToRun} ${args.join(" ")}`);
 const child = spawn(binToRun, args, {
   cwd: projectRoot,
   stdio: "inherit",
-  env: process.env,
+  // On Windows, shell: true is required for PATH resolution of bare "python".
+  // On POSIX, we avoid shell: true so args are passed directly to execvp.
+  shell: isWin,
+});
+
+child.on("error", (err) => {
+  console.error(`Failed to start python process: ${err.message}`);
+  process.exit(1);
 });
 
 child.on("close", (code) => {
