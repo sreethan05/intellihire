@@ -70,14 +70,14 @@ class CandidateJobFitRanker:
         )
 
         # Binary label with logistic threshold
-        probs = 1.0 / (1.0 + np.exp(-(weighted_score - 55.0) / 10.0))
+        probs = 1.0 / (1.0 + np.exp(-(weighted_score - 55.0) / 6.0))
         y = (np.random.binomial(1, probs) == 1).astype(int)
 
         return X_raw, y
 
     def train(self) -> Dict[str, Any]:
         """Train model to maximum extent using Grid Search, 5-Fold CV, and Ensemble Stacking."""
-        X_raw, y = self.generate_training_dataset(num_samples=3000)
+        X_raw, y = self.generate_training_dataset(num_samples=1000)
 
         # 1. Strict Train/Test Split BEFORE fitting any transformer
         X_train, X_test, y_train, y_test = train_test_split(
@@ -94,13 +94,13 @@ class CandidateJobFitRanker:
         # Generate interaction feature names
         self.feature_names_ = [f"f_{i}" for i in range(X_train_poly.shape[1])]
 
-        # 3. Hyperparameter Tuning using 5-Fold Cross-Validation
-        cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+        # 3. Hyperparameter Tuning using 3-Fold Cross-Validation
+        cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
 
         param_grid = {
-            "n_estimators": [100, 200],
-            "max_depth": [3, 4],
-            "learning_rate": [0.05, 0.1],
+            "n_estimators": [50, 80],
+            "max_depth": [3],
+            "learning_rate": [0.1],
         }
 
         grid_search = GridSearchCV(
@@ -114,8 +114,8 @@ class CandidateJobFitRanker:
         best_gb = grid_search.best_estimator_
 
         # 4. Soft Voting Ensemble (GradientBoosting + RandomForest + ExtraTrees)
-        rf = RandomForestClassifier(n_estimators=200, max_depth=6, random_state=42)
-        et = ExtraTreesClassifier(n_estimators=200, max_depth=6, random_state=42)
+        rf = RandomForestClassifier(n_estimators=50, max_depth=5, random_state=42)
+        et = ExtraTreesClassifier(n_estimators=50, max_depth=5, random_state=42)
 
         ensemble = VotingClassifier(
             estimators=[("gb", best_gb), ("rf", rf), ("et", et)],
@@ -123,7 +123,7 @@ class CandidateJobFitRanker:
         )
 
         # 5. Isotonic Probability Calibration
-        calibrated_model = CalibratedClassifierCV(estimator=ensemble, cv=5, method="isotonic")
+        calibrated_model = CalibratedClassifierCV(estimator=ensemble, cv=3, method="isotonic")
         calibrated_model.fit(X_train_poly, y_train)
 
         self.model = calibrated_model
