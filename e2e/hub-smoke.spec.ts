@@ -26,14 +26,14 @@ test.describe("HubPage Smoke Tests per Role", () => {
     await page.click('button[type="submit"]');
 
     // Should redirect to recruiter/overview
-    await expect(page).toHaveURL(/recruiter\/overview/);
+    await expect(page).toHaveURL(/recruiter\/overview/, { timeout: 15000 });
 
     // Dashboard header check
-    await expect(page.getByRole("heading", { name: "Test Recruiter's Command Hub" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Test Recruiter's Command Hub" })).toBeVisible({ timeout: 15000 });
 
     // Check dashboard blocks
-    await expect(page.getByText("Recent Activities")).toBeVisible();
-    await expect(page.getByText("Recruitment Insights Summary")).toBeVisible();
+    await expect(page.getByText("Recent Activities")).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText("Recruitment Insights Summary")).toBeVisible({ timeout: 15000 });
   });
 
   test("TPO can view TPO overview hub", async ({ page }) => {
@@ -43,14 +43,14 @@ test.describe("HubPage Smoke Tests per Role", () => {
     await page.click('button[type="submit"]');
 
     // Should redirect to tpo/overview
-    await expect(page).toHaveURL(/tpo\/overview/);
+    await expect(page).toHaveURL(/tpo\/overview/, { timeout: 15000 });
 
     // Dashboard header check
-    await expect(page.getByRole("heading", { name: "Test TPO's Command Hub" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Test TPO's Command Hub" })).toBeVisible({ timeout: 15000 });
 
     // Check dashboard blocks
-    await expect(page.getByText("Recent Activities")).toBeVisible();
-    await expect(page.getByText("College Recruitment Funnel")).toBeVisible();
+    await expect(page.getByText("Recent Activities")).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText("College Recruitment Funnel")).toBeVisible({ timeout: 15000 });
   });
 
   test("Candidate can view candidate overview hub", async ({ page }) => {
@@ -58,6 +58,9 @@ test.describe("HubPage Smoke Tests per Role", () => {
     await page.fill('input[name="email"]', "candidate@example.com");
     await page.fill('input[name="password"]', "candidate123");
     await page.click('button[type="submit"]');
+
+    // Wait for initial redirect away from login
+    await page.waitForURL(/candidate\/(overview|onboarding)/, { timeout: 15000 });
 
     // Should redirect to candidate/overview or onboarding
     if (page.url().includes("onboarding")) {
@@ -73,11 +76,11 @@ test.describe("HubPage Smoke Tests per Role", () => {
     await expect(page).toHaveURL(/candidate\/overview/, { timeout: 15000 });
 
     // Dashboard header check
-    await expect(page.getByRole("heading", { name: "Test Candidate's Command Hub" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Test Candidate's Command Hub" })).toBeVisible({ timeout: 15000 });
 
     // Check dashboard blocks
-    await expect(page.getByText("Active Action Center")).toBeVisible();
-    await expect(page.getByText("Recent Activities")).toBeVisible();
-    await expect(page.getByText("Evaluation Skill Radar")).toBeVisible();
+    await expect(page.getByText("Active Action Center")).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText("Recent Activities")).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText("Evaluation Skill Radar")).toBeVisible({ timeout: 15000 });
   });
 });

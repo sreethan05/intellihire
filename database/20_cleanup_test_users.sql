@@ -127,7 +127,9 @@ ON CONFLICT (email) DO UPDATE SET
   password_hash = EXCLUDED.password_hash,
   name = EXCLUDED.name,
   role = EXCLUDED.role,
-  college_id = EXCLUDED.college_id;
+  college_id = EXCLUDED.college_id,
+  profile_complete = EXCLUDED.profile_complete,
+  must_change_password = EXCLUDED.must_change_password;
 
 -- 4. Reassign existing created_by references
 UPDATE exams SET created_by = 'b2c3d4e5-f6a7-4b5c-8d9e-0f1a2b3c4d5e' WHERE created_by IS NOT NULL AND created_by NOT IN ('6eacac4f-ffc4-4859-a657-196ba2cd939b', 'a1b2c3d4-e5f6-4a5b-8c7d-9e8f7a6b5c4d', 'b2c3d4e5-f6a7-4b5c-8d9e-0f1a2b3c4d5e', 'c3d4e5f6-a7b8-4c5d-8e9f-0a1b2c3d4e5f', 'd4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a', 'e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b', 'f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c');
