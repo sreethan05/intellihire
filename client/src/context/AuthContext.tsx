@@ -24,12 +24,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const response = await authApi.getMe();
         const parsed = AuthMeResponseSchema.safeParse(response.data);
         if (active && parsed.success) {
-          setUser(parsed.data.user);
+          setUser((prev) => prev ?? parsed.data.user);
         } else if (active) {
-          setUser(null);
+          setUser((prev) => prev ?? null);
         }
       } catch {
-        setUser(null);
+        if (active) {
+          setUser((prev) => prev ?? null);
+        }
       } finally {
         if (active) {
           setLoading(false);
@@ -44,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = (_token: string | null | undefined, user: User) => {
     setUser(user);
+    setLoading(false);
   };
 
   const logout = () => {
@@ -63,7 +66,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     </AuthContext.Provider>
   );
 }
-
 
 export function useAuth() {
   const context = useContext(AuthContext);
