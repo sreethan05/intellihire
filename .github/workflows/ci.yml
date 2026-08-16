@@ -52,7 +52,7 @@ jobs:
           --health-retries 5
     env:
       JWT_SECRET: "ci-secret-key-for-testing-purposes-only-1234567890"
-      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/intellihire"
+      DATABASE_URL: "postgresql://postgres:postgres@127.0.0.1:5432/intellihire"
       NODE_ENV: "test"
       PYTHONPATH: "server_py"
     steps:
@@ -77,7 +77,7 @@ jobs:
           PGPASSWORD: postgres
         run: |
           for sql in database/*.sql; do
-            psql -h localhost -U postgres -d intellihire -f "$sql"
+            psql -h 127.0.0.1 -U postgres -d intellihire -f "$sql"
           done
 
       - name: Run Pytest Suite with Coverage
@@ -125,7 +125,7 @@ jobs:
           --health-retries 5
     env:
       JWT_SECRET: "ci-secret-key-for-testing-purposes-only-1234567890"
-      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/intellihire"
+      DATABASE_URL: "postgresql://postgres:postgres@127.0.0.1:5432/intellihire"
       NODE_ENV: "test"
       PYTHONPATH: "server_py"
     steps:
@@ -156,7 +156,7 @@ jobs:
           PGPASSWORD: postgres
         run: |
           for sql in database/*.sql; do
-            psql -h localhost -U postgres -d intellihire -f "$sql"
+            psql -h 127.0.0.1 -U postgres -d intellihire -f "$sql"
           done
 
       - name: Install Root Dependencies
@@ -169,7 +169,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run Playwright smoke suite
-        run: npx playwright test e2e/login.spec.ts e2e/hub-smoke.spec.ts e2e/api.spec.ts --reporter=list,html
+        run: DEBUG=pw:webserver npx playwright test e2e/login.spec.ts e2e/hub-smoke.spec.ts e2e/api.spec.ts --reporter=list,html
 
       - name: Upload Playwright Report
         if: always()

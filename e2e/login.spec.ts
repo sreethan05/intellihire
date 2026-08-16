@@ -23,7 +23,6 @@ test.describe("Login Flow", () => {
 
   test("shows error for invalid credentials", async ({ page }) => {
     page.on('console', msg => console.log('PAGE LOG:', msg.text()));
-    await page.goto("/login");
 
     await page.fill('input[name="email"]', "wrong@example.com");
     await page.fill('input[name="password"]', "wrongpassword");
@@ -35,7 +34,6 @@ test.describe("Login Flow", () => {
 
   test("redirects authenticated user away from login", async ({ page }) => {
     // Login first
-    await page.goto("/login");
     await page.fill('input[name="email"]', "admin@intellihire.com");
     await page.fill('input[name="password"]', "admin123");
     await page.click('button[type="submit"]');

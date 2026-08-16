@@ -25,7 +25,6 @@ test.describe("HubPage Smoke Tests per Role", () => {
   });
 
   test("Recruiter can view recruiter overview hub", async ({ page }) => {
-    await page.goto("/login");
     await page.fill('input[name="email"]', "recruiter@intellihire.com");
     await page.fill('input[name="password"]', "admin123");
     await page.click('button[type="submit"]');
@@ -42,7 +41,6 @@ test.describe("HubPage Smoke Tests per Role", () => {
   });
 
   test("TPO can view TPO overview hub", async ({ page }) => {
-    await page.goto("/login");
     await page.fill('input[name="email"]', "tpo@intellihire.com");
     await page.fill('input[name="password"]', "admin123");
     await page.click('button[type="submit"]');
@@ -59,7 +57,6 @@ test.describe("HubPage Smoke Tests per Role", () => {
   });
 
   test("Candidate can view candidate overview hub", async ({ page }) => {
-    await page.goto("/login");
     await page.fill('input[name="email"]', "candidate@intellihire.com");
     await page.fill('input[name="password"]', "admin123");
     await page.click('button[type="submit"]');
