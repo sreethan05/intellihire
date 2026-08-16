@@ -1,8 +1,13 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("HubPage Smoke Tests per Role", () => {
-  test("Admin can view admin overview hub", async ({ page }) => {
+  test.beforeEach(async ({ context, page }) => {
+    await context.clearCookies();
     await page.goto("/login");
+    await page.evaluate(() => localStorage.clear());
+  });
+
+  test("Admin can view admin overview hub", async ({ page }) => {
     await page.fill('input[name="email"]', "admin@intellihire.com");
     await page.fill('input[name="password"]', "admin123");
     await page.click('button[type="submit"]');

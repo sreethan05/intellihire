@@ -23,7 +23,7 @@ export default defineConfig({
     {
       command: "npm run server:py",
       url: "http://127.0.0.1:5000/api/health",
-      reuseExistingServer: true,
+      reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,
       env: {
         DISABLE_RATE_LIMITS: "true",
@@ -33,7 +33,7 @@ export default defineConfig({
     {
       command: "npm --prefix client run dev",
       url: "http://127.0.0.1:3000",
-      reuseExistingServer: true,
+      reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,
       env: {
         DISABLE_RATE_LIMITS: "true",

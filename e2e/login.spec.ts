@@ -1,8 +1,13 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Login Flow", () => {
-  test("admin can login and view dashboard", async ({ page }) => {
+  test.beforeEach(async ({ context, page }) => {
+    await context.clearCookies();
     await page.goto("/login");
+    await page.evaluate(() => localStorage.clear());
+  });
+
+  test("admin can login and view dashboard", async ({ page }) => {
 
     // Fill login form
     await page.fill('input[name="email"]', "admin@intellihire.com");
