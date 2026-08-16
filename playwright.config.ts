@@ -9,7 +9,7 @@ export default defineConfig({
   workers: 1,
   reporter: "html",
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: "http://127.0.0.1:3000",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },
@@ -22,7 +22,7 @@ export default defineConfig({
   webServer: [
     {
       command: "npm run server:py",
-      url: "http://localhost:5000/api/health",
+      url: "http://127.0.0.1:5000/api/health",
       reuseExistingServer: true,
       timeout: 120 * 1000,
       env: {
@@ -32,7 +32,7 @@ export default defineConfig({
     },
     {
       command: "npm --prefix client run dev",
-      url: "http://localhost:3000",
+      url: "http://127.0.0.1:3000",
       reuseExistingServer: true,
       timeout: 120 * 1000,
       env: {

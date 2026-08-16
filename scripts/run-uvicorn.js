@@ -24,7 +24,7 @@ console.log(`Launching: ${binToRun} ${args.join(" ")}`);
 const child = spawn(binToRun, args, {
   cwd: projectRoot,
   stdio: "inherit",
-  shell: true,
+  env: process.env,
 });
 
 child.on("close", (code) => {
