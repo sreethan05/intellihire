@@ -169,4 +169,12 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run Playwright smoke suite
-        run: npx playwright test e2e/login.spec.ts e2e/hub-smoke.spec.ts e2e/api.spec.ts --reporter=list
+        run: npx playwright test e2e/login.spec.ts e2e/hub-smoke.spec.ts e2e/api.spec.ts --reporter=list,html
+
+      - name: Upload Playwright Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

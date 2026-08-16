@@ -41,7 +41,7 @@ INSERT INTO users (name, email, password_hash, role)
 VALUES (
   'Super Admin',
   'admin@intellihire.com',
-  '$2b$10$0fObminTV6hQGizL7Gj94umvznPv8EoJosGl08giBAd4R0u8bMwYK', -- admin123 (bcrypt)
+  '$2b$10$Kv9cwK1MHmCtXTXNOCxhyOF/vPCPfbVeV4hkE.zL9CdN5ymuWZFnW', -- admin123 (bcrypt)
   'admin'
 ) ON CONFLICT (email) DO NOTHING;
 -- IntelliHire Auto-Generated Question Bank SQL Seed
