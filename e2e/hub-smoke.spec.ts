@@ -2,6 +2,12 @@ import { test, expect } from "@playwright/test";
 
 test.describe("HubPage Smoke Tests per Role", () => {
   test.beforeEach(async ({ context, page }) => {
+    page.on("console", (msg) => console.log("BROWSER LOG:", msg.text()));
+    page.on("response", (res) => {
+      if (res.url().includes("/api/")) {
+        console.log(`API [${res.status()}] ${res.url()}`);
+      }
+    });
     await context.clearCookies();
     await page.goto("/login");
     await page.evaluate(() => localStorage.clear());

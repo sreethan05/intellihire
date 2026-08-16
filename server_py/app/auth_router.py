@@ -154,6 +154,8 @@ async def login(req: LoginRequest, response: Response, request: Request):
         users = res.data
         
     if res.error or not users or len(users) == 0:
+        from .logger import logger
+        logger.warning(f"Login failed: user not found for identifier '{lookup}' (db error: {res.error})")
         return error_response("Invalid credentials", status_code=401, code="INVALID_CREDENTIALS")
         
     user = users[0]
@@ -164,10 +166,14 @@ async def login(req: LoginRequest, response: Response, request: Request):
         if isinstance(pwd_hash, str):
             pwd_hash = pwd_hash.encode("utf-8")
         valid = bcrypt.checkpw(req.password.encode("utf-8"), pwd_hash)
-    except Exception:
+    except Exception as e:
+        from .logger import logger
+        logger.error(f"Login bcrypt check error for '{lookup}': {e}")
         valid = False
         
     if not valid:
+        from .logger import logger
+        logger.warning(f"Login failed: invalid password for '{lookup}'")
         return error_response("Invalid credentials", status_code=401, code="INVALID_CREDENTIALS")
 
     token = generate_token(user)
