@@ -146,6 +146,14 @@ DELETE FROM users WHERE id NOT IN (
   'd4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a',
   'e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b',
   'f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c'
+) AND email NOT IN (
+  'admin@intellihire.com',
+  'tpo@intellihire.com',
+  'recruiter@intellihire.com',
+  'candidate@intellihire.com',
+  'recruiter@example.com',
+  'tpo@example.com',
+  'candidate@example.com'
 );
 
 -- 6. Create candidate profiles

@@ -37,13 +37,14 @@ INSERT INTO coding_questions (
 ON CONFLICT (title) DO NOTHING;
 
 -- Seed default super admin account (password: admin123)
-INSERT INTO users (name, email, password_hash, role)
+INSERT INTO users (id, name, email, password_hash, role)
 VALUES (
+  '6eacac4f-ffc4-4859-a657-196ba2cd939b',
   'Super Admin',
   'admin@intellihire.com',
   '$2b$10$twBA7k7Q.nPu82N2SSV9tOk.nxtizSR/yz4zJpbkQrF1TSg/w28H2', -- admin123 (bcrypt)
   'admin'
-) ON CONFLICT (email) DO NOTHING;
+) ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash;
 -- IntelliHire Auto-Generated Question Bank SQL Seed
 -- Total: 780 MCQs grouped by topic and difficulty (60 per topic)
 
