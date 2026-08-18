@@ -52,6 +52,7 @@ that should be understood before production use:
 11. [PostgreSQL Database Schema & Data Models](#-postgresql-database-schema--data-models)
 12. [Environment Configuration & Variables Guide](#-environment-configuration--variables-guide)
 13. [Step-by-Step Local Development Setup](#-step-by-step-local-development-setup)
+    - [Default Test Accounts & Credentials](#4-default-test-accounts--credentials)
 14. [Automated Quality Assurance & Testing Framework](#-automated-quality-assurance--testing-framework)
     - [Client Static Analysis & Type Checking](#1-client-static-analysis--type-checking)
     - [Backend Pytest Unit & Integration Testing](#2-backend-pytest-unit--integration-testing)
@@ -896,6 +897,17 @@ npm run dev
 * **FastAPI Backend**: `http://localhost:5000`
 * **Backend Health Check**: `http://localhost:5000/api/health`
 
+### 4. Default Test Accounts & Credentials
+
+The database is pre-seeded with 4 standard user accounts covering all roles:
+
+| Role | Username / Email | Password | Default Redirect Route |
+| :--- | :--- | :--- | :--- |
+| **Super Admin** | `admin@intellihire.com` | `admin123` | `/admin/overview` |
+| **College TPO** | `tpo@intellihire.com` | `admin123` | `/tpo/overview` |
+| **Lead Recruiter** | `recruiter@intellihire.com` | `admin123` | `/recruiter/overview` |
+| **Candidate** | `candidate@intellihire.com` | `admin123` | `/candidate/overview` |
+
 ---
 
 ## 🧪 Automated Quality Assurance & Testing Framework
@@ -1077,20 +1089,36 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: intellihire
-        ports:
-          - 5432:5432
+    env:
+      JWT_SECRET: "ci-secret-key-for-testing-purposes-only-1234567890"
+      DATABASE_URL: "postgresql://postgres:postgres@127.0.0.1:5432/intellihire"
+      NODE_ENV: "test"
+      PYTHONPATH: "server_py"
+      PYTHON: "python3"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: pip
+          cache-dependency-path: server_py/requirements.txt
       - run: pip install -r server_py/requirements.txt
-      - run: npm install && npm --prefix client install
+      - name: Apply Database Schemas
+        env:
+          PGPASSWORD: postgres
+        run: |
+          for sql in database/*.sql; do
+            psql -h 127.0.0.1 -U postgres -d intellihire -f "$sql"
+          done
+      - run: npm install
+      - run: npm --prefix client install
       - run: npx playwright install --with-deps chromium
-      - run: npx playwright test e2e/login.spec.ts e2e/hub-smoke.spec.ts e2e/api.spec.ts --reporter=list
+      - run: npx playwright test e2e/login.spec.ts e2e/hub-smoke.spec.ts e2e/api.spec.ts
 ```
 
 ---
