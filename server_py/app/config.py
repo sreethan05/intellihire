@@ -47,30 +47,6 @@ class Settings(BaseSettings):
             raise ValueError("JWT_SECRET must be at least 32 characters")
         return v
 
-    @field_validator("INTERNAL_API_SECRET")
-    @classmethod
-    def validate_internal_secret(cls, v, info):
-        # In production, INTERNAL_API_SECRET must be set — the /internal/notify
-        # endpoint refuses all requests if it is empty, so a missing secret
-        # silently breaks internal workers in prod.
-        if info.data.get("NODE_ENV") == "production" and not v:
-            raise ValueError("INTERNAL_API_SECRET must be set in production")
-        return v
-
-    @field_validator("JUDGE0_API_KEY")
-    @classmethod
-    def validate_judge0_key(cls, v, info):
-        if info.data.get("NODE_ENV") == "production" and not v:
-            raise ValueError("JUDGE0_API_KEY must be set in production")
-        return v
-
-    @field_validator("S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY")
-    @classmethod
-    def validate_s3_creds(cls, v, info):
-        if info.data.get("NODE_ENV") == "production" and not v:
-            raise ValueError("S3 credentials must be set in production (no dev defaults)")
-        return v
-
     model_config = SettingsConfigDict(env_file=env_path, extra="ignore")
 
 settings = Settings()
