@@ -8,6 +8,9 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15.0+-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 [![License](https://img.shields.io/badge/License-Proprietary-violet?style=flat-square)](#-license)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
+
+> 📖 **Deploy Online for Free**: See the complete [Free Cloud Deployment Guide](./DEPLOYMENT_GUIDE.md) for 1-click deployment on Render with free Neon serverless PostgreSQL.
 
 ---
 
@@ -992,7 +995,7 @@ EXPOSE 5000
 CMD ["gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "server_py.app.main:app", "--bind", "0.0.0.0:5000"]
 ```
 
-### Building & Running Production Container
+### Building & Running Production Container Locally
 
 ```bash
 # Build production Docker image
@@ -1001,6 +1004,14 @@ docker build -t intellihire:latest .
 # Run production container
 docker run -p 5000:5000 --env-file .env intellihire:latest
 ```
+
+### 1-Click Free Cloud Deployment
+
+IntelliHire can be deployed to the cloud **100% free of charge** using **Render** and **Neon serverless PostgreSQL**:
+
+1. **Database**: Create a free PostgreSQL instance on [Neon.tech](https://neon.tech) (free forever, 0.5 GB).
+2. **Web Service**: In [Render.com](https://render.com), create a **New Blueprint Instance** and connect this repository. Render automatically reads [`render.yaml`](./render.yaml) and provisions the service.
+3. For step-by-step instructions and Koyeb setup, read the full **[Free Cloud Deployment Guide](./DEPLOYMENT_GUIDE.md)**.
 
 ---
 

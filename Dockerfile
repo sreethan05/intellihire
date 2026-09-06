@@ -20,6 +20,8 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=server_py
+ENV PORT=5000
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends tesseract-ocr \
@@ -39,4 +41,4 @@ USER appuser
 
 EXPOSE 5000
 
-CMD ["gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "server_py.app.main:app", "--bind", "0.0.0.0:5000"]
+CMD ["sh", "-c", "exec gunicorn -w 2 -k uvicorn.workers.UvicornWorker server_py.app.main:app --bind 0.0.0.0:${PORT:-5000}"]
