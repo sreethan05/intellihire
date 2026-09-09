@@ -35,9 +35,9 @@ const ROLES: RoleConfig[] = [
     key: "admin",
     label: "Admin",
     badge: "Platform Governance",
-    title: "System Control",
+    title: "Admin Login",
     subtitle: "Enterprise administration & global audits",
-    placeholder: "admin@intellihire.com",
+    placeholder: "Enter admin username",
     defaultEmail: "admin@intellihire.com",
     icon: Shield,
   },
@@ -45,9 +45,9 @@ const ROLES: RoleConfig[] = [
     key: "candidate",
     label: "Student",
     badge: "Campus Candidate",
-    title: "Student Portal",
+    title: "Student Login",
     subtitle: "Exams, Monaco sandbox & certificates",
-    placeholder: "candidate@intellihire.com",
+    placeholder: "Enter student email",
     defaultEmail: "candidate@intellihire.com",
     icon: GraduationCap,
   },
@@ -55,9 +55,9 @@ const ROLES: RoleConfig[] = [
     key: "tpo",
     label: "TPO",
     badge: "Placement Cell",
-    title: "Placement Hub",
+    title: "TPO Login",
     subtitle: "Student directory & bulk OCR verification",
-    placeholder: "tpo@intellihire.com",
+    placeholder: "Enter TPO email",
     defaultEmail: "tpo@intellihire.com",
     icon: Building2,
   },
@@ -65,9 +65,9 @@ const ROLES: RoleConfig[] = [
     key: "recruiter",
     label: "Recruiter",
     badge: "Talent Acquisition",
-    title: "Recruiter Suite",
+    title: "Recruiter Login",
     subtitle: "Live drive proctoring & talent assessment",
-    placeholder: "recruiter@intellihire.com",
+    placeholder: "Enter recruiter email",
     defaultEmail: "recruiter@intellihire.com",
     icon: Briefcase,
   },
@@ -316,7 +316,7 @@ export default function Login() {
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••••••"
+                      placeholder="Enter password"
                       className="block h-11 w-full rounded-xl border border-slate-300 bg-slate-50/50 pl-10 pr-11 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-blue-600 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100"
                     />
                     <button
@@ -347,7 +347,7 @@ export default function Login() {
                     </div>
                   ) : (
                     <>
-                      <span>Sign In to {currentRole.label}</span>
+                      <span>Sign In</span>
                       <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
                     </>
                   )}
