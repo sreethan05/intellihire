@@ -1,6 +1,11 @@
 import axios from "axios";
 import type { AuthMeResponse, ProfileStatsResponse } from "./apiSchemas";
 
+// NOTE: Server request/response contracts are generated from the FastAPI
+// OpenAPI schema into ./api-types.gen.ts (`npm run gen:api-types` at the repo
+// root). CI fails if the committed types drift from the backend schema, so
+// regenerate after changing any FastAPI route or model.
+
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 const api = axios.create({

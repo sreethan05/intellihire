@@ -15,6 +15,7 @@ from ..utils import record_pipeline_stage, send_drive_registered_email, storage_
 from ..websocket import send_realtime_notification
 from ..ai import generate_json, has_ai_key
 from ..validation import get_drive_validation_error
+from ..date_utils import utc_now, now_iso
 
 router = APIRouter(prefix="/api/recruiter", tags=["recruiter_drives"])
 
@@ -403,7 +404,7 @@ async def upload_offer_letter(candidate_id: str, job_id: str, offerLetter: Uploa
         raise HTTPException(status_code=404, detail="Candidate not found")
 
     file_bytes = await read_validated_pdf(offerLetter)
-    unique_name = f"{int(datetime.datetime.utcnow().timestamp())}-{uuid.uuid4().hex[:8]}.pdf"
+    unique_name = f"{int(utc_now().timestamp())}-{uuid.uuid4().hex[:8]}.pdf"
     file_path = os.path.join(storage_root, "offers", unique_name)
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
@@ -415,7 +416,7 @@ async def upload_offer_letter(candidate_id: str, job_id: str, offerLetter: Uploa
     await db.from_("candidate_status").update({
         "status": "offered",
         "offer_letter_url": offer_url,
-        "updated_at": datetime.datetime.utcnow().isoformat()
+        "updated_at": now_iso()
     }).eq("candidate_id", candidate_id).eq("job_id", job_id)
     
     await record_pipeline_stage(candidate_id, job_id, "offered", "Offer Letter extended by recruiter", user["id"])

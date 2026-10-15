@@ -6,6 +6,10 @@ pipeline {
         PYTHONPATH   = 'server_py'
         JWT_SECRET   = 'ci-secret-key-for-testing-purposes-only-1234567890'
         DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/intellihire'
+        // CI=true makes Playwright start (and stop) its own backend + client
+        // web servers instead of reusing whatever happens to be on the agent,
+        // and enables retries + the JUnit reporter.
+        CI           = 'true'
     }
 
     options {
@@ -69,48 +73,84 @@ pipeline {
             }
         }
 
-        stage('Client Lint & Vitest Unit Tests') {
+        stage('Client Lint, Types, Vitest & Build') {
             steps {
-                echo "--- Executing Client Lint & Vitest Tests ---"
+                echo "--- Linting, Type-Checking, Testing and Building the Client ---"
                 script {
                     if (isUnix()) {
+                        sh 'mkdir -p reports'
                         sh 'npm --prefix client run lint'
                         sh 'npm --prefix client run check'
-                        sh 'npm --prefix client test -- --run'
+                        sh 'npm --prefix client test -- --run --reporter=default --reporter=junit --outputFile=../reports/vitest.xml'
+                        sh 'npm --prefix client run build'
                     } else {
+                        bat 'if not exist reports mkdir reports'
                         bat 'npm --prefix client run lint'
                         bat 'npm --prefix client run check'
-                        bat 'npm --prefix client test -- --run'
+                        bat 'npm --prefix client test -- --run --reporter=default --reporter=junit --outputFile=../reports/vitest.xml'
+                        bat 'npm --prefix client run build'
                     }
                 }
             }
         }
 
-        stage('FastAPI Backend Pytest & Bandit Audit') {
+        stage('FastAPI Backend Pytest, Coverage & Bandit Audit') {
             steps {
                 echo "--- Executing Backend Unit & Security Tests ---"
                 script {
                     if (isUnix()) {
-                        sh 'python3 -m pytest server_py/tests --cov=server_py/app --cov-report=term-missing --cov-fail-under=30'
+                        sh 'mkdir -p reports'
+                        sh 'python3 -m pytest server_py/tests --cov=server_py/app --cov-report=term-missing --cov-report=xml:reports/coverage.xml --junitxml=reports/pytest.xml --cov-fail-under=40'
                         sh 'bandit -q -r server_py/app -s B101,B104,B105 -ll'
                     } else {
-                        bat 'python -m pytest server_py/tests --cov=server_py/app --cov-report=term-missing --cov-fail-under=30'
+                        bat 'if not exist reports mkdir reports'
+                        bat 'python -m pytest server_py/tests --cov=server_py/app --cov-report=term-missing --cov-report=xml:reports/coverage.xml --junitxml=reports/pytest.xml --cov-fail-under=40'
                         bat 'bandit -q -r server_py/app -s B101,B104,B105 -ll'
                     }
                 }
             }
         }
 
-        stage('Playwright Smoke Tests') {
+        stage('Dependency Vulnerability Audit') {
             steps {
-                echo "--- Executing Playwright Smoke Suite ---"
+                echo "--- Auditing npm Dependencies (production deps for the client) ---"
                 script {
                     if (isUnix()) {
-                        sh 'npx playwright install --with-deps chromium || true'
-                        sh 'npx playwright test e2e/login.spec.ts e2e/hub-smoke.spec.ts e2e/api.spec.ts'
+                        sh 'npm audit --audit-level=high'
+                        sh 'npm --prefix client audit --omit=dev --audit-level=high'
+                    } else {
+                        bat 'npm audit --audit-level=high'
+                        bat 'npm --prefix client audit --omit=dev --audit-level=high'
+                    }
+                }
+            }
+        }
+
+        stage('API Contract Types Check') {
+            steps {
+                echo "--- Verifying generated TypeScript types match the FastAPI schema ---"
+                script {
+                    if (isUnix()) {
+                        sh 'npm run gen:api-types'
+                        sh 'git diff --exit-code client/src/lib/api-types.gen.ts'
+                    } else {
+                        bat 'npm run gen:api-types'
+                        bat 'git diff --exit-code client/src/lib/api-types.gen.ts'
+                    }
+                }
+            }
+        }
+
+        stage('Playwright E2E Suite') {
+            steps {
+                echo "--- Executing Full Playwright E2E Suite ---"
+                script {
+                    if (isUnix()) {
+                        sh 'npx playwright install chromium'
+                        sh 'npx playwright test'
                     } else {
                         bat 'npx playwright install chromium'
-                        bat 'npx playwright test e2e/login.spec.ts e2e/hub-smoke.spec.ts e2e/api.spec.ts'
+                        bat 'npx playwright test'
                     }
                 }
             }
@@ -119,6 +159,8 @@ pipeline {
 
     post {
         always {
+            junit allowEmptyResults: true, skipPublishingChecks: true, testResults: 'reports/*.xml, test-results/junit.xml'
+            archiveArtifacts allowEmptyArchive: true, artifacts: 'reports/**, test-results/**, playwright-report/**'
             echo "========================================================="
             echo "  Build #${env.BUILD_NUMBER} Completed on ${new Date().format('yyyy-MM-dd HH:mm:ss')}"
             echo "========================================================="

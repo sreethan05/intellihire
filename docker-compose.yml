@@ -1,5 +1,3 @@
-
-
 services:
   postgres:
     image: postgres:15-alpine
@@ -12,6 +10,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev -d intellihire"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
   redis:
@@ -21,6 +24,11 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
   minio:
@@ -35,6 +43,11 @@ services:
       - "9001:9001"
     volumes:
       - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
   web:
@@ -50,13 +63,18 @@ services:
       - S3_ACCESS_KEY_ID=minioadmin
       - S3_SECRET_ACCESS_KEY=minioadminpass
       - NODE_ENV=production
-      - JWT_SECRET=YOUR_SECURE_JWT_SECRET_KEY_HERE_MIN_32_CHARS
+      # Never commit a real secret: docker compose reads JWT_SECRET from the
+      # environment (or the git-ignored .env file) and refuses to start without it.
+      - JWT_SECRET=${JWT_SECRET:?Set JWT_SECRET (min 32 chars) in the environment or a .env file before starting}
     ports:
       - "5000:5000"
     depends_on:
-      - postgres
-      - redis
-      - minio
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

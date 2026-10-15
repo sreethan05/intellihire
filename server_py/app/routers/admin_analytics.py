@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ..auth_router import get_current_user, require_roles
 from ..db import db, get_connection
-from ..date_utils import parse_datetime
+from ..date_utils import parse_datetime, now_iso
 from ..config import JUDGE0_API_KEY, GROQ_API_KEY
 from .recruiter_drives import deserialize_drive_colleges
 
@@ -594,7 +594,7 @@ async def get_system_readiness(user: Dict[str, Any] = Depends(require_roles(["ad
     health = {
         "overall": "healthy",
         "checks": {},
-        "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+        "timestamp": now_iso(),
     }
 
     # 1. PostgreSQL check

@@ -64,3 +64,6 @@ coverage/
 .coverage
 htmlcov/
 
+# CI report artifacts (junit xml, coverage xml, exported OpenAPI schema)
+reports/
+

@@ -13,7 +13,14 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
-  reporter: process.env.CI ? [["list"], ["github"], ["html", { open: "never" }]] : "html",
+  reporter: process.env.CI
+    ? [
+        ["list"],
+        ["github"],
+        ["html", { open: "never" }],
+        ["junit", { outputFile: "test-results/junit.xml" }],
+      ]
+    : "html",
   use: {
     baseURL: BASE_URL,
     trace: "retain-on-failure",

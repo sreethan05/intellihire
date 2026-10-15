@@ -7,6 +7,7 @@ from .ai import generate_json, has_ai_key
 from .logger import logger
 from .repositories import interview_repo
 from .utils import deserialize_drive_colleges
+from .date_utils import now_iso
 
 STAGES = [
     {"id": 1, "name": "Introduction", "questionCount": 2},
@@ -165,7 +166,7 @@ async def submit_interview(interview_id: str, candidate_id: str) -> dict:
 
     updated = await interview_repo.update_interview(interview_id, {
         "status": "processing",
-        "submitted_at": datetime.utcnow().isoformat(),
+        "submitted_at": now_iso(),
     })
 
     # Push to background grading queue

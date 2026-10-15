@@ -12,6 +12,7 @@ from .plagiarism import run_plagiarism_check
 from .utils import send_email_async, record_pipeline_stage
 from .websocket import sio
 from .logger import logger
+from .date_utils import now_iso
 
 router = APIRouter(prefix="/api/result", tags=["result"])
 
@@ -525,7 +526,7 @@ async def regrade_attempt(
     cand_res = await db.from_("users").select("id, name, email").eq("id", att_res.data["candidate_id"]).single()
     candidate = cand_res.data or {"id": att_res.data["candidate_id"], "name": "Candidate", "email": ""}
 
-    now_str = datetime.datetime.utcnow().isoformat() + "Z"
+    now_str = now_iso()
     task = asyncio.create_task(grade_attempt_background(attemptId, candidate, exam_id, now_str))
     _background_grading_tasks.add(task)
     task.add_done_callback(_background_grading_tasks.discard)

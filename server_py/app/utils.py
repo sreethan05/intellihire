@@ -7,6 +7,7 @@ from .db import db, get_connection
 
 from .config import JWT_SECRET, NODE_ENV, FILE_STORAGE_DIR
 from .logger import logger
+from .date_utils import now_iso
 
 storage_root = os.path.abspath(FILE_STORAGE_DIR)
 os.makedirs(storage_root, exist_ok=True)
@@ -38,7 +39,7 @@ async def record_pipeline_stage(
     updated_by: Optional[str] = None
 ) -> None:
     try:
-        now_str = datetime.datetime.utcnow().isoformat()
+        now_str = now_iso()
         
         with get_connection() as conn:
             with conn.cursor() as cur:

@@ -41,4 +41,9 @@ USER appuser
 
 EXPOSE 5000
 
+# Reports unhealthy (503) when Postgres is unreachable, so orchestrators can
+# restart/reroute based on real dependency status rather than process liveness.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/api/health', timeout=5)"
+
 CMD ["sh", "-c", "exec gunicorn -w 2 -k uvicorn.workers.UvicornWorker server_py.app.main:app --bind 0.0.0.0:${PORT:-5000}"]

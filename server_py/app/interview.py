@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from .auth_router import get_current_user, require_roles
 from .db import db
 from .ai import generate_json, has_ai_key
-from .date_utils import parse_datetime
+from .date_utils import parse_datetime, now_iso
 from .logger import logger
 from .utils import deserialize_drive_colleges
 
@@ -351,7 +351,7 @@ async def submit_interview(interviewId: str, user: Dict[str, Any] = Depends(get_
     if interview["candidate_id"] != user["id"]:
         raise HTTPException(status_code=403, detail="Forbidden")
         
-    now = datetime.datetime.utcnow().isoformat() + "Z"
+    now = now_iso()
     up_res = await db.from_("ai_interviews").update({
         "status": "processing",
         "submitted_at": now

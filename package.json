@@ -13,11 +13,13 @@
     "lint": "npm --prefix client run lint",
     "preview": "npm --prefix client run preview",
     "start": "node scripts/run-uvicorn.js server_py.app.main:app --port 5000 --host 0.0.0.0",
-    "test:e2e": "npx playwright test"
+    "test:e2e": "npx playwright test",
+    "gen:api-types": "node scripts/export-openapi.mjs && openapi-typescript reports/openapi.json -o client/src/lib/api-types.gen.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
     "concurrently": "^9.1.2",
+    "openapi-typescript": "^7.13.0",
     "playwright": "^1.61.1"
   }
 }

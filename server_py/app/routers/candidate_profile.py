@@ -13,6 +13,7 @@ from ..db import db
 from ..upload_validation import read_validated_pdf
 from ..utils import storage_root, hash_password
 from ..validation import get_password_validation_error
+from ..date_utils import utc_now, now_iso
 
 router = APIRouter(prefix="/api/candidate", tags=["candidate_profile"])
 
@@ -118,7 +119,7 @@ def extract_timeline(text: str) -> dict:
     for match in YEAR_RANGE_RE.finditer(text):
         start_year = int(match.group(1))
         end_raw = match.group(4).lower()
-        end_year = datetime.datetime.utcnow().year if "present" in end_raw or "current" in end_raw else int(end_raw)
+        end_year = utc_now().year if "present" in end_raw or "current" in end_raw else int(end_raw)
         ranges.append({"raw": match.group(0), "startYear": start_year, "endYear": end_year})
         
     ranges.sort(key=lambda x: x["startYear"])
@@ -212,7 +213,7 @@ async def upload_resume(resume: UploadFile = File(...), user: Dict[str, Any] = D
     file_bytes = await read_validated_pdf(resume)
     
     # Save physical copy locally
-    unique_name = f"{int(datetime.datetime.utcnow().timestamp())}-{uuid.uuid4().hex[:8]}.pdf"
+    unique_name = f"{int(utc_now().timestamp())}-{uuid.uuid4().hex[:8]}.pdf"
     file_path = os.path.join(storage_root, "resumes", unique_name)
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
 

@@ -14,18 +14,12 @@ from psycopg.rows import dict_row
 from .config import JWT_SECRET, NODE_ENV
 from .rate_limit import limiter
 from .errors import error_response
+from .date_utils import utc_now
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 ACCESS_TOKEN_TTL_SECONDS = 15 * 60
 REFRESH_TOKEN_TTL_DAYS = 30
-
-_TZ_UTC = datetime.timezone.utc
-
-
-def _now_utc() -> datetime.datetime:
-    """Return a timezone-aware UTC datetime (replaces deprecated utcnow)."""
-    return datetime.datetime.now(_TZ_UTC)
 
 class LoginRequest(BaseModel):
     email: Optional[str] = None
@@ -39,7 +33,7 @@ def generate_token(user: Dict[str, Any]) -> str:
         "id": str(user["id"]),
         "email": user["email"],
         "role": user["role"],
-        "exp": _now_utc() + datetime.timedelta(seconds=ACCESS_TOKEN_TTL_SECONDS)
+        "exp": utc_now() + datetime.timedelta(seconds=ACCESS_TOKEN_TTL_SECONDS)
     }
     return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
 
@@ -260,7 +254,7 @@ async def refresh(request: Request, response: Response):
                 expires_at = datetime.datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
             if expires_at.tzinfo is None:
                 expires_at = expires_at.replace(tzinfo=_TZ_UTC)
-            now = _now_utc()
+            now = utc_now()
                 
             if expires_at <= now:
                 cur.execute("UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = %s", [row["refresh_token_id"]])
@@ -268,7 +262,7 @@ async def refresh(request: Request, response: Response):
                 
             next_ref_token = generate_refresh_token()
             next_hash = hash_refresh_token(next_ref_token)
-            next_expires = (_now_utc() + datetime.timedelta(days=30)).isoformat()
+            next_expires = (utc_now() + datetime.timedelta(days=30)).isoformat()
             
             cur.execute(
                 "UPDATE refresh_tokens SET revoked_at = NOW(), last_used_at = NOW(), replaced_by_token_hash = %s WHERE id = %s",
@@ -332,7 +326,7 @@ async def logout(request: Request, response: Response):
     current_ref_token = request.cookies.get("refresh_token")
     if current_ref_token:
         h = hash_refresh_token(current_ref_token)
-        await db.from_("refresh_tokens").update({"revoked_at": _now_utc().isoformat()}).eq("token_hash", h).eq("revoked_at", None)
+        await db.from_("refresh_tokens").update({"revoked_at": utc_now().isoformat()}).eq("token_hash", h).eq("revoked_at", None)
         
     clear_session_cookies(response)
     return {"success": True}

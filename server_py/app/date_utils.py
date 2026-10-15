@@ -2,6 +2,21 @@ from datetime import datetime, timezone
 from typing import Any, List, Optional
 
 
+def utc_now() -> datetime:
+    """Current time as a timezone-aware UTC datetime.
+
+    Never use the deprecated naive ``datetime.utcnow()`` — aware timestamps
+    serialize unambiguously and compare correctly against DB ``timestamptz``
+    values.
+    """
+    return datetime.now(timezone.utc)
+
+
+def now_iso() -> str:
+    """Current UTC time as an ISO-8601 string ending in ``Z``."""
+    return utc_now().isoformat().replace("+00:00", "Z")
+
+
 def parse_datetime(value: Optional[Any], assume_utc: bool = True) -> Optional[datetime]:
     """Best-effort parse of a datetime or ISO-8601 string into a datetime.
 
