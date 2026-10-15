@@ -11,8 +11,8 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         if request.method in SAFE_METHODS:
             return await call_next(request)
 
-        path = request.url.path
-        # Exempt login and refresh endpoints
+        path = request.url.path.rstrip("/")
+        # Exempt login and refresh endpoints (including trailing slashes)
         if path.endswith("/auth/login") or path.endswith("/auth/refresh"):
             return await call_next(request)
 
@@ -27,7 +27,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         if (
             not cookie_token
             or not header_token
-            or not hmac.compare_digest(cookie_token.encode("utf-8"), header_token.encode("utf-8"))
+            or not hmac.compare_digest(cookie_token.strip().encode("utf-8"), header_token.strip().encode("utf-8"))
         ):
             return JSONResponse(
                 status_code=403,

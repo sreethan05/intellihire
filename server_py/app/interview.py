@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import re
 from urllib.parse import quote, urlencode
@@ -7,9 +8,21 @@ from pydantic import BaseModel
 from .auth_router import get_current_user, require_roles
 from .db import db
 from .ai import generate_json, has_ai_key
+from .date_utils import parse_datetime
+from .logger import logger
 from .utils import deserialize_drive_colleges
 
 router = APIRouter(prefix="/api/interview", tags=["interview"])
+
+# Strong references to fire-and-forget background tasks so they are not
+# garbage-collected mid-flight and can be awaited on shutdown if needed.
+_background_tasks: set = set()
+
+
+def _spawn_background(coro) -> None:
+    task = asyncio.create_task(coro)
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
 
 STAGES = [
     {"id": 1, "name": "Introduction", "questionCount": 2},
@@ -67,6 +80,35 @@ def clamp_score(value: Any, fallback: int = 0) -> int:
 def fallback_feedback(score: int) -> str:
     return "Clear answer with useful detail." if score >= 75 else "Add more concrete examples and outcomes."
 
+
+async def _assert_interview_access(interview: Dict[str, Any], user: Dict[str, Any]) -> None:
+    """Raises 403 unless the user may view/manage this interview.
+
+    - admins: always allowed
+    - candidates: only their own interview
+    - recruiters: only interviews tied to an exam/job they created
+    """
+    role = user.get("role")
+    if role == "admin":
+        return
+    if role == "candidate":
+        if interview.get("candidate_id") == user["id"]:
+            return
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if role == "recruiter":
+        exam_id = interview.get("exam_id")
+        job_id = interview.get("job_id")
+        if exam_id:
+            res = await db.from_("exams").select("id").eq("id", exam_id).eq("created_by", user["id"]).maybeSingle()
+            if res.data:
+                return
+        if job_id:
+            res = await db.from_("jobs").select("id").eq("id", job_id).eq("created_by", user["id"]).maybeSingle()
+            if res.data:
+                return
+        raise HTTPException(status_code=403, detail="Forbidden")
+    raise HTTPException(status_code=403, detail="Forbidden")
+
 async def get_passed_attempts(candidate_id: str, exam_id: str = None) -> List[Dict[str, Any]]:
     query = db.from_("attempts").select("*, exam:exam_id(*)").eq("candidate_id", candidate_id).eq("status", "completed").order("submitted_at", ascending=False)
     if exam_id:
@@ -112,7 +154,23 @@ async def get_pending_interviews(user: Dict[str, Any] = Depends(get_current_user
 
 @router.get("/recruiter/pending")
 async def get_recruiter_pending(user: Dict[str, Any] = Depends(require_roles(["recruiter"]))):
-    res = await db.from_("ai_interviews").select("*, users:candidate_id(id, name, email), jobs:job_id(title)").in_("status", ["scheduled", "completed"]).order("scheduled_start", ascending=True)
+    query = db.from_("ai_interviews").select("*, users:candidate_id(id, name, email), jobs:job_id(title), exam:exam_id(title)").in_("status", ["scheduled", "completed"]).order("scheduled_start", ascending=True)
+
+    exams_res = await db.from_("exams").select("id").eq("created_by", user["id"])
+    jobs_res = await db.from_("jobs").select("id").eq("created_by", user["id"])
+    exam_ids = [e["id"] for e in (exams_res.data or [])]
+    job_ids = [j["id"] for j in (jobs_res.data or [])]
+    if not exam_ids and not job_ids:
+        return {"interviews": []}
+
+    conds = []
+    if exam_ids:
+        conds.append(f"exam_id.in.({','.join(str(x) for x in exam_ids)})")
+    if job_ids:
+        conds.append(f"job_id.in.({','.join(str(x) for x in job_ids)})")
+    query = query.or_(",".join(conds))
+
+    res = await query
     return {"interviews": res.data or []}
 
 @router.post("/start")
@@ -149,6 +207,11 @@ async def schedule_interview(
     req: ScheduleInterviewRequest,
     user: Dict[str, Any] = Depends(require_roles(["recruiter", "admin"]))
 ):
+    existing = await db.from_("ai_interviews").select("id, candidate_id, exam_id, job_id").eq("id", interviewId).maybeSingle()
+    if existing.error or not existing.data:
+        raise HTTPException(status_code=404, detail="Interview not found")
+    await _assert_interview_access(existing.data, user)
+
     res = await db.from_("ai_interviews").update({
         "scheduled_start": req.scheduled_start,
         "scheduled_end": req.scheduled_end,
@@ -161,6 +224,10 @@ async def schedule_interview(
 
 @router.get("/{interviewId}/answers")
 async def get_interview_answers(interviewId: str, user: Dict[str, Any] = Depends(get_current_user)):
+    int_res = await db.from_("ai_interviews").select("id, candidate_id, exam_id, job_id").eq("id", interviewId).maybeSingle()
+    if int_res.error or not int_res.data:
+        raise HTTPException(status_code=404, detail="Interview not found")
+    await _assert_interview_access(int_res.data, user)
     res = await db.from_("ai_interview_answers").select("*").eq("interview_id", interviewId).order("created_at", ascending=True)
     return {"answers": res.data or []}
 
@@ -294,8 +361,7 @@ async def submit_interview(interviewId: str, user: Dict[str, Any] = Depends(get_
         raise HTTPException(status_code=400, detail=up_res.error.get("message") or "Failed to submit interview")
         
     # Asynchronously grade interview evaluation in Python (Background execution)
-    import asyncio
-    asyncio.create_task(evaluate_interview_background(interviewId))
+    _spawn_background(evaluate_interview_background(interviewId))
     
     return {"message": "Interview submitted for evaluation", "interview": up_res.data}
 
@@ -326,11 +392,19 @@ async def get_summaries(
             
         conds = []
         if exam_ids:
-            conds.append(f"exam_id.in.({','.join(exam_ids)})")
+            conds.append(f"exam_id.in.({','.join(str(x) for x in exam_ids)})")
         if job_ids:
-            conds.append(f"job_id.in.({','.join(job_ids)})")
+            conds.append(f"job_id.in.({','.join(str(x) for x in job_ids)})")
         query = query.or_(",".join(conds))
-        
+    elif role == "candidate":
+        query = query.eq("candidate_id", uid)
+    elif role == "tpo":
+        tpo_res = await db.from_("users").select("college_id").eq("id", uid).maybeSingle()
+        tpo_college = (tpo_res.data or {}).get("college_id")
+        if not tpo_college:
+            return {"interviews": []}
+        collegeId = tpo_college
+
     if collegeId:
         prof_res = await db.from_("candidate_profiles").select("user_id").eq("college_id", collegeId)
         user_ids = [p["user_id"] for p in (prof_res.data or []) if p.get("user_id")]
@@ -341,15 +415,16 @@ async def get_summaries(
     res = await query
     return {"interviews": res.data or []}
 
-    return {"interview": res.data}
-
 
 def generate_google_calendar_link(title: str, start_time: str, end_time: str, description: str = "") -> str:
     """Generate a Google Calendar 'Add to Calendar' link."""
     try:
-        from datetime import datetime
-        dt_start = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
-        dt_end = datetime.fromisoformat(end_time.replace("Z", "+00:00"))
+        dt_start = parse_datetime(start_time)
+        dt_end = parse_datetime(end_time)
+        if not dt_start or not dt_end:
+            return ""
+        dt_start = dt_start.astimezone(datetime.timezone.utc)
+        dt_end = dt_end.astimezone(datetime.timezone.utc)
         dates = f"{dt_start.strftime('%Y%m%dT%H%M%SZ')}/{dt_end.strftime('%Y%m%dT%H%M%SZ')}"
         params = {
             "action": "TEMPLATE",
@@ -371,6 +446,7 @@ async def get_calendar_link(interviewId: str, user: Dict[str, Any] = Depends(get
         raise HTTPException(status_code=404, detail="Interview not found")
 
     interview = res.data
+    await _assert_interview_access(interview, user)
     job = interview.get("jobs") or {}
     title = f"AI Interview: {job.get('title') or 'Placement Interview'} ({job.get('company_name') or 'IntelliHire'})"
     start_time = interview.get("scheduled_start") or interview.get("started_at")
@@ -378,14 +454,21 @@ async def get_calendar_link(interviewId: str, user: Dict[str, Any] = Depends(get
     if not start_time:
         raise HTTPException(status_code=400, detail="Interview is not scheduled yet")
     if not end_time:
-        try:
-            dt = datetime.datetime.fromisoformat(start_time.replace("Z", "+00:00"))
-            end_time = (dt + datetime.timedelta(minutes=30)).isoformat()
-        except Exception:
-            end_time = start_time
+        dt = parse_datetime(start_time)
+        end_time = (dt + datetime.timedelta(minutes=30)).isoformat() if dt else start_time
 
     link = generate_google_calendar_link(title, start_time, end_time, f"Join your AI Interview at {job.get('company_name') or 'IntelliHire'}")
     return {"url": link}
+
+
+@router.get("/{interviewId}")
+async def get_interview(interviewId: str, user: Dict[str, Any] = Depends(get_current_user)):
+    """Fetch a single interview (with job details) for the owner/recruiter."""
+    res = await db.from_("ai_interviews").select("*, jobs(title, company_name)").eq("id", interviewId).maybeSingle()
+    if res.error or not res.data:
+        raise HTTPException(status_code=404, detail="Interview not found")
+    await _assert_interview_access(res.data, user)
+    return {"interview": res.data}
 
 async def build_stage_questions(candidate_id: str, attempt: dict, job: dict = None) -> List[str]:
     intro = default_intro_questions
@@ -485,8 +568,15 @@ async def evaluate_interview_background(interview_id: str):
             "summary": summary_res["summary"],
             "feedback": summary_res["feedback"]
         }).eq("id", interview_id)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.error(f"[Interview] Background evaluation failed for {interview_id}: {exc}")
+        try:
+            await db.from_("ai_interviews").update({
+                "status": "failed",
+                "feedback": "Automated evaluation failed. Please contact your recruiter.",
+            }).eq("id", interview_id)
+        except Exception as fallback_exc:
+            logger.error(f"[Interview] Failed to mark interview {interview_id} as failed: {fallback_exc}")
 
 async def summarize_interview(answers: List[dict], pass_score: int, job: dict = None) -> dict:
     stage1 = [a for a in answers if a["stage"] == 1]

@@ -9,6 +9,9 @@ def hash_pw(password: str) -> str:
 
 USERS = {
     "admin@intellihire.com": "admin123",
+    "recruiter@intellihire.com": "admin123",
+    "tpo@intellihire.com": "admin123",
+    "candidate@intellihire.com": "admin123",
     "recruiter@example.com": "recruiter123",
     "tpo@example.com": "tpo123",
     "candidate@example.com": "candidate123",

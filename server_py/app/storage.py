@@ -1,3 +1,4 @@
+import asyncio
 import os
 import boto3
 from botocore.exceptions import ClientError
@@ -33,32 +34,64 @@ if not is_test:
     except Exception as err:
         logger.warning(f"MinIO storage initialization failed: {err}")
 
+
+def validate_storage_key(key: str) -> str:
+    """
+    Validate and sanitize storage key to prevent path traversal and null-byte injection.
+    Rejects keys with '..', null bytes, or empty path components.
+    """
+    if not key or not isinstance(key, str):
+        raise ValueError("Storage key must be a non-empty string")
+    if "\x00" in key:
+        raise ValueError("Storage key contains null byte")
+    
+    normalized = key.replace("\\", "/").strip()
+    parts = normalized.split("/")
+    if any(part in ("..", ".") for part in parts if part):
+        raise ValueError(f"Path traversal detected in storage key: {key}")
+    
+    clean_key = normalized.lstrip("/")
+    if not clean_key:
+        raise ValueError("Invalid storage key after sanitization")
+    return clean_key
+
+
 async def upload_file(key: str, body: bytes, content_type: str) -> str:
+    clean_key = validate_storage_key(key)
     bucket_name = S3_BUCKET_NAME
     if is_test or not s3_client:
-        return f"/dummy-storage/{bucket_name}/{key}"
+        return f"/dummy-storage/{bucket_name}/{clean_key}"
 
     try:
-        s3_client.put_object(
+        await asyncio.to_thread(
+            s3_client.put_object,
             Bucket=bucket_name,
-            Key=key,
+            Key=clean_key,
             Body=body,
-            ContentType=content_type
+            ContentType=content_type,
         )
-        return f"{S3_ENDPOINT}/{bucket_name}/{key}"
+        return f"{S3_ENDPOINT}/{bucket_name}/{clean_key}"
     except Exception as e:
         logger.error(f"Failed to upload file to S3: {e}")
         raise e
 
+
 async def delete_file(key: str) -> None:
+    clean_key = validate_storage_key(key)
     if is_test or not s3_client:
         return
     try:
-        s3_client.delete_object(Bucket=S3_BUCKET_NAME, Key=key)
+        await asyncio.to_thread(
+            s3_client.delete_object,
+            Bucket=S3_BUCKET_NAME,
+            Key=clean_key,
+        )
     except Exception as e:
         logger.error(f"Failed to delete file from S3: {e}")
 
+
 storage_service = {
     "upload_file": upload_file,
-    "delete_file": delete_file
+    "delete_file": delete_file,
+    "validate_storage_key": validate_storage_key,
 }

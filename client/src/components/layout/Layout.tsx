@@ -7,6 +7,7 @@ import { ProfileStatsResponseSchema } from "@/lib/apiSchemas";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import { io } from "socket.io-client";
+import { WS_URL } from "@/lib/wsUrl";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -89,8 +90,9 @@ export default function Layout() {
   useEffect(() => {
     if (!user) return;
 
-    const socket = io(import.meta.env.VITE_API_URL?.replace("/api", "") || "http://localhost:5000", {
+    const socket = io(WS_URL, {
       transports: ["websocket"],
+      withCredentials: true,
     });
 
     socket.on("connect", () => {
@@ -105,6 +107,7 @@ export default function Layout() {
     });
 
     return () => {
+      socket.emit("notifications:leave", { userId: user.id });
       socket.disconnect();
     };
   }, [user]);

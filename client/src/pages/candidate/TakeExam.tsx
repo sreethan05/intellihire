@@ -67,6 +67,7 @@ export default function TakeExam() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const violationCooldownRef = useRef(0);
+  const violationCountRef = useRef(0);
   const submittedRef = useRef(false);
 
   const [exam, setExam] = useState<Exam | null>(null);
@@ -288,6 +289,7 @@ export default function TakeExam() {
       }
 
       await resultApi.submitExam(attemptId);
+      localStorage.removeItem(`intellihire_exam_draft_${examId}`);
       toast.success(reason ? `Exam submitted: ${reason}` : "Exam submitted successfully!");
       navigate("/candidate/overview");
     } catch (error: unknown) {
@@ -304,7 +306,12 @@ export default function TakeExam() {
     } finally {
       setSubmitting(false);
     }
-  }, [answers, attemptId, captureSnapshot, codeSubmissions, codingQuestions, exitExamFullscreen, logProctoringEvent, mcqQuestions, navigate, stopCamera]);
+  }, [answers, attemptId, captureSnapshot, codeSubmissions, codingQuestions, examId, exitExamFullscreen, logProctoringEvent, mcqQuestions, navigate, stopCamera]);
+
+  const handleSubmitExamRef = useRef(handleSubmitExam);
+  useEffect(() => {
+    handleSubmitExamRef.current = handleSubmitExam;
+  }, [handleSubmitExam]);
 
   const registerViolation = useCallback((message: string, shouldLock = false) => {
     if (!started || submitting || submittedRef.current) return;
@@ -318,23 +325,25 @@ export default function TakeExam() {
       setSecurityMessage(message);
     }
 
-    setViolationCount((previous) => {
-      const next = previous + 1;
-      void logProctoringEvent("violation", message, captureSnapshot());
+    // Keep side effects out of the state updater: React can invoke updaters
+    // more than once (StrictMode/concurrent rendering), which used to double-log
+    // violations and double-submit the exam.
+    const next = violationCountRef.current + 1;
+    violationCountRef.current = next;
+    setViolationCount(next);
 
-      if (next >= MAX_VIOLATIONS) {
-        toast.error("Maximum security violations reached. Auto-submitting exam.");
-        void handleSubmitExam("security violations");
-      } else {
-        toast.error(`${message} Warning ${next}/${MAX_VIOLATIONS}.`);
-      }
+    void logProctoringEvent("violation", message, captureSnapshot());
 
-      return next;
-    });
-  }, [captureSnapshot, handleSubmitExam, logProctoringEvent, started, submitting]);
+    if (next >= MAX_VIOLATIONS) {
+      toast.error("Maximum security violations reached. Auto-submitting exam.");
+      void handleSubmitExamRef.current("security violations");
+    } else {
+      toast.error(`${message} Warning ${next}/${MAX_VIOLATIONS}.`);
+    }
+  }, [captureSnapshot, logProctoringEvent, started, submitting]);
 
   useEffect(() => {
-    if (!started || timeLeft <= 0) return;
+    if (!started) return;
 
     const timer = setInterval(() => {
       setTimeLeft((previous) => {
@@ -347,7 +356,7 @@ export default function TakeExam() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [started, timeLeft]);
+  }, [started]);
 
   useEffect(() => {
     if (started && timeLeft === 0 && attemptId) {
@@ -429,11 +438,15 @@ export default function TakeExam() {
         if (!isSubscribed) return;
 
         const events = data.events || [];
-        const latestEvent = events[0];
+        const latestOverride = events.find((event: any) => event.event_type === "admin_override");
+        const latestViolation = events.find((event: any) => event.event_type === "violation");
+        const isUnlocked = Boolean(latestOverride && latestViolation) &&
+          String(latestOverride?.captured_at || "") >= String(latestViolation?.captured_at || "");
 
-        if (latestEvent && latestEvent.event_type === "camera_check" && latestEvent.message === "OVERRIDE_UNLOCK") {
+        if (isUnlocked) {
           setSecurityLocked(false);
           setViolationCount(0);
+          violationCountRef.current = 0;
           toast.success("Exam unlocked by recruiter! You can now resume.");
         }
       } catch (error) {
@@ -557,7 +570,11 @@ export default function TakeExam() {
 
       setAttemptId(data.attempt.id);
       setStarted(true);
+      if (typeof data.attempt.remaining_seconds === "number") {
+        setTimeLeft(data.attempt.remaining_seconds);
+      }
       setViolationCount(0);
+      violationCountRef.current = 0;
       submittedRef.current = false;
     } catch (error: unknown) {
       const message =
@@ -991,6 +1008,7 @@ export default function TakeExam() {
                 </div>
 
                 <CodingCompiler
+                  key={codingQuestions[currentCoding].coding_question_id}
                   question={codingQuestions[currentCoding].question}
                   code={codeSubmissions[codingQuestions[currentCoding].coding_question_id]?.code || ""}
                   language={codeSubmissions[codingQuestions[currentCoding].coding_question_id]?.language || "python"}

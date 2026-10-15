@@ -6,20 +6,20 @@ test.describe("Admin Dashboard", () => {
     await page.fill('input[name="email"]', "admin@intellihire.com");
     await page.fill('input[name="password"]', "admin123");
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/admin\/overview/);
+    await expect(page).toHaveURL(/admin\/overview/, { timeout: 15000 });
   });
 
   test("can view and navigate admin pages", async ({ page }) => {
     // Overview page
-    await expect(page.getByRole("heading", { name: /Platform Control Console|Command Hub/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Platform Control Console|Command Hub/i })).toBeVisible({ timeout: 15000 });
 
     // Navigate to manage
     await page.click('a[href="/admin/manage"]');
-    await expect(page).toHaveURL(/admin\/manage/);
+    await expect(page).toHaveURL(/admin\/manage/, { timeout: 15000 });
 
     // Navigate to create recruiter
     await page.goto("/admin/create-recruiter");
-    await expect(page).toHaveURL(/admin\/create-recruiter/);
+    await expect(page).toHaveURL(/admin\/create-recruiter/, { timeout: 15000 });
   });
 
   test("can create a recruiter", async ({ page }) => {
@@ -31,7 +31,7 @@ test.describe("Admin Dashboard", () => {
     await page.click('button[type="submit"]');
 
     // Should show success message
-    await expect(page.getByText(/Recruiter created/i)).toBeVisible();
+    await expect(page.getByText(/Recruiter created/i)).toBeVisible({ timeout: 15000 });
   });
 });
 

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ..auth_router import get_current_user
 from ..db import db
+from ..date_utils import iso_date
 from ..insights import (
     create_topic_scores,
     feed_mcq_answer,
@@ -260,12 +261,12 @@ async def get_streak(user: Dict[str, Any] = Depends(get_current_user)):
     dates = set()
     for a in (att_res.data or []):
         if a.get("started_at"):
-            dates.add(a["started_at"][:10])
+            dates.add(iso_date(a["started_at"]))
         if a.get("submitted_at"):
-            dates.add(a["submitted_at"][:10])
+            dates.add(iso_date(a["submitted_at"]))
     for c in (subs_res.data or []):
         if c.get("created_at"):
-            dates.add(c["created_at"][:10])
+            dates.add(iso_date(c["created_at"]))
             
     sorted_dates = sorted(list(dates))
     current_streak = 0
@@ -523,35 +524,3 @@ async def get_certificates(user: Dict[str, Any] = Depends(get_current_user)):
     certs_res = await db.from_("certificates").select("*, exam:exam_id(title, total_marks)").eq("candidate_id", candidate_id).order("issued_at", ascending=False)
     return {"certificates": certs_res.data or []}
 
-@router.get("/badges")
-async def get_badges(user: Dict[str, Any] = Depends(get_current_user)):
-    candidate_id = user["id"]
-    att_res = await db.from_("attempts").select("score, exams:exam_id(total_marks)").eq("candidate_id", candidate_id).eq("status", "completed")
-    completed = att_res.data or []
-    
-    best_pct = 0.0
-    for att in completed:
-        exam = att.get("exams") or {}
-        tot = float(exam.get("total_marks") or 100.0)
-        pct = (float(att.get("score") or 0.0) / tot) * 100.0 if tot else 0.0
-        best_pct = max(best_pct, pct)
-        
-    earned = []
-    if len(completed) >= 1:
-        earned.append({"name": "Assessment Starter", "description": "Completed the first assessment."})
-    if len(completed) >= 3:
-        earned.append({"name": "Consistent Performer", "description": "Completed three assessments."})
-    if best_pct >= 80.0:
-        earned.append({"name": "Top Scorer", "description": "Scored 80% or above in an assessment."})
-        
-    for badge in earned:
-        exist_res = await db.from_("badges").select("id").eq("candidate_id", candidate_id).eq("name", badge["name"]).maybeSingle()
-        if not exist_res.data:
-            await db.from_("badges").insert({
-                "candidate_id": candidate_id,
-                "name": badge["name"],
-                "description": badge["description"]
-            })
-            
-    badges_res = await db.from_("badges").select("*").eq("candidate_id", candidate_id).order("awarded_at", ascending=False)
-    return {"badges": badges_res.data or []}

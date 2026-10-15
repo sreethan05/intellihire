@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 export interface CollegeSummary {
   id: string;
@@ -28,6 +29,7 @@ interface CollegeContextType {
 const CollegeContext = createContext<CollegeContextType | null>(null);
 
 export function CollegeProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const [selectedCollegeId, setSelectedCollegeIdState] = useState<string | null>(() => {
     return localStorage.getItem("selected_college_id");
   });
@@ -43,7 +45,7 @@ export function CollegeProvider({ children }: { children: ReactNode }) {
     setSelectedCollegeIdState(id);
   };
 
-  const refreshColleges = async () => {
+  const refreshColleges = useCallback(async () => {
     setLoading(true);
     try {
       const response = await api.get("/recruiter/colleges-summary");
@@ -53,21 +55,15 @@ export function CollegeProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    const userStr = localStorage.getItem("user");
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        if (user.role === "recruiter") {
-          void refreshColleges();
-        }
-      } catch {
-        // ignore
-      }
+    // AuthState is memory-only, so gate on the authenticated user from context
+    // (restored via /auth/me) instead of the never-written localStorage key.
+    if (user?.role === "recruiter") {
+      void refreshColleges();
     }
-  }, []);
+  }, [refreshColleges, user?.role]);
 
   return (
     <CollegeContext.Provider

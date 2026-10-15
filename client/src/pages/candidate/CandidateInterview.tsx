@@ -55,11 +55,19 @@ type PassedAttempt = {
   submittedAt: string | null;
 };
 
+type PendingInterview = {
+  id: string;
+  exam_id?: string | null;
+  job_id?: string | null;
+  scheduled_start?: string | null;
+  scheduled_end?: string | null;
+  status?: string | null;
+};
+
 type Eligibility = {
   eligible: boolean;
-  selectedAttempt: PassedAttempt | null;
-  passedAttempts: PassedAttempt[];
-  message: string;
+  message?: string;
+  attempts?: PassedAttempt[];
 };
 
 type TranscriptItem = {
@@ -145,7 +153,7 @@ export default function CandidateInterview() {
   const [localAudioPreview, setLocalAudioPreview] = useState<string | null>(null);
 
   const [eligibility, setEligibility] = useState<Eligibility | null>(null);
-  const [pendingInterview, setPendingInterview] = useState<any>(null);
+  const [pendingInterview, setPendingInterview] = useState<PendingInterview | null>(null);
   const [history, setHistory] = useState<InterviewResult[]>([]);
   const [questions, setQuestions] = useState<string[]>([]);
   const [interviewId, setInterviewId] = useState("");
@@ -171,6 +179,7 @@ export default function CandidateInterview() {
   const [attemptId, setAttemptId] = useState("");
   const [examId, setExamId] = useState("");
   const violationCooldownRef = useRef(0);
+  const violationCountRef = useRef(0);
   const submittedRef = useRef(false);
   const interviewContainerRef = useRef<HTMLDivElement | null>(null);
   const prevAnswerLengthRef = useRef(0);
@@ -191,8 +200,8 @@ export default function CandidateInterview() {
   const speechSupported = Boolean(getSpeechRecognition());
   const live = Boolean(interviewId && !result);
 
-  const scheduledStartMs = pendingInterview?.scheduled_start_at ? new Date(pendingInterview.scheduled_start_at).getTime() : null;
-  const scheduledEndMs = pendingInterview?.scheduled_end_at ? new Date(pendingInterview.scheduled_end_at).getTime() : null;
+  const scheduledStartMs = pendingInterview?.scheduled_start ? new Date(pendingInterview.scheduled_start).getTime() : null;
+  const scheduledEndMs = pendingInterview?.scheduled_end ? new Date(pendingInterview.scheduled_end).getTime() : null;
   const nowMs = Date.now();
   const canStartInterview =
     scheduledStartMs !== null &&
@@ -302,7 +311,7 @@ export default function CandidateInterview() {
       ]);
       setEligibility(eligRes.data);
       setHistory(histRes.data.interviews || []);
-      setPendingInterview(pendingRes.data.interview || null);
+      setPendingInterview(((pendingRes.data.interviews || [])[0] as PendingInterview) || null);
     } catch (error: any) {
       toast.error(error.response?.data?.error || "Could not load AI interview status");
     } finally {
@@ -362,15 +371,20 @@ export default function CandidateInterview() {
     try {
       const { data } = await interviewApi.submit(interviewId);
       
-      // Poll interview status until completed
+      // Poll interview status until completed. Transient polling failures are
+      // retried until the timeout instead of aborting the whole submission.
       let currentInterview = data.interview;
       const startTime = Date.now();
       const timeoutMs = 60000; // 1-minute timeout
       
       while (currentInterview && currentInterview.status === "processing" && (Date.now() - startTime) < timeoutMs) {
         await new Promise((r) => setTimeout(r, 2000));
-        const res = await interviewApi.get(interviewId);
-        currentInterview = res.data.interview;
+        try {
+          const res = await interviewApi.get(interviewId);
+          currentInterview = res.data.interview || currentInterview;
+        } catch {
+          // transient failure - keep polling until the timeout
+        }
       }
       
       setResult(currentInterview);
@@ -399,19 +413,18 @@ export default function CandidateInterview() {
       setSecurityMessage(message);
     }
 
-    setViolationCount((previous) => {
-      const next = previous + 1;
-      void logProctoringEvent("violation", message, captureSnapshot());
+    const next = violationCountRef.current + 1;
+    violationCountRef.current = next;
+    setViolationCount(next);
 
-      if (next >= 3) {
-        toast.error("Maximum security violations reached. Auto-submitting interview.");
-        void finishInterview();
-      } else {
-        toast.error(`${message} Warning ${next}/3.`);
-      }
+    void logProctoringEvent("violation", message, captureSnapshot());
 
-      return next;
-    });
+    if (next >= 3) {
+      toast.error("Maximum security violations reached. Auto-submitting interview.");
+      void finishInterview();
+    } else {
+      toast.error(`${message} Warning ${next}/3.`);
+    }
   }, [captureSnapshot, finishInterview, logProctoringEvent, live, loading]);
 
   const submitCurrentAnswer = useCallback(async (finishAfter = false) => {
@@ -569,8 +582,8 @@ export default function CandidateInterview() {
   }, [startListening]);
 
   const startInterview = useCallback(async () => {
-    const examId = pendingInterview?.exam_id || eligibility?.selectedAttempt?.examId;
-    const jobId = pendingInterview?.job_id || null;
+    const examId = pendingInterview?.exam_id || eligibility?.attempts?.[0]?.examId || undefined;
+    const jobId = pendingInterview?.job_id || undefined;
 
     if (!examId) { toast.error("Pass an assigned exam to unlock the AI interview."); return; }
     if (!scheduledStartMs || !scheduledEndMs) {
@@ -596,12 +609,16 @@ export default function CandidateInterview() {
       if (!devicesReady) { toast.error("Camera and microphone access is required."); return; }
 
       const { data } = await interviewApi.start({ exam_id: examId, job_id: jobId });
-      const nextQuestions = data.questions || [];
+      const startedInterview = data.interview || {};
+      const nextQuestions = startedInterview.questions || data.questions || [];
 
       setQuestions(nextQuestions);
-      setInterviewId(data.interview.id);
-      setAttemptId(data.eligibleAttempt?.attemptId || "");
-      setExamId(data.eligibleAttempt?.examId || "");
+      setInterviewId(startedInterview.id || "");
+      // AI interviews are not exam attempts, so candidate proctoring events
+      // remain disabled until an interview-scoped proctoring channel exists.
+      setAttemptId("");
+      setExamId(startedInterview.exam_id || examId || "");
+      violationCountRef.current = 0;
       setViolationCount(0);
       submittedRef.current = false;
       prevAnswerLengthRef.current = 0;
@@ -620,7 +637,7 @@ export default function CandidateInterview() {
     } finally {
       setLoading(false);
     }
-  }, [eligibility?.selectedAttempt, pendingInterview, requestDevices, speak, stopDevices, canStartInterview, scheduledStartMs, scheduledEndMs, user]);
+  }, [eligibility?.attempts, pendingInterview, requestDevices, speak, stopDevices, canStartInterview, scheduledStartMs, scheduledEndMs, user]);
 
   useEffect(() => { void refreshInterviewState(); }, [refreshInterviewState]);
 
@@ -687,10 +704,14 @@ export default function CandidateInterview() {
         if (!isSubscribed) return;
 
         const events = data.events || [];
-        const latestEvent = events[0];
+        const latestOverride = events.find((event: any) => event.event_type === "admin_override");
+        const latestViolation = events.find((event: any) => event.event_type === "violation");
+        const isUnlocked = Boolean(latestOverride && latestViolation) &&
+          String(latestOverride?.captured_at || "") >= String(latestViolation?.captured_at || "");
 
-        if (latestEvent && latestEvent.event_type === "camera_check" && latestEvent.message === "OVERRIDE_UNLOCK") {
+        if (isUnlocked) {
           setSecurityLocked(false);
+          violationCountRef.current = 0;
           setViolationCount(0);
           toast.success("Interview unlocked by recruiter! You can now resume.");
         }
@@ -946,21 +967,21 @@ export default function CandidateInterview() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <QualifiedExam attempt={eligibility?.selectedAttempt || null} />
+                <QualifiedExam attempt={eligibility?.attempts?.[0] || null} />
                 {pendingInterview &&
-                  (!pendingInterview.scheduled_start_at || !pendingInterview.scheduled_end_at) && (
+                  (!pendingInterview.scheduled_start || !pendingInterview.scheduled_end) && (
                   <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
                     🎉 You've been <strong>shortlisted</strong>! Your recruiter will schedule the interview start/end time shortly.
                   </div>
                 )}
                 {pendingInterview &&
-                  pendingInterview.scheduled_start_at &&
-                  pendingInterview.scheduled_end_at && (
+                  pendingInterview.scheduled_start &&
+                  pendingInterview.scheduled_end && (
                   <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
                     🎉 Interview scheduled! You can start at{" "}
                     <strong>
-                      {pendingInterview.scheduled_start_at
-                        ? new Date(pendingInterview.scheduled_start_at).toLocaleString()
+                      {pendingInterview.scheduled_start
+                        ? new Date(pendingInterview.scheduled_start).toLocaleString()
                         : "the scheduled time"}
                     </strong>
                     .

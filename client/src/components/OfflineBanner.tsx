@@ -12,13 +12,14 @@ export default function OfflineBanner({ onSyncDrafts }: OfflineBannerProps) {
   const [showSyncSuccess, setShowSyncSuccess] = useState<boolean>(false);
 
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
     const handleOnline = () => {
       setIsOnline(true);
       setShowSyncSuccess(true);
       if (onSyncDrafts) onSyncDrafts();
 
-      const timer = setTimeout(() => setShowSyncSuccess(false), 4000);
-      return () => clearTimeout(timer);
+      clearTimeout(timer);
+      timer = setTimeout(() => setShowSyncSuccess(false), 4000);
     };
 
     const handleOffline = () => {
@@ -30,6 +31,7 @@ export default function OfflineBanner({ onSyncDrafts }: OfflineBannerProps) {
     window.addEventListener("offline", handleOffline);
 
     return () => {
+      clearTimeout(timer);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };

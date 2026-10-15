@@ -100,6 +100,8 @@ def normalize_dataframe(df: pd.DataFrame) -> List[Dict[str, Any]]:
 
         name = str(raw_name).strip()
         roll_number = str(raw_roll).strip()
+        if roll_number.endswith(".0") and roll_number[:-2].isdigit():
+            roll_number = roll_number[:-2]
 
         if not name or name.lower() in ("nan", "none", "null") or not roll_number or roll_number.lower() in ("nan", "none", "null"):
             continue
@@ -155,8 +157,11 @@ def _parse_cgpa(raw: str) -> float:
         return 0.0
     try:
         val = float(cleaned)
-        if val > 10:
-            return round(val / 10.0, 2)
+        if val > 100:
+            val = val / 100.0
+        elif val > 10:
+            val = val / 10.0
+        val = max(0.0, min(10.0, val))
         return round(val, 2)
     except ValueError:
         return 0.0
@@ -166,10 +171,13 @@ def _parse_graduation_year(raw: str) -> int:
     """Parse a 4-digit graduation year from a string."""
     if not raw or raw.lower() == "nan":
         return 0
-    match = re.search(r"\d{4}", raw)
+    match = re.search(r"\b(20\d{2})\b", raw)
     if match:
-        return int(match.group())
+        return int(match.group(1))
     try:
-        return int(float(raw))
+        val = int(float(raw))
+        if 2000 <= val <= 2100:
+            return val
+        return 0
     except (ValueError, TypeError):
         return 0

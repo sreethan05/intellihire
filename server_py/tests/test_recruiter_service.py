@@ -53,3 +53,70 @@ async def test_get_colleges_list():
     with patch("app.recruiter_service.recruiter_repo", mock_repo):
         result = await get_colleges_list()
         assert len(result["colleges"]) == 1
+
+@pytest.mark.asyncio
+async def test_create_drive_invalid_date():
+    from app.recruiter_service import create_drive
+    invalid_drive = {
+        "title": "Software Engineer",
+        "company_name": "Acme Corp",
+        "college_id": "col_1",
+        "allowed_branches": ["CSE"],
+        "drive_date": "not-a-valid-date"
+    }
+    with pytest.raises(ValueError) as exc:
+        await create_drive(invalid_drive, "recruiter_1")
+    assert "Invalid drive date" in str(exc.value)
+
+@pytest.mark.asyncio
+async def test_create_drive_invalid_salary():
+    from app.recruiter_service import create_drive
+    invalid_drive = {
+        "title": "Software Engineer",
+        "company_name": "Acme Corp",
+        "college_id": "col_1",
+        "allowed_branches": ["CSE"],
+        "salary_min": 500000,
+        "salary_max": 300000
+    }
+    with pytest.raises(ValueError) as exc:
+        await create_drive(invalid_drive, "recruiter_1")
+    assert "Minimum salary cannot exceed maximum salary" in str(exc.value)
+
+@pytest.mark.asyncio
+async def test_create_drive_zero_applicants():
+    from app.recruiter_service import create_drive
+    drive_data = {
+        "title": "Software Engineer",
+        "company_name": "Acme Corp",
+        "college_id": "col_1",
+        "allowed_branches": ["CSE"],
+        "min_cgpa": 9.5,
+        "drive_date": "2026-11-20"
+    }
+    mock_repo = MagicMock()
+    mock_repo.insert_job = AsyncMock(return_value={
+        "id": "job_123",
+        "title": "Software Engineer",
+        "company_name": "Acme Corp",
+        "company_description": "{}",
+        "college_id": "col_1"
+    })
+    mock_repo.get_candidates_for_eligibility = AsyncMock(return_value=[])
+    mock_repo.get_colleges_by_ids = AsyncMock(return_value=[{"id": "col_1", "name": "Test College"}])
+
+    with patch("app.recruiter_service.recruiter_repo", mock_repo):
+        res = await create_drive(drive_data, "recruiter_1")
+        assert res["eligibleCount"] == 0
+        assert res["drive"]["id"] == "job_123"
+
+@pytest.mark.asyncio
+async def test_upload_offer_letter_unauthorized():
+    from app.recruiter_service import upload_offer_letter
+    mock_repo = MagicMock()
+    mock_repo.get_job_by_id_and_recruiter = AsyncMock(return_value=None)
+
+    with patch("app.recruiter_service.recruiter_repo", mock_repo):
+        with pytest.raises(ValueError) as exc:
+            await upload_offer_letter("cand_1", "job_diff_recruiter", "offer.pdf", "recruiter_1")
+        assert "unauthorized" in str(exc.value).lower()

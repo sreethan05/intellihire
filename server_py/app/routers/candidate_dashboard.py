@@ -8,6 +8,7 @@ from ..rate_limit import limiter
 
 from ..auth_router import get_current_user
 from ..db import db
+from ..date_utils import iso_date, parse_datetime
 from ..utils import record_pipeline_stage
 from ..insights import (
     create_topic_scores,
@@ -53,14 +54,15 @@ async def get_dashboard(user: Dict[str, Any] = Depends(get_current_user)):
     performance = []
     for assign in completed_attempts:
         lat = assign["attempts"][0]
+        exam_info = assign.get("exam") or {}
         score = float(lat.get("score") or 0.0)
-        tot = float(assign["exam"]["total_marks"] or 100.0)
-        pass_m = float(assign["exam"]["pass_marks"] or 0.0)
+        tot = float(exam_info.get("total_marks") or 100.0)
+        pass_m = float(exam_info.get("pass_marks") or 0.0)
         pct = round((score / tot) * 100, 1) if tot else 0.0
         
         performance.append({
             "examId": assign["exam_id"],
-            "title": assign["exam"]["title"],
+            "title": exam_info.get("title") or "Exam",
             "score": score,
             "totalMarks": tot,
             "passMarks": pass_m,
@@ -88,33 +90,35 @@ async def get_dashboard(user: Dict[str, Any] = Depends(get_current_user)):
         
     exam_insights = [{"label": p["title"], "score": p["percentage"], "status": p["status"]} for p in sorted(performance, key=lambda x: x["percentage"], reverse=True)]
     
-    now_ms = datetime.datetime.utcnow().timestamp() * 1000
+    now_ms = datetime.datetime.now(datetime.timezone.utc).timestamp() * 1000
     upcoming_exams = []
     for assign in pending_assignments:
-        avail = assign["exam"].get("available_from") or assign.get("assigned_at")
-        opens_at = datetime.datetime.fromisoformat(avail.replace("Z", "+00:00")).timestamp() * 1000 if avail else now_ms
+        exam_info = assign.get("exam") or {}
+        avail = exam_info.get("available_from") or assign.get("assigned_at")
+        avail_dt = parse_datetime(avail)
+        opens_at = avail_dt.timestamp() * 1000 if avail_dt else now_ms
         days_left = max(0, int((opens_at - now_ms) / 86400000))
         meta = f"{days_left or 1} Day{'s' if days_left != 1 else ''} Left" if opens_at > now_ms else "Open Now"
         
         upcoming_exams.append({
-            "id": assign["id"],
+            "id": assign.get("id"),
             "examId": assign["exam_id"],
-            "title": assign["exam"]["title"],
-            "subtitle": f"{avail[:10]} - {assign['exam'].get('duration')} min",
+            "title": exam_info.get("title") or "Exam",
+            "subtitle": f"{iso_date(avail)} - {exam_info.get('duration', 0)} min",
             "meta": meta,
             "tone": "violet" if opens_at > now_ms else "green",
-            "date": avail
+            "date": avail_dt.isoformat() if avail_dt else ""
         })
     upcoming_exams.sort(key=lambda x: x["date"] or "")
     upcoming_exams = upcoming_exams[:5]
     
     recent_results = []
-    for p in sorted(performance, key=lambda x: x["submittedAt"] or "", reverse=True)[:5]:
+    for p in sorted(performance, key=lambda x: str(x["submittedAt"] or ""), reverse=True)[:5]:
         recent_results.append({
             "id": p["examId"],
             "examId": p["examId"],
             "title": p["title"],
-            "subtitle": p["submittedAt"][:10] if p["submittedAt"] else "",
+            "subtitle": iso_date(p["submittedAt"]),
             "meta": f"{p['percentage']}%",
             "tone": "green" if p["status"] == "pass" else "rose",
             "score": p["score"],
@@ -210,28 +214,44 @@ async def get_dashboard(user: Dict[str, Any] = Depends(get_current_user)):
 @router.post("/offers/{jobId}/respond")
 async def respond_offer(jobId: str, req: RespondOfferRequest, user: Dict[str, Any] = Depends(get_current_user)):
     uid = user["id"]
-    resp = req.response
+    resp = req.response.strip().lower()
     notes = req.notes or ""
-    
+
+    if resp not in ("accept", "decline", "negotiate"):
+        raise HTTPException(status_code=400, detail="Invalid response. Must be 'accept', 'decline', or 'negotiate'")
+
+    # Verify that the candidate actually has a record for this job
+    status_res = await db.from_("candidate_status").select("*").eq("candidate_id", uid).eq("job_id", jobId).maybeSingle()
+    if not status_res.data:
+        raise HTTPException(status_code=404, detail="Job application not found")
+
+    current_status = status_res.data.get("status")
+    if current_status != "offered":
+        raise HTTPException(status_code=400, detail=f"Cannot respond to offer with status '{current_status}'. Status must be 'offered'")
+
+    if status_res.data.get("offer_accepted_at") or status_res.data.get("offer_declined_at"):
+        raise HTTPException(status_code=400, detail="Offer has already been responded to")
+
     up_fields = {"recruiter_notes": notes}
-    now_str = datetime.datetime.utcnow().isoformat() + "Z"
-    
+    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
     if resp == "accept":
         up_fields["offer_accepted_at"] = now_str
     elif resp == "decline":
         up_fields["offer_declined_at"] = now_str
+        up_fields["status"] = "rejected"
     else:
         up_fields["status"] = "on_hold"
-        
+
     up_res = await db.from_("candidate_status").update(up_fields).eq("candidate_id", uid).eq("job_id", jobId).select().single()
     if up_res.error:
         raise HTTPException(status_code=400, detail=up_res.error.get("message") or "Failed to update offer response")
-        
+
     stage = "offered" if resp == "accept" else "rejected" if resp == "decline" else "on_hold"
     notes_txt = "Offer accepted by candidate" if resp == "accept" else "Offer declined by candidate" if resp == "decline" else "Negotiation requested by candidate"
-    
+
     await record_pipeline_stage(uid, jobId, stage, notes_txt, uid)
-    
+
     await db.from_("activity_feed").insert({
         "actor_id": uid,
         "actor_role": "candidate",
@@ -240,7 +260,7 @@ async def respond_offer(jobId: str, req: RespondOfferRequest, user: Dict[str, An
         "title": f"Offer {'Accepted' if resp == 'accept' else 'Declined' if resp == 'decline' else 'Negotiation Initiated'}",
         "description": f"Candidate responded with {resp.upper()} to the job offer."
     })
-    
+
     return {"message": f"Successfully responded to the offer with: {resp}", "status": up_res.data}
 
 @router.get("/activity")
@@ -422,7 +442,7 @@ BADGE_DEFINITIONS = [
 
 async def compute_candidate_stats(user_id: str) -> dict:
     """Compute candidate statistics for badge evaluation."""
-    att_res = await db.from_("attempts").select("score, status, exams:exam_id(total_marks, pass_marks)").eq("candidate_id", user_id)
+    att_res = await db.from_("attempts").select("id, exam_id, score, status, exams:exam_id(total_marks, pass_marks)").eq("candidate_id", user_id)
     attempts = att_res.data or []
     exams_completed = len(attempts)
     exams_passed = sum(1 for a in attempts if float(a.get("score") or 0) >= float((a.get("exams") or {}).get("pass_marks") or 0))

@@ -48,6 +48,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
+import threading
+
 import psycopg
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
@@ -55,15 +57,28 @@ from psycopg_pool import ConnectionPool
 from .config import DATABASE_URL
 
 _pool = None
+_pool_lock = threading.Lock()
 
 
 def get_pool() -> ConnectionPool:
     global _pool
     if _pool is None:
-        _pool = ConnectionPool(conninfo=DATABASE_URL, min_size=1, max_size=20, open=False)
+        with _pool_lock:
+            if _pool is None:
+                _pool = ConnectionPool(conninfo=DATABASE_URL, min_size=1, max_size=20, open=False)
     if _pool.closed:
-        _pool.open()
+        with _pool_lock:
+            if _pool.closed:
+                _pool.open()
     return _pool
+
+
+def close_pool() -> None:
+    """Close the global database connection pool gracefully."""
+    global _pool
+    with _pool_lock:
+        if _pool is not None and not _pool.closed:
+            _pool.close()
 
 
 EMPTY_UUID = "00000000-0000-0000-0000-000000000000"
@@ -73,7 +88,14 @@ EMPTY_UUID = "00000000-0000-0000-0000-000000000000"
 def get_connection():
     pool_instance = get_pool()
     with pool_instance.connection() as conn:
-        yield conn
+        try:
+            yield conn
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            raise
 
 
 class QueryError(Exception):

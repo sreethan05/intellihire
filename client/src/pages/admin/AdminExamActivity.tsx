@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Activity, Users } from "lucide-react";
 import { io } from "socket.io-client";
+import { WS_URL } from "@/lib/wsUrl";
 import { adminAnalyticsApi } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   AreaChart, Area, ResponsiveContainer, XAxis, CartesianGrid
 } from "recharts";
-
-const WS_URL = import.meta.env.VITE_API_URL?.replace("/api", "") || "http://localhost:5000";
 
 export default function AdminExamActivity() {
   const [loading, setLoading] = useState(true);
@@ -63,6 +62,7 @@ export default function AdminExamActivity() {
     // Connect to WebSocket
     const socket = io(WS_URL, {
       transports: ["websocket"],
+      withCredentials: true,
     });
 
     socket.on("connect", () => {
@@ -136,6 +136,7 @@ export default function AdminExamActivity() {
     });
 
     return () => {
+      socket.emit("admin:leave");
       socket.disconnect();
     };
   }, []);

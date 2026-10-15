@@ -3,6 +3,7 @@ from typing import Dict, Any, List
 from fastapi import APIRouter, Depends, HTTPException, Request
 from .auth_router import get_current_user
 from .db import db
+from .date_utils import parse_datetime
 from .insights import (
     create_topic_scores,
     feed_mcq_answer,
@@ -90,7 +91,7 @@ async def get_candidate_hub_data(user_id: str) -> Dict[str, Any]:
     assignments = assign_res.data or []
     
     completed_exam_ids = {a["exam_id"] for a in attempts if "exam_id" in a}
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
     for assign in assignments:
         exam = assign.get("exam") or {}
         exam_id = assign.get("exam_id")
@@ -99,7 +100,7 @@ async def get_candidate_hub_data(user_id: str) -> Dict[str, Any]:
             until_str = exam.get("available_until")
             if until_str:
                 try:
-                    until_dt = datetime.datetime.fromisoformat(until_str.replace("Z", "+00:00")).replace(tzinfo=None)
+                    until_dt = parse_datetime(until_str)
                     diff = until_dt - now
                     hours_left = max(0, int(diff.total_seconds() / 3600))
                 except Exception:
@@ -132,7 +133,7 @@ async def get_candidate_hub_data(user_id: str) -> Dict[str, Any]:
         recent_activity.append({
             "title": "Placement Passport Activated",
             "description": "Welcome to IntelliHire. Your verifiable campus passport is live.",
-            "date": now.isoformat() + "Z"
+            "date": now.isoformat()
         })
         
     # 5. Upcoming Schedule
@@ -142,7 +143,7 @@ async def get_candidate_hub_data(user_id: str) -> Dict[str, Any]:
         until_str = exam.get("available_until")
         if until_str:
             try:
-                until_dt = datetime.datetime.fromisoformat(until_str.replace("Z", "+00:00")).replace(tzinfo=None)
+                until_dt = parse_datetime(until_str)
                 if until_dt > now:
                     upcoming_schedule.append({
                         "title": f"Exam: {exam.get('title')}",
@@ -152,11 +153,11 @@ async def get_candidate_hub_data(user_id: str) -> Dict[str, Any]:
             except Exception:
                 pass
     for iv in ivs:
-        start_str = iv.get("scheduled_start_at")
+        start_str = iv.get("scheduled_start") or iv.get("scheduled_start_at")
         job = iv.get("job") or {}
         if start_str:
             try:
-                start_dt = datetime.datetime.fromisoformat(start_str.replace("Z", "+00:00")).replace(tzinfo=None)
+                start_dt = parse_datetime(start_str)
                 if start_dt > now:
                     upcoming_schedule.append({
                         "title": f"AI Interview: {job.get('title', 'Shortlist Interview')}",
@@ -291,11 +292,11 @@ async def get_tpo_hub_data(tpo_user_id: str) -> Dict[str, Any]:
             "action_url": "/tpo/students?tab=pending"
         })
         
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
     for job in jobs:
         if job.get("status") == "active" and job.get("drive_date"):
             try:
-                drive_dt = datetime.datetime.fromisoformat(job["drive_date"].replace("Z", "+00:00")).replace(tzinfo=None)
+                drive_dt = parse_datetime(job["drive_date"])
                 diff = drive_dt - now
                 if 0 < diff.total_seconds() < 3 * 24 * 60 * 60:
                     action_items.append({
@@ -323,14 +324,14 @@ async def get_tpo_hub_data(tpo_user_id: str) -> Dict[str, Any]:
         recent_activity.append({
             "title": "College Placement Portal Online",
             "description": "TPO cockpit successfully registered and linked to college database.",
-            "date": now.isoformat() + "Z"
+            "date": now.isoformat()
         })
         
     upcoming_schedule = []
     for j in jobs:
         if j.get("status") == "active" and j.get("drive_date"):
             try:
-                drive_dt = datetime.datetime.fromisoformat(j["drive_date"].replace("Z", "+00:00")).replace(tzinfo=None)
+                drive_dt = parse_datetime(j["drive_date"])
                 if drive_dt > now:
                     upcoming_schedule.append({
                         "title": f"Drive: {j.get('company_name')} - {j.get('title')}",
@@ -456,7 +457,7 @@ async def get_recruiter_hub_data(recruiter_id: str) -> Dict[str, Any]:
         recent_activity.append({
             "title": "Recruiting War Room Ready",
             "description": "Recruiter campaign portal initialized. Proctoring feeds active.",
-            "date": datetime.datetime.utcnow().isoformat() + "Z"
+            "date": datetime.datetime.now(datetime.timezone.utc).isoformat()
         })
         
     upcoming_schedule = []
@@ -467,7 +468,7 @@ async def get_recruiter_hub_data(recruiter_id: str) -> Dict[str, Any]:
         job = iv.get("job") or {}
         upcoming_schedule.append({
             "title": f"Interview: {candidate.get('name') or 'Candidate'} - {job.get('title')}",
-            "date": iv.get("scheduled_start_at"),
+            "date": iv.get("scheduled_start") or iv.get("scheduled_start_at"),
             "type": "interview"
         })
         
@@ -543,7 +544,7 @@ async def get_admin_hub_data(admin_id: str) -> Dict[str, Any]:
         recent_activity.append({
             "title": "Platform Administration Panel Active",
             "description": "Platform orchestration database services reporting healthy.",
-            "date": datetime.datetime.utcnow().isoformat() + "Z"
+            "date": datetime.datetime.now(datetime.timezone.utc).isoformat()
         })
         
     quick_links = [

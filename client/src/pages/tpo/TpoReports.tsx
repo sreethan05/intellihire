@@ -41,7 +41,9 @@ export default function TpoReports() {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([
+    // allSettled so one failing dataset (e.g. role-restricted exam list) does
+    // not blank out every other section of the reports page.
+    Promise.allSettled([
       tpoApi.getStudents(),
       examApi.getExams(),
       tpoAnalyticsApi.getPlacementStats(),
@@ -50,14 +52,18 @@ export default function TpoReports() {
       tpoAnalyticsApi.getUploadTracking(),
     ])
       .then(([studentsRes, examsRes, placementRes, readinessRes, companyRes, uploadRes]) => {
-        setStudents(studentsRes.data.students || []);
-        setExams(examsRes.data.exams || []);
-        setPlacementStats(placementRes.data || { byBranch: [], byYear: [], topCompanies: [] });
-        setReadinessData(readinessRes.data || { students: [], zoneCounts: { ready: 0, approaching: 0, needs_work: 0 } });
-        setCompanyData(companyRes.data || { companies: [] });
-        setUploadData(uploadRes.data || { uploads: [], trend: [] });
+        if (studentsRes.status === "fulfilled") setStudents(studentsRes.value.data.students || []);
+        if (examsRes.status === "fulfilled") {
+          setExams(examsRes.value.data.exams || []);
+        } else {
+          setExams([]);
+          console.warn("Exam list unavailable for this role", examsRes.reason);
+        }
+        if (placementRes.status === "fulfilled") setPlacementStats(placementRes.value.data || { byBranch: [], byYear: [], topCompanies: [] });
+        if (readinessRes.status === "fulfilled") setReadinessData(readinessRes.value.data || { students: [], zoneCounts: { ready: 0, approaching: 0, needs_work: 0 } });
+        if (companyRes.status === "fulfilled") setCompanyData(companyRes.value.data || { companies: [] });
+        if (uploadRes.status === "fulfilled") setUploadData(uploadRes.value.data || { uploads: [], trend: [] });
       })
-      .catch((err) => console.error("Error loading TPO analytics reports", err))
       .finally(() => setLoading(false));
   }, []);
 

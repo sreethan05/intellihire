@@ -1,6 +1,6 @@
 import asyncio
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from .utils import redis_client, hash_password
@@ -208,7 +208,7 @@ async def get_dashboard_data(candidate_id: str) -> dict:
         score = latest_attempt.get("score") or 0.0
         exam_info = assignment.get("exam") or {}
         total_marks = exam_info.get("total_marks") or 100.0
-        pass_marks = exam_info.get("pass_marks") or 40.0
+        pass_marks = exam_info.get("pass_marks") if exam_info.get("pass_marks") is not None else 40.0
 
         percentage = round((score / total_marks) * 100, 1) if total_marks else 0.0
         status = "pass" if score >= pass_marks else "fail"
@@ -265,7 +265,7 @@ async def get_dashboard_data(candidate_id: str) -> dict:
         "status": p["status"],
     } for p in sorted_performance]
 
-    now_ms = datetime.utcnow().timestamp() * 1000
+    now_ms = datetime.now(timezone.utc).timestamp() * 1000
     upcoming_exams_list = []
     for assignment in pending_assignments:
         exam_info = assignment.get("exam") or {}

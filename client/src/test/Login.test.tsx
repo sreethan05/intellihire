@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import Login from "../pages/Login";
 import { authApi } from "@/lib/api";
@@ -74,15 +74,17 @@ describe("Login Component", () => {
       target: { value: "secret123" },
     });
 
-    // Submit form
-    fireEvent.submit(screen.getByRole("button", { name: "Sign In" }));
+    // Submit form inside act to capture asynchronous state updates
+    await act(async () => {
+      fireEvent.submit(screen.getByRole("button", { name: "Sign In" }));
+    });
 
     // Verify it called API
     expect(authApi.login).toHaveBeenCalledWith("bob@college.edu", "secret123");
 
-    // Wait for async auth processing
-    await vi.waitFor(() => {
-      expect(mockLogin).toHaveBeenCalledWith("fake-token", mockUser);
-    });
+    // Wait for async auth processing and navigation
+    expect(mockLogin).toHaveBeenCalledWith("fake-token", mockUser);
+    expect(mockNavigate).toHaveBeenCalledWith("/candidate/overview", { replace: true });
+    expect(screen.getByRole("button", { name: "Sign In" })).not.toBeDisabled();
   });
 });

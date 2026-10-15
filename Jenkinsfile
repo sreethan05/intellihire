@@ -107,7 +107,7 @@ pipeline {
                 script {
                     if (isUnix()) {
                         sh 'npx playwright install --with-deps chromium || true'
-                        sh 'npx playwright test e2e/login.spec.ts e2e/hub-smoke.spec.ts e2e/api.spec.ts || true'
+                        sh 'npx playwright test e2e/login.spec.ts e2e/hub-smoke.spec.ts e2e/api.spec.ts'
                     } else {
                         bat 'npx playwright install chromium'
                         bat 'npx playwright test e2e/login.spec.ts e2e/hub-smoke.spec.ts e2e/api.spec.ts'

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { ErrorBoundary } from "./ErrorBoundary";
 
@@ -9,6 +9,8 @@ const ThrowError = () => {
 
 describe("ErrorBoundary", () => {
   it("renders fallback when child throws", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
     render(
       <ErrorBoundary>
         <ThrowError />
@@ -17,6 +19,7 @@ describe("ErrorBoundary", () => {
 
     expect(screen.getByText("Something went wrong")).toBeInTheDocument();
     expect(screen.getByText("Reload Application")).toBeInTheDocument();
+    consoleSpy.mockRestore();
   });
 
   it("renders children when no error", () => {

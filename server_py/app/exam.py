@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from .auth_router import get_current_user, require_roles
 from .db import db
+from .date_utils import parse_datetime
 from .utils import send_email_async, redis_client
 from .websocket import sio
 
@@ -241,23 +242,26 @@ async def add_coding_questions(req: AddCodingQuestionsRequest, user: Dict[str, A
 
 @router.post("/assign")
 async def assign_exam(req: AssignExamRequest, user: Dict[str, Any] = Depends(require_roles(["recruiter", "admin"]))):
-    assignments = [{"exam_id": req.exam_id, "candidate_id": cid, "assigned_by": user["id"]} for cid in req.candidate_ids]
+    # Check which candidates already have this exam assigned
+    existing_res = await db.from_("exam_assignments").select("candidate_id").eq("exam_id", req.exam_id).in_("candidate_id", req.candidate_ids)
+    existing_cids = {row["candidate_id"] for row in (existing_res.data or []) if row.get("candidate_id")}
     
-    # Upsert logic in Python
+    to_assign_cids = [cid for cid in req.candidate_ids if cid not in existing_cids]
+    
     upserted = []
-    for assign in assignments:
+    for cid in to_assign_cids:
+        assign = {"exam_id": req.exam_id, "candidate_id": cid, "assigned_by": user["id"]}
         res = await db.from_("exam_assignments").upsert(assign, on_conflict="exam_id,candidate_id")
         if not res.error:
-            # Upsert on Postgres does not always return data if ignored, select it instead
-            sel = await db.from_("exam_assignments").select("*").eq("exam_id", req.exam_id).eq("candidate_id", assign["candidate_id"]).single()
+            sel = await db.from_("exam_assignments").select("*").eq("exam_id", req.exam_id).eq("candidate_id", cid).single()
             if sel.data:
                 upserted.append(sel.data)
                 
     new_count = len(upserted)
-    skipped = len(assignments) - new_count
+    skipped = len(req.candidate_ids) - new_count
     message = f"{new_count} candidate(s) assigned. {skipped} already had this exam (skipped)." if skipped > 0 else "Exam assigned successfully."
     
-    # Send email notifications to newly assigned candidates (fire-and-forget background task)
+    # Send email notifications ONLY to newly assigned candidates
     if new_count > 0:
         exam_res = await db.from_("exams").select("title").eq("id", req.exam_id).single()
         exam_title = exam_res.data.get("title") if exam_res.data else "Untitled Exam"
@@ -302,49 +306,76 @@ async def start_exam(req: StartExamRequest, user: Dict[str, Any] = Depends(get_c
     if assign_res.error or not assign_res.data:
         raise HTTPException(status_code=403, detail="Exam not assigned to you")
         
-    exam_res = await db.from_("exams").select("created_by, title, available_from, available_until").eq("id", req.exam_id).single()
+    exam_res = await db.from_("exams").select("created_by, title, duration, available_from, available_until").eq("id", req.exam_id).single()
     if exam_res.error or not exam_res.data:
         raise HTTPException(status_code=404, detail="Exam not found")
         
     exam = exam_res.data
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
+    duration_min = int(exam.get("duration") or 60)
     
     if exam.get("available_from"):
-        try:
-            from_dt = datetime.datetime.fromisoformat(exam["available_from"].replace("Z", "+00:00")).replace(tzinfo=None)
-            if from_dt > now:
-                raise HTTPException(status_code=403, detail=f"Exam opens at {from_dt.isoformat()}")
-        except Exception as e:
-            if isinstance(e, HTTPException):
-                raise e
-                
+        from_dt = parse_datetime(exam["available_from"])
+        if from_dt and from_dt > now:
+            raise HTTPException(status_code=403, detail=f"Exam opens at {from_dt.isoformat()}")
+            
     if exam.get("available_until"):
-        try:
-            until_dt = datetime.datetime.fromisoformat(exam["available_until"].replace("Z", "+00:00")).replace(tzinfo=None)
-            if until_dt < now:
-                raise HTTPException(status_code=403, detail="Exam attempt window has closed")
-        except Exception as e:
-            if isinstance(e, HTTPException):
-                raise e
+        until_dt = parse_datetime(exam["available_until"])
+        if until_dt and until_dt < now:
+            raise HTTPException(status_code=403, detail="Exam attempt window has closed")
                 
-    existing_res = await db.from_("attempts").select("*").eq("exam_id", req.exam_id).eq("candidate_id", uid).eq("status", "in_progress").maybeSingle()
+    # Check for existing attempts
+    existing_res = await db.from_("attempts").select("*").eq("exam_id", req.exam_id).eq("candidate_id", uid).maybeSingle()
     if existing_res.data:
-        return {"attempt": existing_res.data}
-        
-    completed_res = await db.from_("attempts").select("*").eq("exam_id", req.exam_id).eq("candidate_id", uid).eq("status", "completed").maybeSingle()
-    if completed_res.data:
-        raise HTTPException(status_code=400, detail="Exam already completed")
+        att = existing_res.data
+        if att.get("status") == "completed":
+            raise HTTPException(status_code=400, detail="Exam already completed")
+        if att.get("status") == "grading":
+            raise HTTPException(status_code=400, detail="Exam is currently being graded")
+        if att.get("status") == "in_progress":
+            # Check if duration has already expired
+            started_at_str = att.get("started_at")
+            if started_at_str:
+                try:
+                    started_at = parse_datetime(started_at_str)
+                    elapsed_seconds = (now - started_at).total_seconds()
+                    allowed_seconds = duration_min * 60
+                    # 2-minute grace period
+                    if elapsed_seconds > (allowed_seconds + 120):
+                        await db.from_("attempts").update({"status": "completed"}).eq("id", att["id"])
+                        raise HTTPException(status_code=400, detail="Exam time limit has expired")
+                    remaining = max(0, int(allowed_seconds - elapsed_seconds))
+                    if exam.get("available_until"):
+                        until_dt = parse_datetime(exam["available_until"])
+                        until_rem = max(0, int((until_dt - now).total_seconds()))
+                        remaining = min(remaining, until_rem)
+                    return {"attempt": {**att, "remaining_seconds": remaining}}
+                except HTTPException:
+                    raise
+                except Exception:
+                    pass
+            return {"attempt": {**att, "remaining_seconds": duration_min * 60}}
         
     user_res = await db.from_("users").select("name").eq("id", uid).single()
     candidate_name = user_res.data.get("name") if user_res.data else email
     
+    # Calculate initial remaining seconds
+    remaining_seconds = duration_min * 60
+    if exam.get("available_until"):
+        try:
+            until_dt = parse_datetime(exam["available_until"])
+            until_rem = max(0, int((until_dt - now).total_seconds()))
+            remaining_seconds = min(remaining_seconds, until_rem)
+        except Exception:
+            pass
+
     ins_res = await db.from_("attempts").insert({
         "exam_id": req.exam_id,
         "candidate_id": uid,
         "recruiter_id": exam["created_by"],
         "status": "in_progress",
         "score": 0,
-        "started_at": now.isoformat() + "Z"
+        "started_at": now.isoformat()
     }).select().single()
     
     if ins_res.error:
@@ -361,7 +392,7 @@ async def start_exam(req: StartExamRequest, user: Dict[str, Any] = Depends(get_c
     except Exception:
         pass
         
-    return {"attempt": ins_res.data}
+    return {"attempt": {**ins_res.data, "remaining_seconds": remaining_seconds}}
 
 @router.get("/{examId}")
 async def get_exam_details(examId: str, user: Dict[str, Any] = Depends(require_roles(["recruiter", "admin"]))):

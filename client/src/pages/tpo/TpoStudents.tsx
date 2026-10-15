@@ -109,7 +109,7 @@ export default function TpoStudents() {
         setScanFailures([...allFailed]);
       }
 
-      toast.success(`${allScanned.length} marksheet(s) scanned and accounts created`);
+      toast.success(`${allScanned.length} marksheet(s) scanned. Review the rows and upload to create accounts.`);
       loadStudents();
     } catch (err: any) {
       toast.error(err.response?.data?.error || "Marksheet scan failed. Check AI API Key configuration.");

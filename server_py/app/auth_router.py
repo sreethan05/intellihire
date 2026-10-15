@@ -44,7 +44,7 @@ def generate_token(user: Dict[str, Any]) -> str:
     return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
 
 def verify_token(token: str) -> Dict[str, Any]:
-    return jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+    return jwt.decode(token, JWT_SECRET, algorithms=["HS256"], options={"require": ["exp"]})
 
 def generate_refresh_token() -> str:
     return secrets.token_urlsafe(48)
@@ -104,6 +104,14 @@ def clear_session_cookies(response: Response):
 # Authentication dependency
 async def get_current_user(request: Request) -> Dict[str, Any]:
     token = request.cookies.get("access_token")
+    if not token and hasattr(request, "headers"):
+        try:
+            auth_header = request.headers.get("authorization")
+            if isinstance(auth_header, str) and auth_header.lower().startswith("bearer "):
+                token = auth_header[7:].strip()
+        except Exception:
+            pass
+
     if not token:
         raise HTTPException(status_code=401, detail="Unauthorized")
     try:
@@ -126,6 +134,8 @@ async def get_current_user(request: Request) -> Dict[str, Any]:
         raise HTTPException(status_code=401, detail="Invalid token")
 
 def require_roles(roles: list):
+    if isinstance(roles, str):
+        roles = [roles]
     async def dependency(user: Dict[str, Any] = Depends(get_current_user)):
         if user.get("role") not in roles:
             raise HTTPException(status_code=403, detail="Forbidden - Insufficient permissions")
@@ -152,6 +162,11 @@ async def login(req: LoginRequest, response: Response, request: Request):
     if (not users or len(users) == 0) and not res.error:
         res = await db.from_("users").select("*").eq("roll_number", lookup).limit(1)
         users = res.data
+
+    # Fallback for roll numbers stored in uppercase (e.g. 21CS0101) when user entered lowercase
+    if (not users or len(users) == 0) and not res.error and is_roll:
+        res = await db.from_("users").select("*").eq("roll_number", lookup.upper()).limit(1)
+        users = res.data
         
     if res.error or not users or len(users) == 0:
         from .logger import logger
@@ -165,7 +180,9 @@ async def login(req: LoginRequest, response: Response, request: Request):
         pwd_hash = user["password_hash"]
         if isinstance(pwd_hash, str):
             pwd_hash = pwd_hash.encode("utf-8")
-        valid = bcrypt.checkpw(req.password.encode("utf-8"), pwd_hash)
+        # Bcrypt has a hard limit of 72 bytes
+        pwd_bytes = req.password.encode("utf-8")[:72]
+        valid = bcrypt.checkpw(pwd_bytes, pwd_hash)
     except Exception as e:
         from .logger import logger
         logger.error(f"Login bcrypt check error for '{lookup}': {e}")

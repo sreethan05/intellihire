@@ -107,59 +107,20 @@ async def get_colleges_summary(user: Dict[str, Any] = Depends(require_roles(["re
         
     return {"colleges": summary}
 
-@router.get("/candidates/compare")
-async def compare_candidates(candidateIds: str, user: Dict[str, Any] = Depends(require_roles(["recruiter"]))):
-    ids = [i.strip() for i in candidateIds.split(",") if i.strip()]
-    if not ids:
-        raise HTTPException(status_code=400, detail="At least one candidate ID is required")
-        
-    # Query users, profiles, attempts, and interviews
-    users_res = await db.from_("users").select("id, name, email, roll_number").in_("id", ids)
-    profiles_res = await db.from_("candidate_profiles").select("*").in_("user_id", ids)
-    attempts_res = await db.from_("attempts").select("exam_id, score, status, candidate_id").in_("candidate_id", ids).eq("status", "completed")
-    interviews_res = await db.from_("ai_interviews").select("score, technical_score, communication_score, candidate_id").in_("candidate_id", ids).eq("status", "completed")
-    
-    users = users_res.data or []
-    profiles = profiles_res.data or []
-    attempts = attempts_res.data or []
-    interviews = interviews_res.data or []
-    
-    res = []
-    for u in users:
-        p = next((x for x in profiles if x["user_id"] == u["id"]), {})
-        c_att = [a for a in attempts if a["candidate_id"] == u["id"]]
-        c_int = [i for i in interviews if i["candidate_id"] == u["id"]]
-        
-        avg_exam = round(sum(a.get("score") or 0 for a in c_att) / len(c_att)) if c_att else 0
-        avg_comm = round(sum(i.get("communication_score") or 0 for i in c_int) / len(c_int)) if c_int else 0
-        avg_tech = round(sum(i.get("technical_score") or 0 for i in c_int) / len(c_int)) if c_int else 0
-        
-        res.append({
-            "id": u["id"],
-            "name": u["name"],
-            "email": u["email"],
-            "roll_number": u["roll_number"],
-            "cgpa": p.get("cgpa") or 0.0,
-            "branch": p.get("branch") or "Unknown",
-            "skills": p.get("skills") or [],
-            "avgExamScore": avg_exam,
-            "avgCommScore": avg_comm,
-            "avgTechScore": avg_tech
-        })
-        
-    return res
-
 @router.get("/candidates/{candidateId}/analytics")
 async def get_candidate_analytics(candidateId: str, user: Dict[str, Any] = Depends(require_roles(["recruiter", "admin"]))):
     recruiter_id = user["id"]
     
-    user_res = await db.from_("users").select("id, name, email, roll_number, created_at").eq("id", candidateId).single()
-    if user_res.error or not user_res.data:
+    user_res = await db.from_("users").select("id, name, email, roll_number, role, created_at").eq("id", candidateId).single()
+    if user_res.error or not user_res.data or user_res.data.get("role", "candidate") != "candidate":
         raise HTTPException(status_code=404, detail="Candidate not found")
         
     profile_res = await db.from_("candidate_profiles").select("*, college:college_id(name, code)").eq("user_id", candidateId).maybeSingle()
     
-    attempts_res = await db.from_("attempts").select("*, exams:exam_id(title, total_marks, pass_marks)").eq("candidate_id", candidateId).eq("recruiter_id", recruiter_id).order("started_at", ascending=False)
+    attempts_query = db.from_("attempts").select("*, exams:exam_id(title, total_marks, pass_marks)").eq("candidate_id", candidateId)
+    if user.get("role") == "recruiter":
+        attempts_query = attempts_query.eq("recruiter_id", recruiter_id)
+    attempts_res = await attempts_query.order("started_at", ascending=False)
     attempts = attempts_res.data or []
     
     attempt_ids = [a["id"] for a in attempts]
@@ -169,11 +130,30 @@ async def get_candidate_analytics(candidateId: str, user: Dict[str, Any] = Depen
         subs_res = await db.from_("coding_submissions").select("*, coding_questions:coding_question_id(title, difficulty)").in_("attempt_id", attempt_ids)
         coding_subs = subs_res.data or []
         
-    proc_res = await db.from_("proctoring_snapshots").select("*").eq("candidate_id", candidateId).order("captured_at", ascending=False).limit(20)
-    
-    ivs_res = await db.from_("ai_interviews").select("*, job:job_id(title, company_name)").eq("candidate_id", candidateId).eq("status", "completed").order("submitted_at", ascending=False)
-    
-    pipe_res = await db.from_("candidate_status").select("*, job:job_id(title, company_name)").eq("candidate_id", candidateId)
+    proc_events = []
+    if attempt_ids:
+        proc_res = await db.from_("proctoring_snapshots").select("*").in_("attempt_id", attempt_ids).order("captured_at", ascending=False).limit(20)
+        proc_events = proc_res.data or []
+
+    recruiter_job_ids = []
+    if user.get("role") == "recruiter":
+        jobs_res = await db.from_("jobs").select("id").eq("created_by", recruiter_id)
+        recruiter_job_ids = [j["id"] for j in (jobs_res.data or [])]
+
+    if user.get("role") == "recruiter":
+        if recruiter_job_ids:
+            ivs_res = await db.from_("ai_interviews").select("*, job:job_id(title, company_name)").eq("candidate_id", candidateId).eq("status", "completed").in_("job_id", recruiter_job_ids).order("submitted_at", ascending=False)
+            ivs_data = ivs_res.data or []
+            pipe_res = await db.from_("candidate_status").select("*, job:job_id(title, company_name)").eq("candidate_id", candidateId).in_("job_id", recruiter_job_ids)
+            pipe_data = pipe_res.data or []
+        else:
+            ivs_data = []
+            pipe_data = []
+    else:
+        ivs_res = await db.from_("ai_interviews").select("*, job:job_id(title, company_name)").eq("candidate_id", candidateId).eq("status", "completed").order("submitted_at", ascending=False)
+        ivs_data = ivs_res.data or []
+        pipe_res = await db.from_("candidate_status").select("*, job:job_id(title, company_name)").eq("candidate_id", candidateId)
+        pipe_data = pipe_res.data or []
     
     completed = [a for a in attempts if a["status"] == "completed"]
     avg_s = round(sum(a.get("score") or 0 for a in completed) / len(completed), 1) if completed else 0.0
@@ -213,7 +193,7 @@ async def get_candidate_analytics(candidateId: str, user: Dict[str, Any] = Depen
             "message": e.get("message"),
             "violationCount": e.get("violation_count"),
             "capturedAt": e.get("captured_at")
-        } for e in (proc_res.data or [])],
+        } for e in proc_events],
         "interviews": [{
             "id": i["id"],
             "jobTitle": (i.get("job") or {}).get("title"),
@@ -221,14 +201,14 @@ async def get_candidate_analytics(candidateId: str, user: Dict[str, Any] = Depen
             "score": i.get("score"),
             "selected": i.get("selected"),
             "submittedAt": i.get("submitted_at")
-        } for i in (ivs_res.data or [])],
+        } for i in ivs_data],
         "pipeline": [{
             "jobId": p["job_id"],
             "jobTitle": (p.get("job") or {}).get("title"),
             "companyName": (p.get("job") or {}).get("company_name"),
             "status": p["status"],
             "updatedAt": p.get("updated_at")
-        } for p in (pipe_res.data or [])]
+        } for p in pipe_data]
     }
 
 
@@ -238,6 +218,10 @@ async def get_resume_analysis(
     user: Dict[str, Any] = Depends(require_roles(["recruiter", "admin"]))
 ):
     """Fetch parsed resume skills and ATS analysis for a candidate."""
+    user_res = await db.from_("users").select("id, role").eq("id", candidateId).single()
+    if user_res.error or not user_res.data or user_res.data.get("role", "candidate") != "candidate":
+        raise HTTPException(status_code=404, detail="Candidate not found")
+
     profile_res = await db.from_("candidate_profiles").select("resume_url, resume_ats_analysis, skills, github_url, linkedin_url, bio, projects, cgpa, branch, graduation_year, roll_number").eq("user_id", candidateId).maybeSingle()
     if not profile_res.data:
         raise HTTPException(status_code=404, detail="Candidate profile not found")
@@ -246,7 +230,10 @@ async def get_resume_analysis(
     ats = profile.get("resume_ats_analysis")
     skills = profile.get("skills") or []
 
-    attempts_res = await db.from_("attempts").select("score, status, exams:exam_id(title, total_marks)").eq("candidate_id", candidateId).order("started_at", ascending=False)
+    attempts_query = db.from_("attempts").select("score, status, exams:exam_id(title, total_marks)").eq("candidate_id", candidateId)
+    if user.get("role") == "recruiter":
+        attempts_query = attempts_query.eq("recruiter_id", user["id"])
+    attempts_res = await attempts_query.order("started_at", ascending=False)
     attempts = attempts_res.data or []
 
     exam_summary = []
@@ -291,28 +278,60 @@ async def compare_candidates(
     if len(ids) > 5:
         raise HTTPException(status_code=400, detail="Maximum 5 candidates can be compared")
 
+    recruiter_job_ids = []
+    if user.get("role") == "recruiter":
+        jobs_res = await db.from_("jobs").select("id").eq("created_by", user["id"])
+        recruiter_job_ids = [j["id"] for j in (jobs_res.data or [])]
+
     results = []
     for cid in ids:
+        user_res = await db.from_("users").select("name, email, roll_number, role").eq("id", cid).single()
+        if user_res.error or not user_res.data or user_res.data.get("role") != "candidate":
+            continue
+        u = user_res.data
+
         prof_res = await db.from_("candidate_profiles").select("branch, cgpa, graduation_year, skills, resume_url, documents_verified, placement_ready").eq("user_id", cid).maybeSingle()
         profile = prof_res.data or {}
 
-        user_res = await db.from_("users").select("name, email, roll_number").eq("id", cid).single()
-        u = user_res.data or {}
-
-        att_res = await db.from_("attempts").select("score, status, exams:exam_id(title, total_marks, pass_marks)").eq("candidate_id", cid).order("started_at", ascending=False)
+        att_query = db.from_("attempts").select("id, score, status, exams:exam_id(title, total_marks, pass_marks)").eq("candidate_id", cid)
+        if user.get("role") == "recruiter":
+            att_query = att_query.eq("recruiter_id", user["id"])
+        att_res = await att_query.order("started_at", ascending=False)
         attempts = att_res.data or []
+        attempt_ids = [a["id"] for a in attempts]
+
         avg_score = sum(float(a.get("score") or 0) for a in attempts) / len(attempts) if attempts else 0
         exams_passed = sum(1 for a in attempts if float(a.get("score") or 0) >= float((a.get("exams") or {}).get("pass_marks") or 0))
 
-        iv_res = await db.from_("ai_interviews").select("score, status, communication_score, technical_score").eq("candidate_id", cid).eq("status", "completed")
-        interviews = iv_res.data or []
+        iv_query = db.from_("ai_interviews").select("score, status, communication_score, technical_score").eq("candidate_id", cid).eq("status", "completed")
+        if user.get("role") == "recruiter":
+            if recruiter_job_ids:
+                iv_query = iv_query.in_("job_id", recruiter_job_ids)
+            else:
+                iv_query = None
+        interviews = (await iv_query) if iv_query is not None else []
+        if hasattr(interviews, "data"):
+            interviews = interviews.data or []
+        elif not isinstance(interviews, list):
+            interviews = []
         avg_iv = sum(float(i.get("score") or 0) for i in interviews) / len(interviews) if interviews else 0
 
-        proc_res = await db.from_("proctoring_snapshots").select("id").eq("candidate_id", cid).eq("event_type", "violation")
-        violation_count = len(proc_res.data or [])
+        violation_count = 0
+        if attempt_ids:
+            proc_res = await db.from_("proctoring_snapshots").select("id").in_("attempt_id", attempt_ids).eq("event_type", "violation")
+            violation_count = len(proc_res.data or [])
 
-        pipe_res = await db.from_("candidate_status").select("status, jobs:job_id(title, company_name)").eq("candidate_id", cid)
-        pipeline = pipe_res.data or []
+        pipe_query = db.from_("candidate_status").select("status, jobs:job_id(title, company_name)").eq("candidate_id", cid)
+        if user.get("role") == "recruiter":
+            if recruiter_job_ids:
+                pipe_query = pipe_query.in_("job_id", recruiter_job_ids)
+            else:
+                pipe_query = None
+        pipeline = (await pipe_query) if pipe_query is not None else []
+        if hasattr(pipeline, "data"):
+            pipeline = pipeline.data or []
+        elif not isinstance(pipeline, list):
+            pipeline = []
 
         results.append({
             "candidateId": cid,

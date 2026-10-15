@@ -11,11 +11,13 @@ import { useCollege } from "@/context/CollegeContext";
 type Interview = {
   id: string;
   status: string;
-  scheduled_start_at?: string | null;
-  scheduled_end_at?: string | null;
+  scheduled_start?: string | null;
+  scheduled_end?: string | null;
   candidate?: { id: string; name: string; email: string };
-  job?: { id: string; title: string };
-  exam?: { id: string; title: string };
+  job?: { id?: string; title: string };
+  exam?: { id?: string; title: string };
+  users?: { id: string; name: string; email: string };
+  jobs?: { title: string };
   score?: number;
   selected?: boolean;
   summary?: string;
@@ -56,7 +58,13 @@ export default function AIInterviewScheduling() {
         interviewApi.summaries(selectedCollegeId),
       ]);
 
-      const pendingInterviews: Interview[] = pendingRes.data.interviews || [];
+      // The recruiter pending endpoint aliases the candidate/job rows as
+      // `users`/`jobs`; normalize them to the same shape as the summaries list.
+      const pendingInterviews: Interview[] = (pendingRes.data.interviews || []).map((it: Interview) => ({
+        ...it,
+        candidate: it.candidate || it.users,
+        job: it.job || it.jobs,
+      }));
       const summaries: Interview[] = summariesRes.data.interviews || [];
 
       setPending(pendingInterviews);
@@ -95,7 +103,7 @@ export default function AIInterviewScheduling() {
 
     setSavingId(interview.id);
     try {
-      await interviewApi.schedule(interview.id, { scheduled_start_at: startIso, scheduled_end_at: endIso });
+      await interviewApi.schedule(interview.id, { scheduled_start: startIso, scheduled_end: endIso });
       toast.success("Interview scheduled successfully.");
       await refresh();
     } catch (err) {
@@ -146,7 +154,7 @@ export default function AIInterviewScheduling() {
                     </div>
 
                     <div className="text-xs font-bold">
-                      {interview.scheduled_start_at && interview.scheduled_end_at ? (
+                      {interview.scheduled_start && interview.scheduled_end ? (
                         <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">Scheduled</span>
                       ) : (
                         <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">Awaiting Schedule</span>
@@ -159,8 +167,8 @@ export default function AIInterviewScheduling() {
                       <Label>Start</Label>
                       <Input
                         type="datetime-local"
-                        disabled={(!!interview.scheduled_start_at && !!interview.scheduled_end_at) || savingId === interview.id}
-                        value={draftById[interview.id]?.start ?? toDateTimeLocal(interview.scheduled_start_at)}
+                        disabled={(!!interview.scheduled_start && !!interview.scheduled_end) || savingId === interview.id}
+                        value={draftById[interview.id]?.start ?? toDateTimeLocal(interview.scheduled_start)}
                         onChange={(e) =>
                           setDraftById((prev) => ({ ...prev, [interview.id]: { ...(prev[interview.id] || { start: "", end: "" }), start: e.target.value } }))
                         }
@@ -170,8 +178,8 @@ export default function AIInterviewScheduling() {
                       <Label>End</Label>
                       <Input
                         type="datetime-local"
-                        disabled={(!!interview.scheduled_start_at && !!interview.scheduled_end_at) || savingId === interview.id}
-                        value={draftById[interview.id]?.end ?? toDateTimeLocal(interview.scheduled_end_at)}
+                        disabled={(!!interview.scheduled_start && !!interview.scheduled_end) || savingId === interview.id}
+                        value={draftById[interview.id]?.end ?? toDateTimeLocal(interview.scheduled_end)}
                         onChange={(e) =>
                           setDraftById((prev) => ({ ...prev, [interview.id]: { ...(prev[interview.id] || { start: "", end: "" }), end: e.target.value } }))
                         }
@@ -179,13 +187,13 @@ export default function AIInterviewScheduling() {
                     </div>
                   </div>
 
-                  {interview.scheduled_start_at && interview.scheduled_end_at && (
+                  {interview.scheduled_start && interview.scheduled_end && (
                     <div className="mt-3 text-xs text-slate-600">
-                      Window: {formatMaybeDateTime(interview.scheduled_start_at)} → {formatMaybeDateTime(interview.scheduled_end_at)}
+                      Window: {formatMaybeDateTime(interview.scheduled_start)} → {formatMaybeDateTime(interview.scheduled_end)}
                     </div>
                   )}
 
-                  {(!interview.scheduled_start_at || !interview.scheduled_end_at) && (
+                  {(!interview.scheduled_start || !interview.scheduled_end) && (
                     <div className="mt-4 flex items-center justify-end gap-3">
                       <Button
                         disabled={savingId === interview.id}

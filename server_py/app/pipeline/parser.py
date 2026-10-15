@@ -107,19 +107,25 @@ def _find_header_row(file_bytes: bytes, ext: str) -> pd.DataFrame:
     Uses the csv module to read all rows (handles inconsistent column counts
     by padding shorter rows), then scans for the header row.
     """
-    try:
-        text = file_bytes.decode("utf-8")
-    except UnicodeDecodeError:
-        text = file_bytes.decode("latin-1")
+    if ext in (".xlsx", ".xls"):
+        try:
+            raw_df = pd.read_excel(io.BytesIO(file_bytes), header=None, engine="openpyxl")
+        except Exception as exc:
+            raise ParserError(f"Failed to read Excel file rows: {exc}")
+    else:
+        try:
+            text = file_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            text = file_bytes.decode("latin-1")
 
-    rows = list(csv_mod.reader(io.StringIO(text)))
-    if not rows:
-        raise ParserError("The file contains no data rows.")
+        rows = list(csv_mod.reader(io.StringIO(text)))
+        if not rows:
+            raise ParserError("The file contains no data rows.")
 
-    # Pad shorter rows to the max column count
-    max_cols = max(len(r) for r in rows)
-    padded = [r + [None] * (max_cols - len(r)) for r in rows]
-    raw_df = pd.DataFrame(padded, columns=[f"Unnamed_{i}" for i in range(max_cols)])
+        # Pad shorter rows to the max column count
+        max_cols = max(len(r) for r in rows)
+        padded = [r + [None] * (max_cols - len(r)) for r in rows]
+        raw_df = pd.DataFrame(padded, columns=[f"Unnamed_{i}" for i in range(max_cols)])
 
     # Scan the first 10 rows to find the one that looks most like a header
     best_header_idx = 0

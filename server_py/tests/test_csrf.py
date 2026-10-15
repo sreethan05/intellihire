@@ -82,3 +82,35 @@ async def test_csrf_middleware_valid_token():
     
     assert result == "response"
     call_next.assert_called_once_with(mock_request)
+
+@pytest.mark.asyncio
+async def test_csrf_middleware_exempt_trailing_slash():
+    mock_request = MagicMock()
+    mock_request.method = "POST"
+    mock_request.url.path = "/api/auth/login/"
+    
+    call_next = AsyncMock()
+    call_next.return_value = "response"
+    
+    middleware = CSRFMiddleware(MagicMock())
+    result = await middleware.dispatch(mock_request, call_next)
+    
+    assert result == "response"
+    call_next.assert_called_once_with(mock_request)
+
+@pytest.mark.asyncio
+async def test_csrf_middleware_whitespace_token():
+    mock_request = MagicMock()
+    mock_request.method = "POST"
+    mock_request.url.path = "/api/exam/create"
+    mock_request.cookies = {"access_token": "valid_session", "csrf_token": "  token_123  "}
+    mock_request.headers = {"x-csrf-token": "token_123"}
+
+    call_next = AsyncMock()
+    call_next.return_value = "response"
+
+    middleware = CSRFMiddleware(MagicMock())
+    result = await middleware.dispatch(mock_request, call_next)
+
+    assert result == "response"
+    call_next.assert_called_once_with(mock_request)

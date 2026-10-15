@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ..auth_router import get_current_user, require_roles
 from ..db import db, get_connection
+from ..date_utils import parse_datetime
 from .recruiter_drives import deserialize_drive_colleges
 
 router = APIRouter(prefix="/api/recruiter", tags=["recruiter_dashboard"])
@@ -123,7 +124,7 @@ async def get_dashboard(collegeId: Optional[str] = None, user: Dict[str, Any] = 
     in_progress_att = [a for a in attempt_list if a["status"] == "in_progress"]
     passed_att = [
         a for a in completed_att
-        if (a["score"] or 0) >= (a["exams"]["pass_marks"] or 0)
+        if (a.get("score") or 0) >= ((a.get("exams") or {}).get("pass_marks") or 0)
     ]
     
     completion_rate = round((len(completed_att) / len(assign_list)) * 100, 1) if assign_list else 0.0
@@ -267,6 +268,13 @@ async def get_dashboard(collegeId: Optional[str] = None, user: Dict[str, Any] = 
 async def get_exam_topic_performance(examId: str, user: Dict[str, Any] = Depends(require_roles(["recruiter", "admin"]))):
     recruiter_id = user["id"]
     
+    if user.get("role") == "recruiter":
+        exam_res = await db.from_("exams").select("id, created_by").eq("id", examId).single()
+        if exam_res.error or not exam_res.data:
+            raise HTTPException(status_code=404, detail="Exam not found")
+        if exam_res.data.get("created_by") != recruiter_id:
+            raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this exam")
+
     eq_res = await db.from_("exam_questions").select("question_id, questions:question_id(topic_tags, question_text)").eq("exam_id", examId)
     exam_questions = eq_res.data or []
     
@@ -442,8 +450,8 @@ async def get_time_to_complete(user: Dict[str, Any] = Depends(require_roles(["re
     for a in attempts:
         exam = a.get("exams") or {}
         try:
-            started = datetime.datetime.fromisoformat(a["started_at"].replace("Z", "+00:00")).timestamp()
-            submitted = datetime.datetime.fromisoformat(a["submitted_at"].replace("Z", "+00:00")).timestamp()
+            started = parse_datetime(a["started_at"]).timestamp()
+            submitted = parse_datetime(a["submitted_at"]).timestamp()
             dur = max(0.0, submitted - started)
         except Exception:
             dur = 0.0
@@ -517,8 +525,18 @@ async def get_hiring_metrics(
             if not drive_ids:
                 return {
                     "totalDrives": 0, "totalCandidates": 0, "totalOffers": 0,
+                    "totalAccepted": 0, "totalDeclined": 0,
                     "offerAcceptanceRate": 0, "avgTimeToHireDays": 0,
-                    "pipelineConversion": {}, "driveBreakdown": [],
+                    "pipelineConversion": {
+                        "registered": 0, "examTaken": 0,
+                        "passed": 0, "shortlisted": 0,
+                        "offered": 0, "rejected": 0,
+                    },
+                    "conversionRates": {
+                        "examRate": 0, "passRate": 0,
+                        "shortlistRate": 0, "offerRate": 0,
+                    },
+                    "driveBreakdown": [],
                 }
 
             # Pipeline counts

@@ -4,10 +4,17 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ..auth_router import get_current_user, require_roles
 from ..db import db, get_connection
+from ..date_utils import parse_datetime
 from ..config import JUDGE0_API_KEY, GROQ_API_KEY
 from .recruiter_drives import deserialize_drive_colleges
 
 router = APIRouter(prefix="/api/admin", tags=["admin_analytics"])
+
+
+def _as_date(value):
+    """Normalizes a datetime | ISO string into a ``date`` (None when unparsable)."""
+    dt = parse_datetime(value)
+    return dt.date() if dt else None
 
 @router.get("/dashboard")
 async def get_dashboard(user: Dict[str, Any] = Depends(require_roles(["admin"]))):
@@ -286,7 +293,7 @@ async def get_platform_growth(user: Dict[str, Any] = Depends(require_roles(["adm
     for u in user_list:
         if u.get("created_at"):
             try:
-                dt = datetime.datetime.fromisoformat(u["created_at"].replace("Z", "+00:00")).date()
+                dt = _as_date(u["created_at"])
                 w_key = get_week_key(dt)
                 if w_key in weekly:
                     weekly[w_key]["newUsers"] += 1
@@ -296,7 +303,7 @@ async def get_platform_growth(user: Dict[str, Any] = Depends(require_roles(["adm
     for e in exam_list:
         if e.get("created_at"):
             try:
-                dt = datetime.datetime.fromisoformat(e["created_at"].replace("Z", "+00:00")).date()
+                dt = _as_date(e["created_at"])
                 w_key = get_week_key(dt)
                 if w_key in weekly:
                     weekly[w_key]["examsCreated"] += 1
@@ -306,7 +313,7 @@ async def get_platform_growth(user: Dict[str, Any] = Depends(require_roles(["adm
     for a in completed_attempts:
         if a.get("submitted_at"):
             try:
-                dt = datetime.datetime.fromisoformat(a["submitted_at"].replace("Z", "+00:00")).date()
+                dt = _as_date(a["submitted_at"])
                 w_key = get_week_key(dt)
                 if w_key in weekly:
                     weekly[w_key]["attemptsCompleted"] += 1
@@ -316,7 +323,7 @@ async def get_platform_growth(user: Dict[str, Any] = Depends(require_roles(["adm
     for d in drive_list:
         if d.get("created_at"):
             try:
-                dt = datetime.datetime.fromisoformat(d["created_at"].replace("Z", "+00:00")).date()
+                dt = _as_date(d["created_at"])
                 w_key = get_week_key(dt)
                 if w_key in weekly:
                     weekly[w_key]["drivesCreated"] += 1
@@ -326,7 +333,7 @@ async def get_platform_growth(user: Dict[str, Any] = Depends(require_roles(["adm
     for i in completed_interviews:
         if i.get("submitted_at"):
             try:
-                dt = datetime.datetime.fromisoformat(i["submitted_at"].replace("Z", "+00:00")).date()
+                dt = _as_date(i["submitted_at"])
                 w_key = get_week_key(dt)
                 if w_key in weekly:
                     weekly[w_key]["interviewsCompleted"] += 1
@@ -354,7 +361,7 @@ async def get_platform_growth(user: Dict[str, Any] = Depends(require_roles(["adm
     for u in user_list:
         if u.get("created_at"):
             try:
-                dt = datetime.datetime.fromisoformat(u["created_at"].replace("Z", "+00:00")).date()
+                dt = _as_date(u["created_at"])
                 m_key = get_month_key(dt)
                 if m_key in monthly:
                     monthly[m_key]["newUsers"] += 1
@@ -364,7 +371,7 @@ async def get_platform_growth(user: Dict[str, Any] = Depends(require_roles(["adm
     for e in exam_list:
         if e.get("created_at"):
             try:
-                dt = datetime.datetime.fromisoformat(e["created_at"].replace("Z", "+00:00")).date()
+                dt = _as_date(e["created_at"])
                 m_key = get_month_key(dt)
                 if m_key in monthly:
                     monthly[m_key]["examsCreated"] += 1
@@ -374,7 +381,7 @@ async def get_platform_growth(user: Dict[str, Any] = Depends(require_roles(["adm
     for a in completed_attempts:
         if a.get("submitted_at"):
             try:
-                dt = datetime.datetime.fromisoformat(a["submitted_at"].replace("Z", "+00:00")).date()
+                dt = _as_date(a["submitted_at"])
                 m_key = get_month_key(dt)
                 if m_key in monthly:
                     monthly[m_key]["attemptsCompleted"] += 1
@@ -384,7 +391,7 @@ async def get_platform_growth(user: Dict[str, Any] = Depends(require_roles(["adm
     for d in drive_list:
         if d.get("created_at"):
             try:
-                dt = datetime.datetime.fromisoformat(d["created_at"].replace("Z", "+00:00")).date()
+                dt = _as_date(d["created_at"])
                 m_key = get_month_key(dt)
                 if m_key in monthly:
                     monthly[m_key]["drivesCreated"] += 1
@@ -394,7 +401,7 @@ async def get_platform_growth(user: Dict[str, Any] = Depends(require_roles(["adm
     for i in completed_interviews:
         if i.get("submitted_at"):
             try:
-                dt = datetime.datetime.fromisoformat(i["submitted_at"].replace("Z", "+00:00")).date()
+                dt = _as_date(i["submitted_at"])
                 m_key = get_month_key(dt)
                 if m_key in monthly:
                     monthly[m_key]["interviewsCompleted"] += 1
@@ -418,8 +425,8 @@ async def get_platform_growth(user: Dict[str, Any] = Depends(require_roles(["adm
 
 @router.get("/system-health")
 async def get_system_health(user: Dict[str, Any] = Depends(require_roles(["admin"]))):
-    now = datetime.datetime.utcnow()
-    one_day_ago = (now - datetime.timedelta(days=1)).isoformat() + "Z"
+    now = datetime.datetime.now(datetime.timezone.utc)
+    one_day_ago = (now - datetime.timedelta(days=1)).isoformat()
     
     in_progress_res = await db.from_("attempts").select("id, started_at").eq("status", "in_progress")
     in_progress = in_progress_res.data or []
@@ -429,7 +436,7 @@ async def get_system_health(user: Dict[str, Any] = Depends(require_roles(["admin
     for a in in_progress:
         if a.get("started_at"):
             try:
-                start = datetime.datetime.fromisoformat(a["started_at"].replace("Z", "+00:00")).replace(tzinfo=None)
+                start = parse_datetime(a["started_at"])
                 diff = now - start
                 if diff.total_seconds() > 24 * 3600:
                     pending_jobs += 1
@@ -489,10 +496,10 @@ def infer_violation_type(msg: Optional[str], event_type: str) -> str:
 
 @router.get("/real-time-activity")
 async def get_real_time_activity(user: Dict[str, Any] = Depends(require_roles(["admin"]))):
-    now = datetime.datetime.utcnow()
-    two_hours_ago = (now - datetime.timedelta(hours=2)).isoformat() + "Z"
-    today_start = datetime.datetime(now.year, now.month, now.day).isoformat() + "Z"
-    one_day_ago = (now - datetime.timedelta(days=1)).isoformat() + "Z"
+    now = datetime.datetime.now(datetime.timezone.utc)
+    two_hours_ago = (now - datetime.timedelta(hours=2)).isoformat()
+    today_start = datetime.datetime(now.year, now.month, now.day, tzinfo=datetime.timezone.utc).isoformat()
+    one_day_ago = (now - datetime.timedelta(days=1)).isoformat()
     
     live_res = await db.from_("attempts").select("id, started_at, status").eq("status", "in_progress").gte("started_at", two_hours_ago)
     live_attempts = len(live_res.data) if live_res.data else 0
@@ -527,7 +534,8 @@ async def get_real_time_activity(user: Dict[str, Any] = Depends(require_roles(["
     for a in (today_attempts_res.data or []):
         if a.get("started_at"):
             try:
-                hour = datetime.datetime.fromisoformat(a["started_at"].replace("Z", "+00:00")).hour
+                started = parse_datetime(a["started_at"])
+                hour = started.hour
                 suffix = "am" if hour < 12 else "pm"
                 label = f"{hour % 12 or 12}{suffix}"
                 hour_map[label] = hour_map.get(label, 0) + 1

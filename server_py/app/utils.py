@@ -17,14 +17,16 @@ def is_production() -> bool:
     return NODE_ENV == "production"
 
 def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    pw_bytes = password.encode("utf-8")[:72]
+    return bcrypt.hashpw(pw_bytes, bcrypt.gensalt()).decode("utf-8")
 
 def check_password(password: str, hashed: str) -> bool:
     try:
         h = hashed
         if isinstance(h, str):
             h = h.encode("utf-8")
-        return bcrypt.checkpw(password.encode("utf-8"), h)
+        pw_bytes = password.encode("utf-8")[:72]
+        return bcrypt.checkpw(pw_bytes, h)
     except Exception:
         return False
 

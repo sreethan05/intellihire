@@ -1,5 +1,34 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, List, Optional
+
+
+def parse_datetime(value: Optional[Any], assume_utc: bool = True) -> Optional[datetime]:
+    """Best-effort parse of a datetime or ISO-8601 string into a datetime.
+
+    Database drivers (psycopg) return ``datetime`` objects for timestamptz
+    columns while API payloads/mocks may contain ISO strings. Callers should
+    use this helper instead of calling ``.replace("Z", ...)`` or slicing the
+    value directly.  Naive datetimes are assumed to be UTC by default.
+    """
+    if value is None or value == "":
+        return None
+    dt: Optional[datetime] = value if isinstance(value, datetime) else None
+    if dt is None:
+        try:
+            dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            return None
+    if dt.tzinfo is None and assume_utc:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def iso_date(value: Optional[Any]) -> str:
+    """Returns the ``YYYY-MM-DD`` date portion for a datetime or ISO string."""
+    dt = parse_datetime(value)
+    if dt is not None:
+        return dt.date().isoformat()
+    return str(value)[:10] if value else ""
 
 
 def format_date(date_str: Optional[Any]) -> str:

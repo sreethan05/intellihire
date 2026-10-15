@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 from sklearn.model_selection import train_test_split, StratifiedKFold, GridSearchCV
 from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 from sklearn.ensemble import (
@@ -108,14 +108,14 @@ class CandidateJobFitRanker:
             param_grid=param_grid,
             cv=cv,
             scoring="roc_auc",
-            n_jobs=-1,
+            n_jobs=1,
         )
         grid_search.fit(X_train_poly, y_train)
         best_gb = grid_search.best_estimator_
 
         # 4. Soft Voting Ensemble (GradientBoosting + RandomForest + ExtraTrees)
-        rf = RandomForestClassifier(n_estimators=50, max_depth=5, random_state=42)
-        et = ExtraTreesClassifier(n_estimators=50, max_depth=5, random_state=42)
+        rf = RandomForestClassifier(n_estimators=50, max_depth=5, random_state=42, n_jobs=1)
+        et = ExtraTreesClassifier(n_estimators=50, max_depth=5, random_state=42, n_jobs=1)
 
         ensemble = VotingClassifier(
             estimators=[("gb", best_gb), ("rf", rf), ("et", et)],
@@ -123,7 +123,7 @@ class CandidateJobFitRanker:
         )
 
         # 5. Isotonic Probability Calibration
-        calibrated_model = CalibratedClassifierCV(estimator=ensemble, cv=3, method="isotonic")
+        calibrated_model = CalibratedClassifierCV(estimator=ensemble, cv=3, method="isotonic", n_jobs=1)
         calibrated_model.fit(X_train_poly, y_train)
 
         self.model = calibrated_model
@@ -151,7 +151,7 @@ class CandidateJobFitRanker:
         self.model_metrics_ = {
             "train_sample_size": len(X_train),
             "test_sample_size": len(X_test),
-            "cross_validation_folds": 5,
+            "cross_validation_folds": 3,
             "best_hyperparameters": grid_search.best_params_,
             "ensemble_architecture": "Soft-Voting (GradientBoosting + RandomForest + ExtraTrees) + Isotonic Calibration",
             "test_performance": {
@@ -167,23 +167,41 @@ class CandidateJobFitRanker:
 
         return self.model_metrics_
 
+    def _safe_feature(self, metrics: Dict[str, Any], key: str, default: float, min_val: float = 0.0, max_val: Optional[float] = None) -> float:
+        """Safely extract and bounded-clip numeric feature from input dict."""
+        val = metrics.get(key)
+        if val is None:
+            return default
+        try:
+            f = float(val)
+            if np.isnan(f) or np.isinf(f):
+                return default
+            if min_val is not None:
+                f = max(min_val, f)
+            if max_val is not None:
+                f = min(max_val, f)
+            return round(f, 2)
+        except (ValueError, TypeError):
+            return default
+
     def predict(self, candidate_metrics: Dict[str, float]) -> Dict[str, Any]:
         """Predict job-fit score (0-100%) using maximized ensemble model."""
         if not self.is_trained:
             self.train()
 
-        mcq = float(candidate_metrics.get("mcq_score_pct", 50.0))
-        coding = float(candidate_metrics.get("coding_score_pct", 50.0))
-        time_ratio = float(candidate_metrics.get("time_taken_ratio", 0.8))
-        trust = float(candidate_metrics.get("proctor_trust_score", 100.0))
-        efficiency = float(candidate_metrics.get("code_efficiency_score", 70.0))
+        mcq = self._safe_feature(candidate_metrics, "mcq_score_pct", 50.0, 0.0, 100.0)
+        coding = self._safe_feature(candidate_metrics, "coding_score_pct", 50.0, 0.0, 100.0)
+        time_ratio = self._safe_feature(candidate_metrics, "time_taken_ratio", 0.8, 0.0, 5.0)
+        trust = self._safe_feature(candidate_metrics, "proctor_trust_score", 100.0, 0.0, 100.0)
+        efficiency = self._safe_feature(candidate_metrics, "code_efficiency_score", 70.0, 0.0, 100.0)
 
         raw_features = np.array([[mcq, coding, time_ratio, trust, efficiency]])
         scaled_features = self.scaler.transform(raw_features)
         poly_features = self.poly.transform(scaled_features)
 
-        prob_hire = float(self.model.predict_proba(poly_features)[0][1])
-        job_fit_score = round(prob_hire * 100, 1)
+        raw_prob = float(self.model.predict_proba(poly_features)[0][1])
+        prob_hire = max(0.0, min(1.0, raw_prob))
+        job_fit_score = max(0.0, min(100.0, round(prob_hire * 100, 1)))
 
         if job_fit_score >= 80:
             fit_level = "Strong Hire"
@@ -217,7 +235,7 @@ class CandidateJobFitRanker:
             },
             "model_metadata": {
                 "algorithm": "Calibrated Soft-Voting Ensemble (GradientBoosting + RandomForest + ExtraTrees)",
-                "cross_validation": "5-Fold Stratified K-Fold",
+                "cross_validation": "3-Fold Stratified K-Fold",
             },
         }
 

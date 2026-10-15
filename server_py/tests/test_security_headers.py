@@ -22,3 +22,6 @@ async def test_security_headers_middleware():
     assert result.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
     assert result.headers["X-Permitted-Cross-Domain-Policies"] == "none"
     assert "default-src 'self'" in result.headers["Content-Security-Policy"]
+    assert "max-age=31536000" in result.headers["Strict-Transport-Security"]
+    assert "camera=(self)" in result.headers["Permissions-Policy"]
+    assert "microphone=(self)" in result.headers["Permissions-Policy"]

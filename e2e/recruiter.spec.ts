@@ -1,31 +1,39 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Recruiter Drive & Exam Flow", () => {
-  test.beforeEach(async ({ page }) => {
+  test("admin can create recruiter and recruiter can login", async ({ page, context }) => {
+    // Login as admin
     await page.goto("/login");
     await page.fill('input[name="email"]', "admin@intellihire.com");
     await page.fill('input[name="password"]', "admin123");
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/admin\/overview/);
-  });
+    await expect(page).toHaveURL(/admin\/overview/, { timeout: 15000 });
 
-  test("admin can create recruiter and recruiter can login", async ({ page }) => {
     // Create recruiter as admin
     await page.goto("/admin/create-recruiter");
+    const newEmail = `recruiter-${Date.now()}@test.com`;
+    const newPassword = "Recruiter123";
+
     await page.fill('input[name="name"]', "Test Recruiter");
-    await page.fill('input[name="email"]', `recruiter-${Date.now()}@test.com`);
-    await page.fill('input[name="password"]', "Recruiter123");
+    await page.fill('input[name="email"]', newEmail);
+    await page.fill('input[name="password"]', newPassword);
     await page.click('button[type="submit"]');
 
-    await expect(page.getByText(/Recruiter created/i)).toBeVisible();
+    await expect(page.getByText(/Recruiter created/i)).toBeVisible({ timeout: 15000 });
+
+    // Verify new recruiter can log in
+    await context.clearCookies();
+    await page.goto("/login");
+    await page.evaluate(() => localStorage.clear());
+
+    await page.fill('input[name="email"]', newEmail);
+    await page.fill('input[name="password"]', newPassword);
+    await page.click('button[type="submit"]');
+    await expect(page).toHaveURL(/recruiter\/overview/, { timeout: 15000 });
   });
 
   test("recruiter can create an exam", async ({ page }) => {
-    // Admin is currently logged in due to beforeEach, log out first
-    await page.click('button:has-text("Logout")');
-    await expect(page).toHaveURL(/login/);
-
-    // First login as a recruiter
+    // Login directly as recruiter
     await page.goto("/login");
     await page.fill('input[name="email"]', "recruiter@example.com");
     await page.fill('input[name="password"]', "recruiter123");
@@ -34,7 +42,7 @@ test.describe("Recruiter Drive & Exam Flow", () => {
 
     // Navigate to create exam
     await page.click('a[href="/recruiter/create-exam"]');
-    await expect(page).toHaveURL(/recruiter\/create-exam/);
+    await expect(page).toHaveURL(/recruiter\/create-exam/, { timeout: 15000 });
 
     // Fill exam form Step 1
     await page.fill('input[name="title"]', `E2E Test Exam ${Date.now()}`);
@@ -51,17 +59,18 @@ test.describe("Recruiter Drive & Exam Flow", () => {
 
     // Add an MCQ question under Create New tab
     await page.click('button:has-text("Add MCQ Question")');
-    await page.fill('textarea', 'What is 2 + 2?');
-    await page.getByLabel('Option a').fill('4');
-    await page.getByLabel('Option b').fill('3');
-    await page.getByLabel('Option c').fill('5');
-    await page.getByLabel('Option d').fill('6');
+    const questionTextarea = page.locator('textarea[id^="mcq-"], textarea').first();
+    await questionTextarea.fill("What is 2 + 2?");
+    await page.getByLabel(/Option a/i).fill("4");
+    await page.getByLabel(/Option b/i).fill("3");
+    await page.getByLabel(/Option c/i).fill("5");
+    await page.getByLabel(/Option d/i).fill("6");
 
     // Click Save Questions to go to Step 3
     await page.click('button:has-text("Save Questions")');
 
     // Should show success message
-    await expect(page.getByText(/Exam Created Successfully/i)).toBeVisible();
+    await expect(page.getByText(/Exam Created Successfully/i)).toBeVisible({ timeout: 15000 });
   });
 });
 

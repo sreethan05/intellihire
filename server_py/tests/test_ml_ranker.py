@@ -53,3 +53,58 @@ def test_ml_ranker_robustness():
     assert 0.0 <= result["job_fit_score"] <= 100.0
     assert result["fit_level"] in ["Strong Hire", "Hire", "Consider", "Reject"]
     assert "model_metadata" in result
+
+
+def test_ml_ranker_malformed_and_none_inputs():
+    """Verify ranker handles None, NaN, inf, and invalid string types without crashing."""
+    malformed = {
+        "mcq_score_pct": None,
+        "coding_score_pct": "not_a_number",
+        "time_taken_ratio": -1.5,
+        "proctor_trust_score": float("nan"),
+        "code_efficiency_score": float("inf"),
+    }
+    result = ranker.predict(malformed)
+
+    assert 0.0 <= result["job_fit_score"] <= 100.0
+    assert 0.0 <= result["probability"] <= 1.0
+    assert result["fit_level"] in ["Strong Hire", "Hire", "Consider", "Reject"]
+
+
+def test_ml_ranker_bounded_clipping():
+    """Verify extreme out-of-range inputs are safely clipped."""
+    extreme = {
+        "mcq_score_pct": 5000.0,
+        "coding_score_pct": -200.0,
+        "time_taken_ratio": 50.0,
+        "proctor_trust_score": -99.0,
+        "code_efficiency_score": 999.0,
+    }
+    result = ranker.predict(extreme)
+
+    assert 0.0 <= result["job_fit_score"] <= 100.0
+    assert 0.0 <= result["probability"] <= 1.0
+    assert result["input_metrics"]["mcq_score_pct"] == 100.0
+    assert result["input_metrics"]["coding_score_pct"] == 0.0
+    assert result["input_metrics"]["proctor_trust_score"] == 0.0
+
+
+def test_ml_ranker_score_monotonicity():
+    """Verify high performer scores strictly higher than low performer."""
+    high = ranker.predict({
+        "mcq_score_pct": 95.0,
+        "coding_score_pct": 95.0,
+        "time_taken_ratio": 0.6,
+        "proctor_trust_score": 100.0,
+        "code_efficiency_score": 95.0,
+    })
+    low = ranker.predict({
+        "mcq_score_pct": 20.0,
+        "coding_score_pct": 20.0,
+        "time_taken_ratio": 1.4,
+        "proctor_trust_score": 20.0,
+        "code_efficiency_score": 20.0,
+    })
+
+    assert high["job_fit_score"] > low["job_fit_score"]
+    assert high["probability"] > low["probability"]

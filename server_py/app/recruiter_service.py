@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import httpx
 
@@ -13,7 +13,7 @@ from .utils import (
     serialize_drive_colleges,
     send_drive_registered_email,
 )
-from .validation import get_password_validation_error
+from .validation import get_password_validation_error, get_drive_validation_error
 from .date_utils import format_date, months_back
 
 
@@ -143,8 +143,10 @@ async def create_drive(drive_data: dict, recruiter_id: str) -> dict:
     actual_college_id = college_id or (college_ids[0] if isinstance(college_ids, list) and college_ids else None) or None
     final_college_ids = college_ids if isinstance(college_ids, list) and college_ids else ([actual_college_id] if actual_college_id else [])
 
-    if not title or not company_name or not actual_college_id or not isinstance(allowed_branches, list) or len(allowed_branches) == 0:
-        raise ValueError("Title, company, college, and branches are required")
+    drive_validation_data = {**drive_data, "college_id": actual_college_id, "college_ids": final_college_ids}
+    drive_error = get_drive_validation_error(drive_validation_data)
+    if drive_error:
+        raise ValueError(drive_error)
 
     final_description = serialize_drive_colleges(company_description or "", final_college_ids)
 
@@ -659,6 +661,10 @@ def json_serialize(obj: Any) -> str:
 
 
 async def upload_offer_letter(candidate_id: str, job_id: str, filename: str, recruiter_id: str) -> dict:
+    drive = await recruiter_repo.get_job_by_id_and_recruiter(job_id, recruiter_id)
+    if not drive:
+        raise ValueError("Drive not found or unauthorized")
+
     offer_letter_url = f"/uploads/offers/{filename}"
 
     status = await recruiter_repo.update_candidate_status_by_id(candidate_id, job_id, {

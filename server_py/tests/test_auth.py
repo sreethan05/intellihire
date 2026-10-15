@@ -103,3 +103,49 @@ async def test_require_roles_forbidden():
         await role_dependency(user)
     assert exc_info.value.status_code == 403
     assert exc_info.value.detail == "Forbidden - Insufficient permissions"
+
+def test_token_missing_exp_rejected():
+    # Tokens without 'exp' claim must be rejected (cannot live forever)
+    payload = {"id": "123", "email": "test@intellihire.com", "role": "candidate"}
+    token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+    with pytest.raises(Exception):
+        verify_token(token)
+
+@pytest.mark.asyncio
+async def test_get_current_user_bearer_token(mocker):
+    user = {"id": "456", "email": "bearer@intellihire.com", "role": "admin"}
+    token = generate_token(user)
+
+    mock_request = MagicMock()
+    mock_request.cookies = {}
+    mock_request.headers = {"authorization": f"Bearer {token}"}
+
+    mock_db_res = MagicMock()
+    mock_db_res.data = user
+    mock_chain = MagicMock()
+    mock_chain.select.return_value.eq.return_value.maybeSingle = mocker.AsyncMock(return_value=mock_db_res)
+    mocker.patch("app.auth_router.db.from_", return_value=mock_chain)
+
+    current_user = await get_current_user(mock_request)
+    assert current_user["id"] == "456"
+    assert current_user["role"] == "admin"
+
+@pytest.mark.asyncio
+async def test_require_roles_single_string_normalized():
+    user = {"id": "123", "email": "admin@intellihire.com", "role": "admin"}
+    role_dependency = require_roles("admin")  # passed as string instead of list
+    validated = await role_dependency(user)
+    assert validated == user
+
+    candidate = {"id": "789", "email": "user@intellihire.com", "role": "candidate"}
+    with pytest.raises(HTTPException) as exc_info:
+        await role_dependency(candidate)
+    assert exc_info.value.status_code == 403
+
+def test_password_truncation_safety():
+    from app.utils import hash_password, check_password
+    long_pw = "SuperSecretPassword123!" * 10  # > 72 bytes
+    hashed = hash_password(long_pw)
+    assert isinstance(hashed, str)
+    assert check_password(long_pw, hashed) is True
+    assert check_password("wrong_password", hashed) is False

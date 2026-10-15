@@ -52,9 +52,15 @@ class AuditLoggerMiddleware(BaseHTTPMiddleware):
                 payload = json.loads(body)
                 if isinstance(payload, dict):
                     payload = dict(payload)
-                    payload.pop("password", None)
-                    payload.pop("password_hash", None)
-                    payload.pop("token", None)
+                    SENSITIVE_KEYS = {
+                        "password", "password_hash", "token", "access_token",
+                        "refresh_token", "refreshToken", "new_password", "newPassword",
+                        "current_password", "currentPassword", "secret", "api_key"
+                    }
+                    for k in list(payload.keys()):
+                        k_lower = k.lower()
+                        if k in SENSITIVE_KEYS or "password" in k_lower or "secret" in k_lower or "token" in k_lower:
+                            payload.pop(k, None)
             except Exception:
                 pass
 

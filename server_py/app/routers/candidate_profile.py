@@ -8,6 +8,7 @@ from pydantic import BaseModel
 import pdfplumber
 
 from ..auth_router import get_current_user
+from ..candidate_service import Cache
 from ..db import db
 from ..upload_validation import read_validated_pdf
 from ..utils import storage_root, hash_password
@@ -137,7 +138,7 @@ def detect_passive_voice(text: str) -> dict:
 
 def detect_verb_repetition(text: str, verbs: List[str]) -> List[dict]:
     counts = {}
-    lower = text.toLowerCase() if hasattr(text, "toLowerCase") else text.lower()
+    lower = text.lower()
     for verb in verbs:
         matches = re.findall(rf"\b{verb}\b", lower, re.IGNORECASE)
         if matches:
@@ -165,12 +166,13 @@ async def update_profile(req: UpdateProfileRequest, user: Dict[str, Any] = Depen
         "photo_url": req.photo_url or None,
         "projects": req.projects or [],
         "semester_grades": req.semester_grades or [],
-        "updated_at": datetime.datetime.utcnow().isoformat() + "Z"
+        "updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
     }
     
     up_res = await db.from_("candidate_profiles").update(payload).eq("user_id", user["id"]).select().single()
     if up_res.error:
         raise HTTPException(status_code=400, detail=up_res.error.get("message") or "Failed to update profile")
+    Cache.invalidate_pattern("portfolio:*")
     return up_res.data
 
 @router.post("/onboarding")
@@ -187,6 +189,8 @@ async def onboarding(req: OnboardingRequest, user: Dict[str, Any] = Depends(get_
         "must_change_password": False,
         "profile_complete": True
     }).eq("id", user["id"]).select().single()
+    if usr_res.error:
+        raise HTTPException(status_code=400, detail=usr_res.error.get("message") or "User update failed")
     
     # Update profile
     prof_res = await db.from_("candidate_profiles").update({
@@ -200,6 +204,7 @@ async def onboarding(req: OnboardingRequest, user: Dict[str, Any] = Depends(get_
     
     if prof_res.error:
         raise HTTPException(status_code=400, detail=prof_res.error.get("message") or "Onboarding failed")
+    Cache.invalidate_pattern("portfolio:*")
     return prof_res.data
 
 @router.post("/resume/upload")
@@ -442,7 +447,7 @@ async def upload_resume(resume: UploadFile = File(...), user: Dict[str, Any] = D
     
     if up_res.error:
         raise HTTPException(status_code=400, detail=up_res.error.get("message") or "Failed to update profile resume details")
-        
+    Cache.invalidate_pattern("portfolio:*")
     return {"message": "Resume parsed successfully", "profile": up_res.data}
 
 @router.delete("/resume")
@@ -460,5 +465,5 @@ async def delete_resume(user: Dict[str, Any] = Depends(get_current_user)):
         "resume_url": None,
         "resume_ats_analysis": None
     }).eq("user_id", user["id"]).select().single()
-    
+    Cache.invalidate_pattern("portfolio:*")
     return {"message": "Resume deleted successfully", "profile": up_res.data}

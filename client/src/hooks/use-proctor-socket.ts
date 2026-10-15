@@ -1,8 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { toast } from "sonner";
-
-const WS_URL = import.meta.env.VITE_API_URL?.replace("/api", "") || "http://localhost:5000";
+import { WS_URL } from "@/lib/wsUrl";
 
 interface ProctoringEvent {
   attemptId: string;
@@ -31,6 +30,8 @@ export function useProctorSocket() {
 
     const socket = io(WS_URL, {
       transports: ["websocket"],
+      withCredentials: true,
+      auth: _token ? { token: _token } : undefined,
     });
 
     socket.on("connect", () => {
@@ -45,6 +46,10 @@ export function useProctorSocket() {
 
     socket.on("connect_error", (err) => {
       console.error("[ProctorSocket] Connection error:", err.message);
+    });
+
+    socket.on("error", (err: any) => {
+      console.error("[ProctorSocket] Socket server error:", err?.message || err);
     });
 
     // Listen for incoming snapshot events (for recruiters monitoring)
@@ -79,6 +84,7 @@ export function useProctorSocket() {
     setIsConnected(false);
     setLastSnapshot(null);
     setLastViolation(null);
+    setLastRecruiterAction(null);
   }, []);
 
   const joinAttempt = useCallback((attemptId: string, role: string) => {
@@ -87,6 +93,10 @@ export function useProctorSocket() {
 
   const joinMonitoring = useCallback((examId: string) => {
     socketRef.current?.emit("proctor:monitor", { examId });
+  }, []);
+
+  const leaveMonitoring = useCallback((examId: string) => {
+    socketRef.current?.emit("proctor:unmonitor", { examId });
   }, []);
 
   const lastSentSnapshotRef = useRef<number>(0);
@@ -135,6 +145,7 @@ export function useProctorSocket() {
     disconnect,
     joinAttempt,
     joinMonitoring,
+    leaveMonitoring,
     sendSnapshot,
     sendViolation,
     leaveAttempt,

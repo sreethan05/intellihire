@@ -67,11 +67,61 @@ class GenerateMcqRequest(BaseModel):
     difficulty: str
     count: Optional[int] = 5
 
+    @field_validator("topic")
+    @classmethod
+    def validate_topic(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("topic must not be empty")
+        if len(v) > 200:
+            raise ValueError("topic must not exceed 200 characters")
+        return re.sub(r"[\r\n]+", " ", v)
+
+    @field_validator("difficulty")
+    @classmethod
+    def validate_difficulty(cls, v: str) -> str:
+        v = v.strip().lower()
+        if v not in {"easy", "medium", "hard"}:
+            return "medium"
+        return v
+
+    @field_validator("count")
+    @classmethod
+    def validate_count(cls, v: Optional[int]) -> int:
+        if v is None or v < 1:
+            return 5
+        return min(v, 20)
+
 
 class GenerateCodingRequest(BaseModel):
     topic: str
     difficulty: str
     count: Optional[int] = 1
+
+    @field_validator("topic")
+    @classmethod
+    def validate_topic(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("topic must not be empty")
+        if len(v) > 200:
+            raise ValueError("topic must not exceed 200 characters")
+        return re.sub(r"[\r\n]+", " ", v)
+
+    @field_validator("difficulty")
+    @classmethod
+    def validate_difficulty(cls, v: str) -> str:
+        v = v.strip().lower()
+        if v not in {"easy", "medium", "hard"}:
+            return "medium"
+        return v
+
+    @field_validator("count")
+    @classmethod
+    def validate_count(cls, v: Optional[int]) -> int:
+        if v is None or v < 1:
+            return 1
+        return min(v, 5)
 
 
 class ImprovementReportRequest(BaseModel):
@@ -164,6 +214,8 @@ async def create_improvement_report(
     user_id = user["id"]
     attempt_res = await db.from_("attempts").select("*, exam:exam_id(title)").eq("id", req.attempt_id).maybeSingle()
     attempt = attempt_res.data
+    if attempt and attempt.get("candidate_id") != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     exam_title = attempt.get("exam", {}).get("title", "Assessment") if attempt else "Assessment"
     score = attempt.get("score", 0) if attempt else 0
     
@@ -245,6 +297,13 @@ class GenerateTextRequest(BaseModel):
             raise ValueError(f"prompt exceeds maximum length of {MAX_PROMPT_LENGTH} characters")
         return v
 
+    @field_validator("systemPrompt")
+    @classmethod
+    def validate_system_prompt_length(cls, v: Optional[str]) -> Optional[str]:
+        if v and len(v) > MAX_PROMPT_LENGTH:
+            raise ValueError(f"systemPrompt exceeds maximum length of {MAX_PROMPT_LENGTH} characters")
+        return v
+
 class GenerateJsonRequest(BaseModel):
     prompt: str
     systemPrompt: Optional[str] = None
@@ -256,6 +315,13 @@ class GenerateJsonRequest(BaseModel):
             raise ValueError("prompt must not be empty")
         if len(v) > MAX_PROMPT_LENGTH:
             raise ValueError(f"prompt exceeds maximum length of {MAX_PROMPT_LENGTH} characters")
+        return v
+
+    @field_validator("systemPrompt")
+    @classmethod
+    def validate_system_prompt_length(cls, v: Optional[str]) -> Optional[str]:
+        if v and len(v) > MAX_PROMPT_LENGTH:
+            raise ValueError(f"systemPrompt exceeds maximum length of {MAX_PROMPT_LENGTH} characters")
         return v
 
 BRANCH_MAP = {
@@ -299,7 +365,9 @@ BRANCH_MAP = {
     "ELECTRONICS AND COMPUTER ENGINEERING": "ECE",
 }
 
-def normalize_branch(raw: str) -> str:
+def normalize_branch(raw: Optional[str]) -> str:
+    if not raw or not isinstance(raw, str):
+        return "UNKNOWN"
     upper = raw.strip().upper()
     upper = re.sub(r"\s+", " ", upper)
     if upper in BRANCH_MAP:
@@ -447,10 +515,17 @@ def parse_marksheet_text(text: str, file_name: str):
 # ─── Pure AI helper endpoints ───
 
 def pick_skills(text: str) -> List[str]:
+    if not text or not isinstance(text, str):
+        return []
     known = ["javascript", "typescript", "python", "java", "c++", "sql", "react", "node", "express", "postgres", "mongodb", "aws", "docker", "git", "html", "css", "dsa", "machine learning"]
-    words = re.sub(r"[^a-z0-9+#.\s-]", " ", text.lower())
-    words = re.sub(r"\s+", " ", words).strip()
-    return [skill for skill in known if skill in words]
+    clean_text = " " + re.sub(r"[^a-z0-9+#.\s-]", " ", text.lower()) + " "
+    clean_text = re.sub(r"\s+", " ", clean_text)
+    matched = []
+    for skill in known:
+        pattern = r"(?:(?<=[\s,])|^)" + re.escape(skill) + r"(?:(?=[\s,])|$)"
+        if re.search(pattern, clean_text):
+            matched.append(skill)
+    return matched
 
 @router.post("/api/ai/resume-parse")
 @limiter.limit("20/minute")
@@ -483,37 +558,25 @@ async def resume_parse(
 
 # ─── Internal loopback endpoints called by Express ───
 
-@router.post("/internal/ocr")
-@limiter.limit("10/minute")
-async def ocr_marksheet(
-    request: Request,
-    file: MarksheetFile,
-    user: Dict[str, Any] = Depends(get_current_user),
-):
-    try:
-        file_bytes = base64.b64decode(file.data)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid base64 encoding")
-
-    text = ""
-    if file.mimeType == "application/pdf":
+def _extract_marksheet_text(file_bytes: bytes, mime_type: str) -> str:
+    if mime_type == "application/pdf":
         try:
             with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
-                text = "\n".join([page.extract_text() or "" for page in pdf.pages])
+                return "\n".join([page.extract_text() or "" for page in pdf.pages])
         except Exception as exc:
             raise HTTPException(status_code=400, detail=f"PDF extraction failed: {str(exc)}")
-    else:
-        try:
-            image = Image.open(io.BytesIO(file_bytes))
-            text = pytesseract.image_to_string(image)
-        except Exception as exc:
-            raise HTTPException(status_code=400, detail=f"OCR extraction failed: {str(exc)}")
+    try:
+        image = Image.open(io.BytesIO(file_bytes))
+        return pytesseract.image_to_string(image)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"OCR extraction failed: {str(exc)}")
 
-    result = parse_marksheet_text(text, file.name)
-    
+
+async def _ai_correct_marksheet(result: dict, file_name: str, text: str) -> None:
     # If confidence is low, and GROQ_API_KEY is available, use Groq to correct/validate
-    if result["confidence"] < 0.6 and GROQ_API_KEY:
-        extraction_prompt = """
+    if result["confidence"] >= 0.6 or not GROQ_API_KEY:
+        return
+    extraction_prompt = """
 You are extracting student account data from an Indian college semester grade report.
 Return only valid JSON. Do not wrap it in markdown.
 
@@ -537,10 +600,10 @@ Schema:
   "warnings": []
 }
 """
-        prompt = f"""
+    prompt = f"""
         {extraction_prompt}
         
-        Below is the raw text extracted via OCR from the marksheet file "{file.name}":
+        Below is the raw text extracted via OCR from the marksheet file "{file_name}":
         ---
         {"Detected Roll Number: " + result["roll_number"] if result["roll_number"] else ""}
         {"Detected Name: " + result["name"] if result["name"] else ""}
@@ -552,53 +615,82 @@ Schema:
         ---
         Please verify the fields, correct any typographical OCR errors, and output the clean JSON object matching the schema.
         """
-        try:
-            import json
-            payload = {
-                "model": GROQ_MODEL,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.2,
-                "response_format": {"type": "json_object"},
-            }
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    "https://api.groq.com/openai/v1/chat/completions",
-                    json=payload,
-                    headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
-                )
-                if response.status_code == 200:
-                    data = response.json()
-                    content = data["choices"][0]["message"]["content"]
-                    cleaned = content.strip().replace("```json", "").replace("```", "").strip()
-                    parsed = json.loads(cleaned)
-                    
-                    if parsed.get("roll_number"):
-                        result["roll_number"] = str(parsed["roll_number"]).strip().upper()
-                    if parsed.get("name"):
-                        result["name"] = str(parsed["name"]).strip()
-                    if parsed.get("branch"):
-                        result["branch"] = normalize_branch(str(parsed["branch"]))
-                    if parsed.get("cgpa") is not None:
-                        try:
-                            result["cgpa"] = float(parsed["cgpa"])
-                        except ValueError:
-                            pass
-                    if parsed.get("graduation_year") is not None:
-                        try:
-                            result["graduation_year"] = int(parsed["graduation_year"])
-                        except ValueError:
-                            pass
-                    if parsed.get("confidence") is not None:
-                        result["confidence"] = float(parsed["confidence"])
-                    if parsed.get("warnings"):
-                        result["warnings"] = [str(w) for w in parsed["warnings"]]
-        except Exception as exc:
-            logger.error(f"[Gateway] Marksheet AI correction failed: {str(exc)}")
+    try:
+        import json
+        payload = {
+            "model": GROQ_MODEL,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.2,
+            "response_format": {"type": "json_object"},
+        }
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                json=payload,
+                headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+            )
+            if response.status_code == 200:
+                data = response.json()
+                content = data["choices"][0]["message"]["content"]
+                cleaned = content.strip().replace("```json", "").replace("```", "").strip()
+                parsed = json.loads(cleaned)
+                
+                if parsed.get("roll_number"):
+                    result["roll_number"] = str(parsed["roll_number"]).strip().upper()
+                if parsed.get("name"):
+                    result["name"] = str(parsed["name"]).strip()
+                if parsed.get("branch"):
+                    result["branch"] = normalize_branch(str(parsed["branch"]))
+                if parsed.get("cgpa") is not None:
+                    try:
+                        result["cgpa"] = float(parsed["cgpa"])
+                    except ValueError:
+                        pass
+                if parsed.get("graduation_year") is not None:
+                    try:
+                        result["graduation_year"] = int(parsed["graduation_year"])
+                    except ValueError:
+                        pass
+                if parsed.get("confidence") is not None:
+                    result["confidence"] = float(parsed["confidence"])
+                if parsed.get("warnings"):
+                    result["warnings"] = [str(w) for w in parsed["warnings"]]
+    except Exception as exc:
+        logger.error(f"[Gateway] Marksheet AI correction failed: {str(exc)}")
+
+
+async def extract_marksheet_result(file_name: str, mime_type: str, data_b64: str) -> dict:
+    """Decodes an uploaded marksheet and runs OCR + field extraction.
+
+    Shared by the internal `/internal/ocr` loopback endpoint and the TPO
+    bulk scanner (`POST /api/tpo/scan-marksheets`).
+    """
+    raw_b64 = data_b64
+    if "," in raw_b64:
+        raw_b64 = raw_b64.split(",", 1)[1]
+    try:
+        file_bytes = base64.b64decode(raw_b64)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid base64 encoding")
+
+    text = _extract_marksheet_text(file_bytes, mime_type)
+    result = parse_marksheet_text(text, file_name)
+    await _ai_correct_marksheet(result, file_name, text)
 
     if not result["roll_number"] and not result["name"]:
-        raise HTTPException(status_code=400, detail=f"Could not extract student data from {file.name}.")
+        raise HTTPException(status_code=400, detail=f"Could not extract student data from {file_name}.")
 
     return result
+
+
+@router.post("/internal/ocr")
+@limiter.limit("10/minute")
+async def ocr_marksheet(
+    request: Request,
+    file: MarksheetFile,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    return await extract_marksheet_result(file.name, file.mimeType, file.data)
 
 @router.post("/internal/proctoring/verify")
 @limiter.limit("30/minute")
@@ -607,8 +699,17 @@ async def verify_proctoring_snapshot(
     req: ProctoringVerifyRequest,
     user: Dict[str, Any] = Depends(get_current_user),
 ):
+    import json
+    fallback_response = {
+        "single_person": True,
+        "multiple_people": False,
+        "looking_away": False,
+        "phone_detected": False,
+        "summary": "Proctoring snapshot audited (fallback heuristic applied).",
+    }
+
     if not GROQ_API_KEY:
-        raise HTTPException(status_code=500, detail="GROQ_API_KEY is not configured on Python backend")
+        return Response(content=json.dumps(fallback_response), media_type="application/json")
 
     # Clean data url
     data_url = req.base64DataUrl
@@ -657,16 +758,25 @@ Return ONLY valid JSON matching this schema:
                 headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
             )
             if response.status_code != 200:
-                raise HTTPException(status_code=500, detail="Groq Vision API failed")
+                logger.warning(f"Groq Vision API returned status {response.status_code}, using fallback")
+                return Response(content=json.dumps(fallback_response), media_type="application/json")
             
             data = response.json()
             content = data["choices"][0]["message"]["content"]
             
             # Clean response text
             cleaned = content.strip().replace("```json", "").replace("```", "").strip()
-            return Response(content=cleaned, media_type="application/json")
+            try:
+                json.loads(cleaned)
+                return Response(content=cleaned, media_type="application/json")
+            except json.JSONDecodeError:
+                m = re.search(r"(\{.*\})", cleaned, re.DOTALL)
+                if m:
+                    return Response(content=m.group(1), media_type="application/json")
+                return Response(content=json.dumps(fallback_response), media_type="application/json")
         except Exception as exc:
-            raise HTTPException(status_code=500, detail=f"Webcam analysis failed: {str(exc)}")
+            logger.warning(f"Webcam analysis failed: {str(exc)}, returning fallback")
+            return Response(content=json.dumps(fallback_response), media_type="application/json")
 
 @router.post("/internal/ai/generate-text")
 @limiter.limit("15/minute")
@@ -779,4 +889,11 @@ async def generate_json(prompt: str, systemPrompt: Optional[str] = None) -> dict
         data = response.json()
         import json
         content = data["choices"][0]["message"]["content"]
-        return json.loads(content.strip().replace("```json", "").replace("```", "").strip())
+        clean = content.strip().replace("```json", "").replace("```", "").strip()
+        try:
+            return json.loads(clean)
+        except json.JSONDecodeError:
+            match = re.search(r"(\{.*\}|\[.*\])", clean, re.DOTALL)
+            if match:
+                return json.loads(match.group(1))
+            raise

@@ -14,6 +14,7 @@ from ..upload_validation import read_validated_pdf
 from ..utils import record_pipeline_stage, send_drive_registered_email, storage_root
 from ..websocket import send_realtime_notification
 from ..ai import generate_json, has_ai_key
+from ..validation import get_drive_validation_error
 
 router = APIRouter(prefix="/api/recruiter", tags=["recruiter_drives"])
 
@@ -104,10 +105,29 @@ async def find_eligible_candidates(drive: any) -> list:
 @router.post("/drives")
 async def create_drive(req: CreateJobRequest, user: Dict[str, Any] = Depends(require_roles(["recruiter"]))):
     actual_college = req.college_id or (req.college_ids[0] if req.college_ids else None)
-    if not actual_college:
-        raise HTTPException(status_code=400, detail="College ID is required")
-        
-    college_ids = req.college_ids if req.college_ids else [actual_college]
+    college_ids = req.college_ids if req.college_ids else ([actual_college] if actual_college else [])
+
+    val_error = get_drive_validation_error({
+        "title": req.title,
+        "company_name": req.company_name,
+        "college_id": actual_college,
+        "college_ids": college_ids,
+        "allowed_branches": req.allowed_branches,
+        "min_cgpa": req.min_cgpa,
+        "salary_min": req.salary_min,
+        "salary_max": req.salary_max,
+        "drive_date": req.drive_date,
+    })
+    if val_error:
+        raise HTTPException(status_code=400, detail=val_error)
+
+    if req.exam_id:
+        exam_res = await db.from_("exams").select("id, created_by").eq("id", req.exam_id).single()
+        if exam_res.error or not exam_res.data:
+            raise HTTPException(status_code=400, detail="Selected exam does not exist")
+        if user.get("role") == "recruiter" and exam_res.data.get("created_by") != user["id"]:
+            raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this exam")
+
     description = serialize_drive_colleges(req.company_description or "", college_ids)
     
     res = await db.from_("jobs").insert({
@@ -139,7 +159,7 @@ async def create_drive(req: CreateJobRequest, user: Dict[str, Any] = Depends(req
             "candidate_id": c["user_id"],
             "status": "registered"
         } for c in eligible]
-        await db.from_("candidate_status").insert(status_data).onConflict("candidate_id")
+        await db.from_("candidate_status").upsert(status_data, on_conflict="job_id,candidate_id", ignore_duplicates=True)
         
         for c in eligible:
             await record_pipeline_stage(c["user_id"], drive["id"], "registered", "Auto-registered for drive by eligibility criteria", user["id"])
@@ -151,7 +171,7 @@ async def create_drive(req: CreateJobRequest, user: Dict[str, Any] = Depends(req
                 "assigned_by": user["id"],
                 "job_id": drive["id"]
             } for c in eligible]
-            await db.from_("exam_assignments").insert(assignments)
+            await db.from_("exam_assignments").upsert(assignments, on_conflict="exam_id,candidate_id", ignore_duplicates=True)
             
         for c in eligible:
             if c.get("email"):
@@ -222,6 +242,12 @@ async def assign_exam_to_drive(drive_id: str, req: AssignExamRequest, user: Dict
     if drive_res.error or not drive_res.data:
         raise HTTPException(status_code=404, detail="Drive not found")
         
+    exam_res = await db.from_("exams").select("id, created_by").eq("id", req.exam_id).single()
+    if exam_res.error or not exam_res.data:
+        raise HTTPException(status_code=400, detail="Selected exam does not exist")
+    if user.get("role") == "recruiter" and exam_res.data.get("created_by") != user["id"]:
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this exam")
+
     drive = drive_res.data
     await db.from_("jobs").update({"exam_id": req.exam_id}).eq("id", drive_id)
     
@@ -233,7 +259,7 @@ async def assign_exam_to_drive(drive_id: str, req: AssignExamRequest, user: Dict
             "assigned_by": user["id"],
             "job_id": drive_id
         } for c in eligible]
-        await db.from_("exam_assignments").insert(assignments)
+        await db.from_("exam_assignments").upsert(assignments, on_conflict="exam_id,candidate_id", ignore_duplicates=True)
         
     return {"message": "Exam assigned successfully"}
 
@@ -261,6 +287,12 @@ async def save_ai_config(drive_id: str, req: SaveAiConfigRequest, user: Dict[str
 
 @router.post("/drives/{drive_id}/test-evaluation")
 async def test_evaluation(drive_id: str, body: Dict[str, Any], user: Dict[str, Any] = Depends(require_roles(["recruiter"]))):
+    drive_res = await db.from_("jobs").select("id, created_by").eq("id", drive_id).single()
+    if drive_res.error or not drive_res.data:
+        raise HTTPException(status_code=404, detail="Drive not found")
+    if user.get("role") == "recruiter" and drive_res.data.get("created_by") != user["id"]:
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this drive")
+
     question = body.get("question")
     answer = body.get("answer", "")
     aiConfig = body.get("aiConfig") or {}
@@ -303,6 +335,9 @@ Schema:
 
 @router.post("/ai/shortlist")
 async def ai_shortlist(req: AiShortlistRequest, user: Dict[str, Any] = Depends(require_roles(["recruiter"]))):
+    if not req.criteria or not str(req.criteria).strip():
+        raise HTTPException(status_code=400, detail="Shortlist criteria cannot be empty")
+
     profiles_res = await db.from_("candidate_profiles").select("*")
     users_res = await db.from_("users").select("id, name").eq("role", "candidate")
     users_map = {u["id"]: u["name"] for u in users_res.data or []}
@@ -357,6 +392,16 @@ Return a JSON object in this format:
 
 @router.post("/offers/{candidate_id}/{job_id}")
 async def upload_offer_letter(candidate_id: str, job_id: str, offerLetter: UploadFile = File(...), user: Dict[str, Any] = Depends(require_roles(["recruiter"]))):
+    drive_res = await db.from_("jobs").select("id, created_by, title, company_name").eq("id", job_id).single()
+    if drive_res.error or not drive_res.data:
+        raise HTTPException(status_code=404, detail="Drive not found")
+    if user.get("role") == "recruiter" and drive_res.data.get("created_by") != user["id"]:
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this drive")
+
+    cand_res = await db.from_("users").select("id, role").eq("id", candidate_id).single()
+    if cand_res.error or not cand_res.data or cand_res.data.get("role") != "candidate":
+        raise HTTPException(status_code=404, detail="Candidate not found")
+
     file_bytes = await read_validated_pdf(offerLetter)
     unique_name = f"{int(datetime.datetime.utcnow().timestamp())}-{uuid.uuid4().hex[:8]}.pdf"
     file_path = os.path.join(storage_root, "offers", unique_name)
@@ -416,8 +461,12 @@ async def get_predictive_shortlist(user: Dict[str, Any] = Depends(require_roles(
         subs_res = await db.from_("coding_submissions").select("attempt_id, score, coding_questions:coding_question_id(marks)").in_("attempt_id", attempt_ids)
         coding_subs = subs_res.data or []
         
-    ivs_res = await db.from_("ai_interviews").select("candidate_id, score, selected").in_("candidate_id", cand_ids).eq("status", "completed")
-    interviews = ivs_res.data or []
+    recruiter_jobs_res = await db.from_("jobs").select("id").eq("created_by", recruiter_id)
+    rec_job_ids = [j["id"] for j in (recruiter_jobs_res.data or [])]
+    interviews = []
+    if rec_job_ids:
+        ivs_res = await db.from_("ai_interviews").select("candidate_id, score, selected").in_("candidate_id", cand_ids).in_("job_id", rec_job_ids).eq("status", "completed")
+        interviews = ivs_res.data or []
     
     proc_res = await db.from_("proctoring_snapshots").select("candidate_id, event_type").in_("attempt_id", attempt_ids if attempt_ids else ["00000000-0000-0000-0000-000000000000"]).eq("event_type", "violation")
     violations = proc_res.data or []

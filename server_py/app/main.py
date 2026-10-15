@@ -2,6 +2,7 @@ import hmac
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response, Header, HTTPException, Depends
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from fastapi.middleware.cors import CORSMiddleware
@@ -61,8 +62,13 @@ async def lifespan(app: FastAPI):
             raise e
         else:
             from .logger import logger
-            logger.warning(f"Database migration skipped/failed during startup: {e}")
     yield
+    # Graceful connection pool shutdown
+    try:
+        from .db import close_pool
+        close_pool()
+    except Exception:
+        pass
 
 app = FastAPI(
     title="IntelliHire Python Gateway & Backend",
@@ -262,10 +268,10 @@ async def health_check():
     else:
         status = "healthy"
 
-    return {
+    payload = {
         "status": status,
         "degraded_services": degraded_services,
-        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat() + "Z",
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "environment": NODE_ENV,
         "services": {
             "postgres": postgres_healthy,
@@ -279,6 +285,13 @@ async def health_check():
             "pipeline": pipeline_status
         }
     }
+
+    if not all_healthy:
+        # Return 503 so orchestrators and load balancers stop routing traffic
+        # to an instance whose database is unreachable.
+        return JSONResponse(status_code=503, content=payload)
+
+    return payload
 
 # Detect frontend static build output directory (root dist or legacy server/dist)
 dist_dir_primary = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "dist"))

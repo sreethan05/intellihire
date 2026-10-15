@@ -597,9 +597,14 @@ async def select_coding_questions(config: dict) -> List[dict]:
     if not raw_questions:
         fallback_res = await db.from_("coding_questions").select(
             "id, title, description, difficulty, starter_code, test_cases, sample_cases, hidden_cases, input_format, output_format, constraints_text, topic_tags, marks, time_limit_ms, memory_limit_kb"
-        ).overlaps("topic_tags", [topic]).execute()
+        ).execute()
         
-        fallback = fallback_res.data or []
+        all_coding = fallback_res.data or []
+        fallback = [
+            q for q in all_coding
+            if topic_match_score(q.get("title") or "", topic) >= 0.3
+            or any(topic_match_score(str(t), topic) >= 0.3 for t in (q.get("topic_tags") or []))
+        ]
         if not fallback:
             raise RuntimeError(f"No coding questions found for topic: {topic}. Seed the question bank first.")
             

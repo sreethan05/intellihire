@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import Layout from "../components/layout/Layout";
 
@@ -51,7 +51,7 @@ vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
 }));
 
 describe("Layout", () => {
-  it("renders layout sidebar navigation elements", () => {
+  it("renders layout sidebar navigation elements and user profile stats", async () => {
     render(
       <MemoryRouter>
         <Layout />
@@ -60,5 +60,9 @@ describe("Layout", () => {
 
     // Assert that the user's name is rendered in the layout
     expect(screen.getByText("Alice")).toBeInTheDocument();
+
+    // Click on profile to open dropdown and assert profileStats loaded asynchronously
+    fireEvent.click(screen.getByText("Alice"));
+    expect(await screen.findByText("Profile")).toBeInTheDocument();
   });
 });

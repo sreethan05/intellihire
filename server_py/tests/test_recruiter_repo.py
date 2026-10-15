@@ -77,3 +77,23 @@ async def test_get_recruiter_jobs():
     with patch("app.repositories.recruiter_repo.db", mock_db):
         jobs = await get_recruiter_jobs("recruiter_123")
         assert len(jobs) == 1
+
+@pytest.mark.asyncio
+async def test_get_colleges_by_ids_empty():
+    from app.repositories.recruiter_repo import get_colleges_by_ids
+    colleges = await get_colleges_by_ids([])
+    assert colleges == []
+
+@pytest.mark.asyncio
+async def test_get_colleges_by_ids_success():
+    from app.repositories.recruiter_repo import get_colleges_by_ids
+    mock_db = MagicMock()
+    mock_res = MagicMock()
+    mock_res.error = None
+    mock_res.data = [{"id": "col_1", "name": "IIT"}]
+    
+    mock_db.from_.return_value.select.return_value.in_.return_value.execute = AsyncMock(return_value=mock_res)
+    with patch("app.repositories.recruiter_repo.db", mock_db):
+        res = await get_colleges_by_ids(["col_1"])
+        assert len(res) == 1
+        assert res[0]["name"] == "IIT"

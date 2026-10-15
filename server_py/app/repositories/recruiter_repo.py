@@ -104,6 +104,8 @@ async def upsert_exam_assignments(assignments: List[Any]) -> List[Dict[str, Any]
 
 
 async def get_colleges_by_ids(college_ids: List[str]) -> List[Dict[str, Any]]:
+    if not college_ids:
+        return []
     res = await db.from_("colleges").select("id, name, code, location").in_("id", college_ids).execute()
     if res.error:
         raise res.error
@@ -186,7 +188,7 @@ async def get_candidate_status_for_dashboard(drive_ids: List[str], college_candi
         if len(college_candidate_user_ids) > 0:
             query = query.in_("candidate_id", college_candidate_user_ids)
         else:
-            query = query.eq("id", "00000000-0000-0000-0000-000000000000")
+            query = query.eq("candidate_id", "00000000-0000-0000-0000-000000000000")
 
     res = await query.execute()
     if res.error:
@@ -218,7 +220,7 @@ async def get_attempts_for_dashboard(recruiter_id: str, college_candidate_user_i
         if len(college_candidate_user_ids) > 0:
             query = query.in_("candidate_id", college_candidate_user_ids)
         else:
-            query = query.eq("id", "00000000-0000-0000-0000-000000000000")
+            query = query.eq("candidate_id", "00000000-0000-0000-0000-000000000000")
 
     res = await query.execute()
     if res.error:

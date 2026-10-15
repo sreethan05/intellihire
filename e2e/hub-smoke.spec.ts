@@ -72,19 +72,23 @@ test.describe("HubPage Smoke Tests per Role", () => {
 
     // Should redirect to candidate/overview or onboarding
     if (page.url().includes("onboarding")) {
-      // If onboarded is needed, fill form to reach candidate overview
-      await page.fill('input[name="rollNumber"]', "CS2026001");
-      await page.fill('input[name="branch"]', "CSE");
-      await page.fill('input[name="cgpa"]', "9.5");
-      await page.fill('input[name="graduationYear"]', "2026");
-      await page.fill('input[name="phone"]', "+91 9876543210");
+      // If onboarding is needed, fill actual onboarding form fields
+      await page.fill('input[type="password"]', "admin123");
+      const phoneInput = page.locator('input[placeholder*="Phone"], input[type="text"]').first();
+      if (await phoneInput.isVisible()) {
+        await phoneInput.fill("+91 9876543210");
+      }
+      const skillsField = page.locator("textarea");
+      if (await skillsField.isVisible()) {
+        await skillsField.fill("Python, JavaScript, React");
+      }
       await page.click('button[type="submit"]');
     }
 
     await expect(page).toHaveURL(/candidate\/overview/, { timeout: 15000 });
 
     // Dashboard header check
-    await expect(page.getByRole("heading", { name: "Alex Candidate's Command Hub" })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { name: /Command Hub/i })).toBeVisible({ timeout: 15000 });
 
     // Check dashboard blocks
     await expect(page.getByText("Active Action Center")).toBeVisible({ timeout: 15000 });

@@ -6,6 +6,8 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from .db import db, get_connection, transaction
 from .auth_router import get_current_user, require_roles
+from .date_utils import iso_date, parse_datetime
+from .ai import MarksheetFile, extract_marksheet_result
 from .utils import hash_password, check_password
 from .pipeline import parse_file, ParserError, normalize_dataframe, ingest_students
 from .repositories import bulk_import_repo
@@ -23,6 +25,9 @@ class StudentRow(BaseModel):
 
 class UploadStudentsRequest(BaseModel):
     rows: List[StudentRow]
+
+class ScanMarksheetsRequest(BaseModel):
+    files: List[MarksheetFile]
 
 class StudentVerificationRequest(BaseModel):
     documents_verified: bool
@@ -225,6 +230,43 @@ async def upload_students(req: UploadStudentsRequest, user: Dict[str, Any] = Dep
         "failed": failed
     }
 
+@router.post("/scan-marksheets")
+async def scan_marksheets(req: ScanMarksheetsRequest, user: Dict[str, Any] = Depends(require_roles(["tpo"]))):
+    """Bulk-OCR uploaded marksheet images/PDFs and return extracted student rows."""
+    await get_tpo_college(user["id"])  # raises 400 when the TPO has no linked college
+    if not req.files:
+        raise HTTPException(status_code=400, detail="No files were provided")
+
+    students: List[Dict[str, Any]] = []
+    failed: List[Dict[str, Any]] = []
+    for f in req.files:
+        try:
+            result = await extract_marksheet_result(f.name, f.mimeType, f.data)
+        except HTTPException as exc:
+            failed.append({"file": f.name, "reason": str(exc.detail)})
+            continue
+        except Exception as exc:  # noqa: BLE001
+            failed.append({"file": f.name, "reason": f"Scan failed: {str(exc)}"})
+            continue
+
+        try:
+            cgpa = float(result.get("cgpa"))
+        except (TypeError, ValueError):
+            cgpa = 0.0
+
+        students.append({
+            "roll_number": result.get("roll_number") or "",
+            "name": result.get("name") or "",
+            "branch": result.get("branch") or "",
+            "cgpa": cgpa,
+            "graduation_year": result.get("graduation_year"),
+            "confidence": result.get("confidence"),
+            "source_file": f.name,
+            "warnings": result.get("warnings") or [],
+        })
+
+    return {"students": students, "failed": failed}
+
 @router.get("/students")
 async def get_students(page: int = 1, limit: int = 10, user: Dict[str, Any] = Depends(require_roles(["tpo"]))):
     college_id = await get_tpo_college(user["id"])
@@ -324,7 +366,7 @@ async def get_dashboard_summary(user: Dict[str, Any] = Depends(require_roles(["t
         if drive.get("status") == "active" and drive.get("drive_date"):
             # Check if deadline is close (< 2 days)
             try:
-                dt = datetime.datetime.fromisoformat(drive["drive_date"].replace("Z", "+00:00"))
+                dt = parse_datetime(drive["drive_date"])
                 diff = dt - datetime.datetime.now(datetime.timezone.utc)
                 if diff.total_seconds() > 0 and diff.total_seconds() < 2 * 24 * 60 * 60:
                     action_items.append({
@@ -679,13 +721,13 @@ async def get_upload_tracking(user: Dict[str, Any] = Depends(require_roles(["tpo
             year -= 1
         d = datetime.date(year, month, 1)
         months.append({
-            "key": f"{d.year}-{str(d.month).padStart(2, '0')}" if hasattr(str(d.month), "padStart") else f"{d.year}-{str(d.month).zfill(2)}",
+            "key": f"{d.year}-{d.month:02d}",
             "label": d.strftime("%b")
         })
         
     trend = []
     for m in months:
-        m_uploads = [u for u in uploads if u.get("created_at") and u["created_at"].startswith(m["key"])]
+        m_uploads = [u for u in uploads if u.get("created_at") and iso_date(u["created_at"]).startswith(m["key"])]
         tot_rows = sum(u.get("rows_total") or 0 for u in m_uploads)
         created_rows = sum(u.get("rows_created") or 0 for u in m_uploads)
         trend.append({

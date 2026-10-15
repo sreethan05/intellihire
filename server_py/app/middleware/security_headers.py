@@ -25,4 +25,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         )
         # HSTS: enforce HTTPS in production
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+        # Permissions-Policy: allow camera & microphone for self (remote proctoring) while restricting geolocation
+        response.headers["Permissions-Policy"] = "camera=(self), microphone=(self), geolocation=()"
         return response

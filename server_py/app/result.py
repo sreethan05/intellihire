@@ -47,28 +47,81 @@ class RegradeRequest(BaseModel):
 class SubmitExamRequest(BaseModel):
     attempt_id: str
 
+EXAM_SUBMISSION_GRACE_PERIOD_SECONDS = 120  # 2 minutes grace period for network latency / auto-submit
+
+def parse_utc_timestamp(ts: Any) -> Optional[datetime.datetime]:
+    if not ts:
+        return None
+    if isinstance(ts, datetime.datetime):
+        if ts.tzinfo is None:
+            return ts.replace(tzinfo=datetime.timezone.utc)
+        return ts.astimezone(datetime.timezone.utc)
+    if isinstance(ts, str):
+        try:
+            cleaned = ts.replace("Z", "+00:00")
+            dt = datetime.datetime.fromisoformat(cleaned)
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=datetime.timezone.utc)
+            return dt.astimezone(datetime.timezone.utc)
+        except Exception:
+            return None
+    return None
+
+def is_attempt_expired(attempt: dict, exam: dict, grace_seconds: int = EXAM_SUBMISSION_GRACE_PERIOD_SECONDS) -> bool:
+    started_at = parse_utc_timestamp(attempt.get("started_at"))
+    duration_min = exam.get("duration")
+    now = datetime.datetime.now(datetime.timezone.utc)
+    
+    deadlines = []
+    if started_at and duration_min and duration_min > 0:
+        deadlines.append(started_at + datetime.timedelta(minutes=duration_min))
+    if exam.get("available_until"):
+        until_dt = parse_utc_timestamp(exam["available_until"])
+        if until_dt:
+            deadlines.append(until_dt)
+            
+    if not deadlines:
+        return False
+        
+    earliest_deadline = min(deadlines)
+    return now > (earliest_deadline + datetime.timedelta(seconds=grace_seconds))
+
 @router.post("/submit-mcq")
 async def submit_mcq(req: SubmitMcqRequest, user: Dict[str, Any] = Depends(get_current_user)):
-    att_res = await db.from_("attempts").select("candidate_id, status, exams:exam_id(negative_marking)").eq("id", req.attempt_id).single()
+    att_res = await db.from_("attempts").select("candidate_id, status, started_at, exam_id, exams:exam_id(duration, available_until, negative_marking)").eq("id", req.attempt_id).single()
     if att_res.error or not att_res.data:
         raise HTTPException(status_code=404, detail="Attempt not found")
         
     attempt = att_res.data
     if attempt["candidate_id"] != user["id"]:
         raise HTTPException(status_code=403, detail="Forbidden")
-    if attempt["status"] == "completed":
+    if attempt["status"] != "in_progress":
         raise HTTPException(status_code=400, detail="Exam already submitted")
         
+    exam = attempt.get("exams") or {}
+    if is_attempt_expired(attempt, exam):
+        raise HTTPException(status_code=400, detail="Submission deadline has passed")
+        
+    # Check exam-specific marks first, fallback to questions bank
+    eq_res = await db.from_("exam_questions").select("marks").eq("exam_id", attempt["exam_id"]).eq("question_id", req.question_id).maybeSingle()
     q_res = await db.from_("questions").select("correct_option, marks").eq("id", req.question_id).single()
     if q_res.error or not q_res.data:
         raise HTTPException(status_code=404, detail="Question not found")
         
     question = q_res.data
-    is_correct = question["correct_option"] == req.selected_option
+    selected_clean = req.selected_option.strip().upper() if req.selected_option else ""
+    correct_clean = str(question.get("correct_option") or "").strip().upper()
+    is_correct = bool(selected_clean) and (selected_clean == correct_clean)
     
-    exam = attempt.get("exams") or {}
+    q_marks = float((eq_res.data.get("marks") if eq_res.data else None) or question.get("marks") or 1.0)
     neg_marking = max(0.0, float(exam.get("negative_marking") or 0.0))
-    marks_obtained = float(question["marks"]) if is_correct else -neg_marking
+    
+    if is_correct:
+        marks_obtained = q_marks
+    elif selected_clean:
+        marks_obtained = -neg_marking
+    else:
+        marks_obtained = 0.0
     
     ins_res = await db.from_("answers").upsert({
         "attempt_id": req.attempt_id,
@@ -85,15 +138,19 @@ async def submit_mcq(req: SubmitMcqRequest, user: Dict[str, Any] = Depends(get_c
 
 @router.post("/submit-code")
 async def submit_code(req: SubmitCodeRequest, user: Dict[str, Any] = Depends(get_current_user)):
-    att_res = await db.from_("attempts").select("candidate_id, status").eq("id", req.attempt_id).single()
+    att_res = await db.from_("attempts").select("candidate_id, status, started_at, exam_id, exams:exam_id(duration, available_until)").eq("id", req.attempt_id).single()
     if att_res.error or not att_res.data:
         raise HTTPException(status_code=404, detail="Attempt not found")
         
     attempt = att_res.data
     if attempt["candidate_id"] != user["id"]:
         raise HTTPException(status_code=403, detail="Forbidden")
-    if attempt["status"] == "completed":
+    if attempt["status"] != "in_progress":
         raise HTTPException(status_code=400, detail="Exam already submitted")
+        
+    exam = attempt.get("exams") or {}
+    if is_attempt_expired(attempt, exam):
+        raise HTTPException(status_code=400, detail="Submission deadline has passed")
         
     ins_res = await db.from_("coding_submissions").upsert({
         "attempt_id": req.attempt_id,
@@ -110,17 +167,22 @@ async def submit_code(req: SubmitCodeRequest, user: Dict[str, Any] = Depends(get
 @router.post("/update-code-score")
 async def update_code_score(req: UpdateCodeScoreRequest, user: Dict[str, Any] = Depends(get_current_user)):
     """Run candidate code server-side via Judge0 and store the computed score."""
-    att_res = await db.from_("attempts").select("candidate_id, status").eq("id", req.attempt_id).single()
+    att_res = await db.from_("attempts").select("candidate_id, status, started_at, exam_id, exams:exam_id(duration, available_until)").eq("id", req.attempt_id).single()
     if att_res.error or not att_res.data:
         raise HTTPException(status_code=404, detail="Attempt not found")
 
     attempt = att_res.data
     if attempt["candidate_id"] != user["id"]:
         raise HTTPException(status_code=403, detail="Forbidden")
-    if attempt["status"] == "completed":
+    if attempt["status"] != "in_progress":
         raise HTTPException(status_code=400, detail="Exam already submitted")
 
-    # Fetch the coding question to get test cases and max marks
+    exam = attempt.get("exams") or {}
+    if is_attempt_expired(attempt, exam):
+        raise HTTPException(status_code=400, detail="Submission deadline has passed")
+
+    # Fetch exam-specific marks first, fallback to coding_questions
+    ecq_res = await db.from_("exam_coding_questions").select("marks").eq("exam_id", attempt["exam_id"]).eq("coding_question_id", req.coding_question_id).maybeSingle()
     q_res = await db.from_("coding_questions").select("test_cases, marks").eq("id", req.coding_question_id).single()
     if q_res.error or not q_res.data:
         raise HTTPException(status_code=404, detail="Coding question not found")
@@ -133,7 +195,7 @@ async def update_code_score(req: UpdateCodeScoreRequest, user: Dict[str, Any] = 
         except Exception:
             test_cases = []
 
-    max_marks = float(question.get("marks") or 10.0)
+    max_marks = float((ecq_res.data.get("marks") if ecq_res.data else None) or question.get("marks") or 10.0)
     code = (req.code or "").strip()
 
     if not code:
@@ -180,36 +242,43 @@ async def update_code_score(req: UpdateCodeScoreRequest, user: Dict[str, Any] = 
 
 @router.post("/submit-exam")
 async def submit_exam(req: SubmitExamRequest, user: Dict[str, Any] = Depends(get_current_user)):
-    att_res = await db.from_("attempts").select("candidate_id, status, exam_id").eq("id", req.attempt_id).single()
+    att_res = await db.from_("attempts").select("candidate_id, status, started_at, exam_id, exams:exam_id(duration, available_until)").eq("id", req.attempt_id).single()
     if att_res.error or not att_res.data:
         raise HTTPException(status_code=404, detail="Attempt not found")
         
     attempt = att_res.data
     if attempt["candidate_id"] != user["id"]:
         raise HTTPException(status_code=403, detail="Forbidden")
-    if attempt["status"] == "completed":
+    if attempt["status"] != "in_progress":
         raise HTTPException(status_code=400, detail="Exam already submitted")
         
-    now_str = datetime.datetime.utcnow().isoformat() + "Z"
-    # Use 'grading' status to prevent concurrent reads from seeing a
-    # completed-but-ungraded attempt with a stale/zero score.
+    now = datetime.datetime.now(datetime.timezone.utc)
+    now_str = now.isoformat()
+    exam = attempt.get("exams") or {}
+
+    # Reject submission if deadline has expired beyond grace period
+    if is_attempt_expired(attempt, exam):
+        # Terminate the expired attempt to prevent further interactions
+        await db.from_("attempts").update({
+            "status": "completed",
+            "submitted_at": now_str
+        }).eq("id", req.attempt_id).eq("status", "in_progress")
+        raise HTTPException(status_code=400, detail="Submission deadline has passed")
+
+    # Atomic state transition: update status to 'grading' ONLY if still 'in_progress'.
+    # This prevents race conditions and duplicate submissions from launching concurrent grading jobs.
     up_res = await db.from_("attempts").update({
         "status": "grading",
         "submitted_at": now_str
-    }).eq("id", req.attempt_id).select().single()
+    }).eq("id", req.attempt_id).eq("status", "in_progress").select().single()
     
-    if up_res.error:
-        raise HTTPException(status_code=400, detail=up_res.error.get("message") or "Failed to submit exam")
+    if up_res.error or not up_res.data:
+        raise HTTPException(status_code=400, detail="Exam already submitted or currently being graded")
         
     # Queue background grading
     task = asyncio.create_task(grade_attempt_background(req.attempt_id, user, up_res.data["exam_id"], now_str))
     _background_grading_tasks.add(task)
     task.add_done_callback(_background_grading_tasks.discard)
-    
-    return {
-        "message": "Exam submitted successfully. Grading is processing in the background.",
-        "attempt": up_res.data
-    }
     
     return {
         "message": "Exam submitted successfully. Grading is processing in the background.",
@@ -236,15 +305,19 @@ async def grade_attempt_background(attempt_id: str, user: dict, exam_id: str, su
                 except Exception:
                     test_cases = []
                     
+            # Check exam_coding_questions for customized marks
+            ecq_res = await db.from_("exam_coding_questions").select("marks").eq("exam_id", exam_id).eq("coding_question_id", sub["coding_question_id"]).maybeSingle()
+            max_marks = float((ecq_res.data.get("marks") if ecq_res.data else None) or q.get("marks") or 10.0)
+
             if not test_cases:
-                await db.from_("coding_submissions").update({"score": float(q.get("marks") or 10.0), "status": "tested"}).eq("id", sub["id"])
+                await db.from_("coding_submissions").update({"score": max_marks, "status": "tested"}).eq("id", sub["id"])
                 continue
                 
             passed = 0
             for tc in test_cases:
                 try:
                     result = await run_with_judge0(sub["code"], sub["language"], tc.get("input") or "", timeout=5)
-                    actual = result["stdout"].strip()
+                    actual = (result.get("stdout") or "").strip()
                     expected = (tc.get("expected_output") or "").strip()
                     if actual == expected:
                         passed += 1
@@ -253,7 +326,7 @@ async def grade_attempt_background(attempt_id: str, user: dict, exam_id: str, su
                 await asyncio.sleep(0.3)
                 
             score_pct = passed / len(test_cases)
-            final_score = round(score_pct * float(q.get("marks") or 10.0))
+            final_score = round(score_pct * max_marks)
             await db.from_("coding_submissions").update({"score": final_score, "status": "tested"}).eq("id", sub["id"])
             
         # Tally final overall score
@@ -262,7 +335,7 @@ async def grade_attempt_background(attempt_id: str, user: dict, exam_id: str, su
         
         mcq_s = sum(float(a.get("marks_obtained") or 0.0) for a in (ans_res.data or []))
         cod_s = sum(float(s.get("score") or 0.0) for s in (sub_res.data or []))
-        total = mcq_s + cod_s
+        total = max(0.0, round(mcq_s + cod_s, 2))
         
         # Save finalized score
         await db.from_("attempts").update({
@@ -330,7 +403,21 @@ async def grade_attempt_background(attempt_id: str, user: dict, exam_id: str, su
         # Plagiarism check
         await run_plagiarism_check(attempt_id)
     except Exception as e:
-        logger.error(f"Background grading error: {str(e)}")
+        logger.error(f"Background grading error for attempt {attempt_id}: {str(e)}")
+        # Fallback to prevent attempt from being stuck indefinitely in 'grading'
+        try:
+            ans_res = await db.from_("answers").select("marks_obtained").eq("attempt_id", attempt_id)
+            sub_res = await db.from_("coding_submissions").select("score").eq("attempt_id", attempt_id)
+            mcq_s = sum(float(a.get("marks_obtained") or 0.0) for a in (ans_res.data or []))
+            cod_s = sum(float(s.get("score") or 0.0) for s in (sub_res.data or []))
+            fallback_score = max(0.0, round(mcq_s + cod_s, 2))
+            await db.from_("attempts").update({
+                "score": fallback_score,
+                "status": "completed",
+                "submitted_at": submitted_at
+            }).eq("id", attempt_id)
+        except Exception as inner_e:
+            logger.error(f"Failed to apply fallback score for attempt {attempt_id}: {inner_e}")
 
 @router.get("/attempt/{attemptId}/review")
 async def get_attempt_review(
@@ -404,7 +491,7 @@ async def override_mcq_marks(
     sub_res = await db.from_("coding_submissions").select("score").eq("attempt_id", req.attempt_id)
     mcq_total = sum(float(a.get("marks_obtained") or 0.0) for a in (ans_res.data or []))
     cod_total = sum(float(s.get("score") or 0.0) for s in (sub_res.data or []))
-    new_total = mcq_total + cod_total
+    new_total = max(0.0, round(mcq_total + cod_total, 2))
 
     await db.from_("attempts").update({"score": new_total}).eq("id", req.attempt_id)
 
@@ -452,6 +539,14 @@ async def get_attempt(attemptId: str, user: Dict[str, Any] = Depends(get_current
     if att_res.error or not att_res.data:
         raise HTTPException(status_code=404, detail="Attempt not found")
         
+    role = user.get("role")
+    if role == "candidate" and att_res.data.get("candidate_id") != user["id"]:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if role == "recruiter" and att_res.data.get("recruiter_id") != user["id"]:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if role not in {"candidate", "recruiter", "admin", "tpo"}:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
     ans_res = await db.from_("answers").select("*, questions:question_id(*)").eq("attempt_id", attemptId)
     subs_res = await db.from_("coding_submissions").select("*, coding_questions:coding_question_id(*)").eq("attempt_id", attemptId)
     

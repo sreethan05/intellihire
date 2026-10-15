@@ -68,3 +68,33 @@ async def test_get_exam_topic_performance_success():
         result = await get_exam_topic_performance("exam_123", {"id": "rec_123"})
         assert "topics" in result
         assert len(result["topics"]) == 0
+
+@pytest.mark.asyncio
+async def test_get_candidate_analytics_non_candidate():
+    mock_db = MagicMock()
+    # User exists but is a recruiter, not a candidate
+    mock_query = AwaitableMock(await_result=MagicMock(data={"id": "user_456", "name": "Admin", "role": "admin"}, error=None))
+    mock_query.select.return_value = mock_query
+    mock_query.eq.return_value = mock_query
+    mock_query.single.return_value = mock_query
+    mock_db.from_.return_value = mock_query
+
+    with patch("app.routers.recruiter_candidates.db", mock_db):
+        with pytest.raises(HTTPException) as exc:
+            await get_candidate_analytics("user_456", {"id": "rec_123", "role": "recruiter"})
+        assert exc.value.status_code == 404
+
+@pytest.mark.asyncio
+async def test_get_exam_topic_performance_unauthorized():
+    mock_db = MagicMock()
+    # Exam belongs to rec_999, but requested by rec_123
+    mock_query = AwaitableMock(await_result=MagicMock(data={"id": "exam_123", "created_by": "rec_999"}, error=None))
+    mock_query.select.return_value = mock_query
+    mock_query.eq.return_value = mock_query
+    mock_query.single.return_value = mock_query
+    mock_db.from_.return_value = mock_query
+
+    with patch("app.routers.recruiter_dashboard.db", mock_db):
+        with pytest.raises(HTTPException) as exc:
+            await get_exam_topic_performance("exam_123", {"id": "rec_123", "role": "recruiter"})
+        assert exc.value.status_code == 403

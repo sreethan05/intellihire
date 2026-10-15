@@ -12,12 +12,14 @@ def tokenize_python_code(code: str) -> list:
     """Extract AST-based token stream from Python code for structural comparison.
     Resilient to variable renaming, comment changes, and whitespace.
     """
+    if not code or not isinstance(code, str):
+        return []
     try:
         tree = ast.parse(code)
         tokens = []
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
-                tokens.append(f"FUNC:{node.name}")
+                tokens.append("FUNC")
                 tokens.append(f"ARGS:{len(node.args.args)}")
             elif isinstance(node, ast.For):
                 tokens.append("FOR")
@@ -42,11 +44,13 @@ def tokenize_python_code(code: str) -> list:
             elif isinstance(node, (ast.Add, ast.Sub, ast.Mult, ast.Div)):
                 tokens.append(f"OP:{type(node).__name__}")
         return tokens
-    except SyntaxError:
+    except (SyntaxError, ValueError, TypeError):
         return []
 
 def normalize_code_structure(code: str, language: str = "python") -> str:
     """Normalize code by removing comments, docstrings, and standardizing whitespace."""
+    if not code or not isinstance(code, str):
+        return ""
     code = re.sub(r'#.*$', '', code, flags=re.MULTILINE)
     code = re.sub(r'//.*$', '', code, flags=re.MULTILINE)
     if language in ("python", "python3"):
@@ -66,6 +70,8 @@ def get_ast_similarity_score(code1: str, code2: str, language: str = "python") -
     """AST-based structural similarity for Python code.
     Falls back to cosine similarity for non-Python languages.
     """
+    if not code1 or not code2:
+        return 0
     if language in ("python", "python3"):
         tokens1 = tokenize_python_code(code1)
         tokens2 = tokenize_python_code(code2)
@@ -82,6 +88,8 @@ def get_ast_similarity_score(code1: str, code2: str, language: str = "python") -
                 return round(blended * 100)
     norm1 = normalize_code_structure(code1, language)
     norm2 = normalize_code_structure(code2, language)
+    if not norm1 or not norm2:
+        return 0
     return round(calculate_cosine_similarity(norm1, norm2, False) * 100)
 
 PROGRAMMING_KEYWORDS = {
@@ -107,12 +115,14 @@ def normalize_code(code: str) -> str:
     # 3. Normalize whitespace
     return " ".join(cleaned.split())
 
+PLAGIARISM_SIMILARITY_THRESHOLD = 85
+
 def calculate_cosine_similarity(str1: str, str2: str, keyword_only: bool = False) -> float:
     norm1 = normalize_code(str1)
     norm2 = normalize_code(str2)
     
     if not norm1 and not norm2:
-        return 1.0
+        return 1.0 if not keyword_only else 0.0
     if not norm1 or not norm2:
         return 0.0
         
@@ -126,7 +136,7 @@ def calculate_cosine_similarity(str1: str, str2: str, keyword_only: bool = False
     t2 = tokenize(norm2)
     
     if not t1 and not t2:
-        return 1.0
+        return 1.0 if not keyword_only else 0.0
     if not t1 or not t2:
         return 0.0
         
@@ -168,6 +178,10 @@ def calculate_levenshtein_similarity(str1: str, str2: str) -> float:
     len1 = len(norm1)
     len2 = len(norm2)
     
+    # Quadratic guard: For very large submissions, use SequenceMatcher to prevent CPU exhaustion
+    if max(len1, len2) > 2000:
+        return SequenceMatcher(None, norm1[:2000], norm2[:2000]).ratio()
+        
     prev_row = list(range(len2 + 1))
     curr_row = [0] * (len2 + 1)
     
@@ -187,7 +201,14 @@ def calculate_levenshtein_similarity(str1: str, str2: str) -> float:
     return 1.0 - (distance / max_len)
 
 def get_similarity_score(code1: str, code2: str, language: str = "python") -> int:
-    """Enhanced similarity scoring with AST-based structural comparison."""
+    """Enhanced similarity scoring with AST-based structural comparison.
+    Returns 0 if either code sample has no executable code content.
+    """
+    norm1 = normalize_code(code1)
+    norm2 = normalize_code(code2)
+    if not norm1 or not norm2:
+        return 0
+
     ast_score = get_ast_similarity_score(code1, code2, language)
     cosine_full = calculate_cosine_similarity(code1, code2, False)
     cosine_keywords = calculate_cosine_similarity(code1, code2, True)
@@ -209,10 +230,11 @@ async def run_plagiarism_check(attempt_id: str) -> None:
             return
             
         cur_att_res = await db.from_("attempts").select("*, users:candidate_id(name)").eq("id", attempt_id).single()
-        cur_candidate_name = cur_att_res.data.get("users", {}).get("name") if cur_att_res.data else "Candidate"
+        cur_att = cur_att_res.data or {}
+        cur_candidate_name = (cur_att.get("users") or {}).get("name") or "Candidate"
         
         # Batch-fetch all other submissions for all coding questions at once
-        all_question_ids = [sub["coding_question_id"] for sub in current_submissions if sub.get("code") and sub["code"].strip()]
+        all_question_ids = [sub["coding_question_id"] for sub in current_submissions if normalize_code(sub.get("code") or "")]
         all_other_subs: dict = {}
         if all_question_ids:
             batch_res = await db.from_("coding_submissions").select("*, attempts:attempt_id(*, users:candidate_id(name))").in_("coding_question_id", all_question_ids).neq("attempt_id", attempt_id)
@@ -223,7 +245,8 @@ async def run_plagiarism_check(attempt_id: str) -> None:
                 all_other_subs[qid].append(other_sub)
 
         for sub in current_submissions:
-            if not sub.get("code") or not sub["code"].strip():
+            sub_code = sub.get("code") or ""
+            if not normalize_code(sub_code):
                 continue
                 
             # Clear existing plagiarism flags for this specific submission
@@ -233,13 +256,16 @@ async def run_plagiarism_check(attempt_id: str) -> None:
             other_submissions = all_other_subs.get(sub["coding_question_id"], [])
             
             for other_sub in other_submissions:
-                if not other_sub.get("code") or not other_sub["code"].strip():
+                other_code = other_sub.get("code") or ""
+                if not normalize_code(other_code):
                     continue
                     
-                similarity = get_similarity_score(sub["code"], other_sub["code"], sub.get("language") or "python")
-                if similarity >= 85:
-                    other_candidate_name = other_sub.get("attempts", {}).get("users", {}).get("name") if other_sub.get("attempts") else "Other Candidate"
-                    q_title = sub.get("coding_questions", {}).get("title") or "Coding Challenge"
+                sub_lang = sub.get("language") or "python"
+                similarity = get_similarity_score(sub_code, other_code, sub_lang)
+                if similarity >= PLAGIARISM_SIMILARITY_THRESHOLD:
+                    other_att = other_sub.get("attempts") or {}
+                    other_candidate_name = (other_att.get("users") or {}).get("name") or "Other Candidate"
+                    q_title = (sub.get("coding_questions") or {}).get("title") or "Coding Challenge"
                     
                     notes = f"High code similarity ({similarity}%) detected on \"{q_title}\" with {other_candidate_name}'s submission."
                     
@@ -254,7 +280,7 @@ async def run_plagiarism_check(attempt_id: str) -> None:
                     
                     # Symmetric flag
                     exist_res = await db.from_("plagiarism_flags").select("id").eq("attempt_id", other_sub["attempt_id"]).eq("coding_submission_id", other_sub["id"]).eq("matched_with_attempt_id", attempt_id).maybeSingle()
-                    if not exist_res.data:
+                    if not (exist_res and exist_res.data):
                         await db.from_("plagiarism_flags").insert({
                             "attempt_id": other_sub["attempt_id"],
                             "coding_submission_id": other_sub["id"],

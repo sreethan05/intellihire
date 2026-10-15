@@ -1,3 +1,4 @@
+import hashlib
 import random
 from typing import Dict, Any
 from fastapi import APIRouter, Depends, HTTPException
@@ -31,12 +32,12 @@ async def get_exam(examId: str, user: Dict[str, Any] = Depends(get_current_user)
     coding_res = await db.from_("exam_coding_questions").select("*, coding_questions:coding_question_id(*)").eq("exam_id", examId)
     
     # Server-side shuffling: questions are shuffled on the server using a
-    # per-exam seed so the order is deterministic per exam but unpredictable
-    # to candidates. This prevents DevTools manipulation of client-side shuffle.
+    # per-candidate seed so the order is deterministic per candidate (resilient to reload)
+    # but unique across candidates to prevent screen-peeking / collusion.
     should_shuffle = bool(exam_res.data.get("shuffle_questions"))
     if should_shuffle:
-        # Use exam_id as seed for deterministic per-exam ordering
-        seed = int(examId.replace("-", "")[:8], 16) if len(examId) > 8 else 42
+        seed_hex = hashlib.sha256(f"{examId}_{candidate_id}".encode("utf-8")).hexdigest()[:8]
+        seed = int(seed_hex, 16)
         rng = random.Random(seed)
 
     mcq_mapped = []
@@ -50,11 +51,13 @@ async def get_exam(examId: str, user: Dict[str, Any] = Depends(get_current_user)
 
     coding_mapped = []
     for q in (coding_res.data or []):
+        raw_cq = dict(q.get("coding_questions") or {})
+        raw_cq.pop("hidden_cases", None)  # Prevent leakage of hidden test cases
         coding_mapped.append({
             "id": q["id"],
             "coding_question_id": q["coding_question_id"],
             "marks": q.get("marks"),
-            "question": q.get("coding_questions")
+            "question": raw_cq
         })
 
     # Shuffle on server side if enabled
@@ -95,12 +98,24 @@ async def join_waitlist(req: JoinWaitlistRequest, user: Dict[str, Any] = Depends
     if pos_res.data:
         next_pos = pos_res.data[0]["position"] + 1
 
-    res = await db.from_("exam_waitlist").insert({
-        "exam_id": req.exam_id,
-        "candidate_id": user["id"],
-        "position": next_pos,
-        "status": "waiting",
-    }).select().single()
+    if existing_res.data:
+        # Re-activate previously cancelled or expired waitlist entry to respect UNIQUE(exam_id, candidate_id)
+        res = await db.from_("exam_waitlist").update({
+            "position": next_pos,
+            "status": "waiting",
+            "promoted_at": None,
+            "expires_at": None,
+        }).eq("id", existing_res.data["id"]).select().single()
+    else:
+        res = await db.from_("exam_waitlist").insert({
+            "exam_id": req.exam_id,
+            "candidate_id": user["id"],
+            "position": next_pos,
+            "status": "waiting",
+        }).select().single()
+
+    if res.error:
+        raise HTTPException(status_code=400, detail=res.error.get("message") or "Failed to join waitlist")
 
     return {"message": "Added to waitlist", "position": next_pos, "waitlistEntry": res.data}
 
@@ -131,6 +146,10 @@ async def get_waitlist_status(examId: str, user: Dict[str, Any] = Depends(get_cu
 @router.post("/waitlist/{examId}/cancel")
 async def cancel_waitlist(examId: str, user: Dict[str, Any] = Depends(get_current_user)):
     """Cancel waitlist entry and reposition remaining candidates."""
+    existing_res = await db.from_("exam_waitlist").select("id").eq("exam_id", examId).eq("candidate_id", user["id"]).eq("status", "waiting").maybeSingle()
+    if not existing_res.data:
+        raise HTTPException(status_code=400, detail="Candidate is not currently on the waitlist for this exam")
+
     res = await db.from_("exam_waitlist").delete().eq("exam_id", examId).eq("candidate_id", user["id"]).eq("status", "waiting")
     if res.error:
         raise HTTPException(status_code=400, detail="Failed to cancel waitlist entry")

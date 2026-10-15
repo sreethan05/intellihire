@@ -1,5 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
 
+// E2E uses a dedicated client port so it can never reuse (or collide with) a
+// developer's own dev server on the default port 3000 — an unrelated app on
+// that port previously made every browser spec run against the wrong site.
+const E2E_CLIENT_PORT = process.env.E2E_CLIENT_PORT || "3100";
+const BASE_URL = process.env.BASE_URL || `http://127.0.0.1:${E2E_CLIENT_PORT}`;
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
@@ -9,9 +15,10 @@ export default defineConfig({
   workers: 1,
   reporter: process.env.CI ? [["list"], ["github"], ["html", { open: "never" }]] : "html",
   use: {
-    baseURL: "http://127.0.0.1:3000",
+    baseURL: BASE_URL,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
+    video: "retain-on-failure",
   },
   projects: [
     {
@@ -34,8 +41,10 @@ export default defineConfig({
       },
     },
     {
-      command: "npm --prefix client run dev",
-      url: "http://127.0.0.1:3000",
+      // strictPort makes the run fail fast instead of silently drifting to
+      // another port if the E2E port is already occupied.
+      command: `npm --prefix client run dev -- --port ${E2E_CLIENT_PORT} --strictPort`,
+      url: BASE_URL,
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,
       env: {

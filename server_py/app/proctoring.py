@@ -102,22 +102,28 @@ async def log_event(
     if attempt.get("exam_id") != req.exam_id:
         raise HTTPException(status_code=400, detail="Attempt does not belong to this exam")
 
-    if req.message == "OVERRIDE_UNLOCK":
+    clean_msg = _sanitize_message(req.message)
+    if clean_msg and clean_msg.strip().upper() == "OVERRIDE_UNLOCK":
         raise HTTPException(status_code=400, detail="Reserved proctoring event message")
 
     # Sliding-window violation count: only count violations within the last
     # VIOLATION_WINDOW_MINUTES, so old violations don't escalate severity forever.
-    window_start = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
-        minutes=VIOLATION_WINDOW_MINUTES
-    )
-    prior_violations = await db.from_("proctoring_snapshots").select(
-        "id", count="exact", head=True
-    ).eq(
-        "attempt_id", req.attempt_id
-    ).eq(
-        "event_type", "violation"
-    ).gte("captured_at", window_start.isoformat())
-    violation_count = (prior_violations.count or 0) + 1 if req.event_type == "violation" else 0
+    # Non-violation events (e.g. snapshots) skip this DB count query for efficiency.
+    if req.event_type == "violation":
+        window_start = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
+            minutes=VIOLATION_WINDOW_MINUTES
+        )
+        prior_violations = await db.from_("proctoring_snapshots").select(
+            "id", count="exact", head=True
+        ).eq(
+            "attempt_id", req.attempt_id
+        ).eq(
+            "event_type", "violation"
+        ).gte("captured_at", window_start.isoformat())
+        violation_count = (prior_violations.count or 0) + 1
+    else:
+        violation_count = 0
+
     severity = _severity_for_event(req.event_type, violation_count)
     payload = {
         "attempt_id": req.attempt_id,
@@ -126,7 +132,7 @@ async def log_event(
         "event_type": req.event_type,
         "violation_count": violation_count,
         "violation_severity": severity,
-        "message": _sanitize_message(req.message),
+        "message": clean_msg,
         "snapshot_data": req.snapshot_data,
         "typing_speed_wpm": int(req.typing_speed_wpm or 0),
     }
@@ -246,8 +252,18 @@ async def get_active_monitoring(
         latest_override = next((event for event in events if event.get("event_type") == "admin_override"), None)
         violations = [event for event in events if event.get("event_type") == "violation"]
         latest_violation = violations[0] if violations else None
-        is_unlocked = latest_override and latest_violation and latest_override.get("captured_at") >= latest_violation.get("captured_at")
-        warning_count = 0 if is_unlocked else max([int(event.get("violation_count") or 1) for event in violations], default=0)
+
+        override_time = str(latest_override.get("captured_at") or "") if latest_override else ""
+        violation_time = str(latest_violation.get("captured_at") or "") if latest_violation else ""
+        is_unlocked = bool(latest_override and latest_violation and override_time >= violation_time)
+
+        def _safe_viol_count(e: Dict[str, Any]) -> int:
+            try:
+                return int(e.get("violation_count") or 1)
+            except (ValueError, TypeError):
+                return 1
+
+        warning_count = 0 if is_unlocked else max([_safe_viol_count(e) for e in violations], default=0)
         candidate = attempt.get("users") or {}
         active.append({
             "attemptId": attempt["id"],

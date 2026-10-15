@@ -35,6 +35,8 @@ async def send_result_published_email(
 class BackgroundGradingQueue:
     def __init__(self):
         self.local_queue: List[str] = []
+        self.local_retries: dict[str, int] = {}
+        self.max_retries: int = 3
         self.is_local_processing = False
         self.storage_root = storage_root
         self.queue_file_path = os.path.join(self.storage_root, "grading_queue.json")
@@ -141,14 +143,43 @@ class BackgroundGradingQueue:
                 # Poll Redis queue
                 data_str = await asyncio.to_thread(self.redis_client.lpop, "grading-queue")
                 if data_str:
+                    attempt_id = None
+                    retries = 0
                     try:
-                        data = json.loads(data_str)
-                        attempt_id = data.get("attemptId")
+                        data = json.loads(data_str) if isinstance(data_str, str) else data_str
+                        if isinstance(data, dict):
+                            attempt_id = data.get("attemptId")
+                            retries = data.get("retries", 0)
+                        else:
+                            attempt_id = str(data)
+                            retries = 0
+
                         if attempt_id:
-                            logger.info(f"Starting Redis-based grading job for attempt {attempt_id}")
+                            logger.info(f"Starting Redis-based grading job for attempt {attempt_id} (retry={retries})")
                             await self.grade_attempt(attempt_id)
                     except Exception as job_err:
-                        logger.error(f"Error executing Redis grading job: {job_err}")
+                        logger.error(f"Error executing Redis grading job for attempt {attempt_id}: {job_err}")
+                        if attempt_id:
+                            if retries < self.max_retries:
+                                next_retry = retries + 1
+                                logger.info(f"Re-queuing attempt {attempt_id} to Redis (retry {next_retry}/{self.max_retries})")
+                                retry_payload = json.dumps({"attemptId": attempt_id, "retries": next_retry})
+                                try:
+                                    await asyncio.to_thread(self.redis_client.rpush, "grading-queue", retry_payload)
+                                except Exception as push_err:
+                                    logger.error(f"Failed to re-queue attempt {attempt_id}: {push_err}")
+                            else:
+                                logger.error(f"Attempt {attempt_id} exceeded max retries ({self.max_retries}), moving to grading-dlq")
+                                dlq_payload = json.dumps({
+                                    "attemptId": attempt_id,
+                                    "retries": retries,
+                                    "failedAt": datetime.now(timezone.utc).isoformat(),
+                                    "error": str(job_err),
+                                })
+                                try:
+                                    await asyncio.to_thread(self.redis_client.rpush, "grading-dlq", dlq_payload)
+                                except Exception as dlq_err:
+                                    logger.error(f"Failed to push to grading-dlq: {dlq_err}")
                 else:
                     await asyncio.sleep(1.0)
             except Exception as e:
@@ -164,15 +195,44 @@ class BackgroundGradingQueue:
                 # Poll Redis queue
                 data_str = await asyncio.to_thread(self.redis_client.lpop, "interview-queue")
                 if data_str:
+                    interview_id = None
+                    retries = 0
                     try:
-                        data = json.loads(data_str)
-                        interview_id = data.get("interviewId")
+                        data = json.loads(data_str) if isinstance(data_str, str) else data_str
+                        if isinstance(data, dict):
+                            interview_id = data.get("interviewId")
+                            retries = data.get("retries", 0)
+                        else:
+                            interview_id = str(data)
+                            retries = 0
+
                         if interview_id:
-                            logger.info(f"Starting Redis-based interview evaluation job for interview {interview_id}")
+                            logger.info(f"Starting Redis-based interview evaluation job for interview {interview_id} (retry={retries})")
                             from .interview_service import evaluate_interview
                             await evaluate_interview(interview_id)
                     except Exception as job_err:
-                        logger.error(f"Error executing Redis interview evaluation job: {job_err}")
+                        logger.error(f"Error executing Redis interview evaluation job for interview {interview_id}: {job_err}")
+                        if interview_id:
+                            if retries < self.max_retries:
+                                next_retry = retries + 1
+                                logger.info(f"Re-queuing interview {interview_id} to Redis (retry {next_retry}/{self.max_retries})")
+                                retry_payload = json.dumps({"interviewId": interview_id, "retries": next_retry})
+                                try:
+                                    await asyncio.to_thread(self.redis_client.rpush, "interview-queue", retry_payload)
+                                except Exception as push_err:
+                                    logger.error(f"Failed to re-queue interview {interview_id}: {push_err}")
+                            else:
+                                logger.error(f"Interview {interview_id} exceeded max retries ({self.max_retries}), moving to interview-dlq")
+                                dlq_payload = json.dumps({
+                                    "interviewId": interview_id,
+                                    "retries": retries,
+                                    "failedAt": datetime.now(timezone.utc).isoformat(),
+                                    "error": str(job_err),
+                                })
+                                try:
+                                    await asyncio.to_thread(self.redis_client.rpush, "interview-dlq", dlq_payload)
+                                except Exception as dlq_err:
+                                    logger.error(f"Failed to push to interview-dlq: {dlq_err}")
                 else:
                     await asyncio.sleep(1.0)
             except Exception as e:
@@ -189,9 +249,25 @@ class BackgroundGradingQueue:
 
             try:
                 await self.grade_attempt(current_attempt_id)
+                self.local_retries.pop(current_attempt_id, None)
                 logger.info(f"Local grading completed successfully for attempt {current_attempt_id}")
             except Exception as error:
-                logger.error(f"Local grading failed for attempt {current_attempt_id}: {error}")
+                retry_count = self.local_retries.get(current_attempt_id, 0)
+                if retry_count < self.max_retries:
+                    next_retry = retry_count + 1
+                    self.local_retries[current_attempt_id] = next_retry
+                    self.local_queue.append(current_attempt_id)
+                    await self.save_local_queue()
+                    logger.warning(
+                        f"Local grading failed for attempt {current_attempt_id}: {error}. "
+                        f"Re-queued for retry {next_retry}/{self.max_retries}"
+                    )
+                else:
+                    self.local_retries.pop(current_attempt_id, None)
+                    logger.error(
+                        f"Local grading permanently failed for attempt {current_attempt_id} "
+                        f"after {self.max_retries} retries: {error}"
+                    )
 
         self.is_local_processing = False
         logger.info("Local worker idle — no more items in local queue")

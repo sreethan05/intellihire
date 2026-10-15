@@ -17,14 +17,47 @@ api.interceptors.response.use(
   (response) => {
     return response;
   },
-  (error) => {
-    if (error.response?.status === 401 && !error.config?.url?.includes("/auth/login") && !error.config?.url?.includes("/auth/me")) {
+  async (error) => {
+    const config = error.config as (typeof error.config & { _retry?: boolean }) | undefined;
+    const url: string = config?.url || "";
+    const isAuthEndpoint =
+      url.includes("/auth/login") || url.includes("/auth/me") || url.includes("/auth/refresh");
+
+    // Access tokens are short-lived; transparently refresh once and replay the
+    // original request instead of bouncing the user to the login page.
+    if (error.response?.status === 401 && config && !isAuthEndpoint && !config._retry) {
+      config._retry = true;
+      try {
+        await refreshSession();
+        return await api(config);
+      } catch {
+        // Refresh failed — fall through to the logout handling below.
+      }
+    }
+
+    if (error.response?.status === 401 && !isAuthEndpoint) {
       localStorage.removeItem("user");
       window.location.href = "/login";
     }
     return Promise.reject(error);
   }
 );
+
+let refreshPromise: Promise<void> | null = null;
+
+function refreshSession(): Promise<void> {
+  // Share one in-flight refresh across concurrent 401s: refresh-token
+  // rotation revokes the previous token, so parallel refreshes would fail.
+  if (!refreshPromise) {
+    refreshPromise = axios
+      .post(`${API_URL}/auth/refresh`, null, { withCredentials: true })
+      .then(() => undefined)
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
+}
 
 export default api;
 
@@ -301,7 +334,7 @@ export const interviewApi = {
   pending: () => api.get("/interview/pending"),
   recruiterPending: (collegeId?: string | null) => api.get("/interview/recruiter/pending", { params: collegeId ? { collegeId } : undefined }),
   start: (data?: { job_id?: string; exam_id?: string }) => api.post("/interview/start", data || {}),
-  schedule: (interviewId: string, data: { scheduled_start_at?: string; scheduled_end_at?: string; start_at?: string; end_at?: string }) =>
+  schedule: (interviewId: string, data: { scheduled_start: string; scheduled_end: string }) =>
     api.post(`/interview/${interviewId}/schedule`, data),
   submitAnswer: (interviewId: string, data: { question: string; answer: string; stage: number }) =>
     api.post(`/interview/${interviewId}/answer`, data),

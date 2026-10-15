@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { candidateApi } from "../lib/api.js";
+import { candidateApi } from "../lib/api";
 
 export function useCandidateProfile() {
   return useQuery({
