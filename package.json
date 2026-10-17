@@ -17,6 +17,7 @@
     "gen:api-types": "node scripts/export-openapi.mjs && openapi-typescript reports/openapi.json -o client/src/lib/api-types.gen.ts"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@playwright/test": "^1.61.1",
     "concurrently": "^9.1.2",
     "openapi-typescript": "^7.13.0",

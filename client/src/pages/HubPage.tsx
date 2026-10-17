@@ -187,7 +187,7 @@ export default function HubPage() {
         <button 
           onClick={() => refetch()} 
           disabled={isRefetching}
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-650 hover:text-slate-900 px-4 py-2.5 transition duration-200 shadow-sm cursor-pointer"
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-600 hover:text-slate-900 px-4 py-2.5 transition duration-200 shadow-sm cursor-pointer"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${isRefetching ? "animate-spin text-blue-500" : "text-slate-400"}`} />
           {isRefetching ? "Syncing..." : "Sync Telemetry"}
@@ -208,10 +208,10 @@ export default function HubPage() {
               const isHigh = item.priority === "high";
               const borderCol = isUrgent ? "border-l-rose-500" : isHigh ? "border-l-amber-500" : "border-l-blue-500";
               const tagStyle = isUrgent 
-                ? "bg-rose-500/10 text-rose-600 border-rose-500/20" 
+                ? "bg-rose-500/10 text-rose-700 border-rose-500/20" 
                 : isHigh 
-                  ? "bg-amber-500/10 text-amber-600 border-amber-500/20" 
-                  : "bg-blue-500/10 text-blue-650 border-blue-500/20";
+                  ? "bg-amber-500/10 text-amber-700 border-amber-500/20" 
+                  : "bg-blue-500/10 text-blue-700 border-blue-500/20";
               
               return (
                 <div key={idx} className={`relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm border-l-4 ${borderCol} flex flex-col justify-between gap-4 hover:-translate-y-0.5 hover:shadow-md hover:bg-slate-50/30 transition duration-300`}>
@@ -223,7 +223,7 @@ export default function HubPage() {
                       {isUrgent && <AlertTriangle className="h-4 w-4 text-rose-500" />}
                     </div>
                     <h4 className="font-extrabold text-sm text-slate-900">{item.title}</h4>
-                    <p className="text-xs text-slate-650 leading-relaxed">{item.description}</p>
+                    <p className="text-xs text-slate-600 leading-relaxed">{item.description}</p>
                   </div>
                   
                   {item.action_url && (
@@ -305,7 +305,7 @@ export default function HubPage() {
                               }`}>
                                 {sidx + 1}
                               </div>
-                              <span className={`text-[9px] font-black mt-2 tracking-wide ${st.active ? "text-slate-700" : "text-slate-400"}`}>{st.name}</span>
+                              <span className={`text-[9px] font-black mt-2 tracking-wide ${st.active ? "text-slate-700" : "text-slate-500"}`}>{st.name}</span>
                             </div>
                           ))}
                         </div>
@@ -330,7 +330,7 @@ export default function HubPage() {
                     <div key={idx} className="space-y-2">
                       <div className="flex justify-between items-center text-xs font-bold">
                         <span className="text-slate-700">{item.label}</span>
-                        <span className="text-slate-650 font-bold">{item.count} Candidates <span className="text-slate-500 text-[10px]">({Math.round(percent)}%)</span></span>
+                        <span className="text-slate-600 font-bold">{item.count} Candidates <span className="text-slate-500 text-[10px]">({Math.round(percent)}%)</span></span>
                       </div>
                       <div className="h-3 w-full rounded-full bg-slate-100 overflow-hidden border border-slate-200">
                         <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-500" style={{ width: `${percent}%` }}></div>
@@ -462,7 +462,7 @@ export default function HubPage() {
                     insights.atRiskStudents.map((st: AtRiskItem, idx: number) => (
                       <div key={idx} className="flex justify-between py-2.5 text-xs font-bold">
                         <span className="text-slate-700">{st.name}</span>
-                        <span className="text-amber-600 font-extrabold">{st.reason}</span>
+                        <span className="text-amber-700 font-extrabold">{st.reason}</span>
                       </div>
                     ))
                   ) : (
@@ -485,7 +485,7 @@ export default function HubPage() {
                 <Sparkles className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-black text-slate-900 text-sm">AI Copilot Recommendation:</p>
-                  <p className="mt-1.5 text-slate-650">{insights?.skillGap || "Diagnostic parameters normal. Complete current drives and review candidates."}</p>
+                  <p className="mt-1.5 text-slate-600">{insights?.skillGap || "Diagnostic parameters normal. Complete current drives and review candidates."}</p>
                 </div>
               </div>
             </div>
@@ -523,7 +523,7 @@ export default function HubPage() {
                     <div className="absolute -left-[21px] top-0.5 h-2 w-2 rounded-full bg-blue-500 border-2 border-white group-hover:scale-125 transition-transform duration-200"></div>
                     <div className="font-extrabold text-slate-800">{feed.title}</div>
                     <p className="text-slate-600 mt-1 leading-relaxed">{feed.description}</p>
-                    <span className="text-[9px] text-slate-400 mt-1.5 block font-bold uppercase tracking-wider">
+                    <span className="text-[9px] text-slate-500 mt-1.5 block font-bold uppercase tracking-wider">
                       {new Date(feed.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
@@ -536,7 +536,7 @@ export default function HubPage() {
             </div>
           </div>
           
-          <div className="text-[8px] text-slate-400 font-black uppercase tracking-widest text-center border-t border-slate-100 pt-4 mt-6">
+          <div className="text-[8px] text-slate-500 font-black uppercase tracking-widest text-center border-t border-slate-100 pt-4 mt-6">
             Command Dashboard Diagnostics Stream
           </div>
         </div>
@@ -592,7 +592,7 @@ export default function HubPage() {
                 <Link
                   key={idx}
                   to={link.path}
-                  className="rounded-xl border border-slate-200 bg-slate-50 hover:bg-violet-600 hover:border-violet-500 hover:text-white p-3.5 text-center text-xs font-bold text-slate-650 transition duration-200 shadow-sm"
+                  className="rounded-xl border border-slate-200 bg-slate-50 hover:bg-violet-600 hover:border-violet-500 hover:text-white p-3.5 text-center text-xs font-bold text-slate-600 transition duration-200 shadow-sm"
                 >
                   {link.label}
                 </Link>
@@ -600,7 +600,7 @@ export default function HubPage() {
             </div>
           </div>
           
-          <div className="text-[8px] text-slate-400 font-bold text-center mt-6">
+          <div className="text-[8px] text-slate-500 font-bold text-center mt-6">
             V.1.0 // Command Terminal
           </div>
         </div>

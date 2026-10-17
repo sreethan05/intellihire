@@ -384,7 +384,8 @@ intellihire/
 │   ├── 09_seed_data.sql                # Comprehensive development seed dataset
 │   ├── 10_indexes.sql ... 20_cleanup.sql # Performance indexing, audit logs, retention & refresh tokens
 │   └── 21_bulk_import.sql              # Bulk student import batches, staging & conflict resolution
-├── e2e/                                # Playwright End-to-End Test Suite (9 spec suites)
+├── e2e/                                # Playwright End-to-End Test Suite (10 spec suites)
+│   ├── a11y.spec.ts                    # Axe-core WCAG A/AA accessibility scans for every role
 │   ├── admin.spec.ts                   # Admin workflows & management E2E tests
 │   ├── api.spec.ts                     # Backend API health & response contract E2E tests
 │   ├── candidate.spec.ts               # Candidate exam flow & sandbox E2E tests
@@ -411,7 +412,6 @@ intellihire/
 │   │   │   ├── bulk_import_repo.py     # Batch and conflict state repository
 │   │   │   ├── candidate_repo.py       # Candidate profile and attempt queries
 │   │   │   ├── interview_repo.py       # AI interview state repository
-│   │   │   └── recruiter_repo.py       # Recruiter drives and college queries
 │   │   ├── routers/                    # Modularized Sub-Routers
 │   │   │   ├── admin_analytics.py      # Admin system and performance analytics
 │   │   │   ├── admin_users.py          # Admin user CRUD and college provisioning
@@ -435,12 +435,12 @@ intellihire/
 │   │   ├── queue_manager.py            # Redis / local in-process fallback task queue
 │   │   ├── tpo.py                      # TPO student management & bulk import endpoints
 │   │   └── websocket.py                # Python Socket.IO real-time event handlers
-│   ├── tests/                          # Backend Pytest Suite (138 test cases in 34 files)
+│   ├── tests/                          # Backend Pytest Suite (427 test cases in 44 files)
 │   │   ├── conftest.py                 # Pytest test client & DB fixtures
+│   │   ├── db_mocks.py                 # Shared db/query-builder mock harness
 │   │   ├── test_auth.py                # Authentication & JWT unit tests
-│   │   ├── test_bulk_import_pipeline.py# Bulk import ETL unit tests
-│   │   ├── test_exam_pipeline.py       # Exam creation & grading pipeline tests
-│   │   └── ...                         # 30+ additional test suites covering all modules
+│   │   ├── test_interview_flow.py      # AI interview router & grading service tests
+│   │   └── ...                         # 40+ additional test suites covering all modules
 │   ├── pytest.ini                      # Pytest runner settings
 │   └── requirements.txt                # Python backend package dependencies
 ├── scripts/                            # Utility scripts
@@ -926,9 +926,9 @@ IntelliHire maintains an exhaustive automated testing suite across four distinct
 │ Client Type Checking  │ `npm --prefix client run check` (tsc -b)                 │
 │ Client Code Linting   │ `npm --prefix client run lint` (ESLint)                  │
 │ Client Unit Testing   │ `npm --prefix client test` (Vitest - 40 test cases)      │
-│ Backend Pytest Suite  │ `.\server_py\.venv\Scripts\python.exe -m pytest` (392)   │
+│ Backend Pytest Suite  │ `.\server_py\.venv\Scripts\python.exe -m pytest` (427)   │
 │ Security AST Scanning │ `bandit -q -r server_py/app -s B101,B104,B105 -ll`       │
-│ Playwright E2E Suite  │ `npx playwright test` (9 suites, 26 browser tests)       │
+│ Playwright E2E Suite  │ `npx playwright test` (10 suites, 31 browser tests)      │
 └───────────────────────┴──────────────────────────────────────────────────────────┘
 ```
 
@@ -943,20 +943,20 @@ npm --prefix client run check
 # ESLint code quality scan
 npm --prefix client run lint
 
-# Vitest client-side unit test suite (21 unit tests across 12 files)
+# Vitest client-side unit test suite (40 unit tests across 16 files)
 npm --prefix client test
 ```
 
 ### 2. Backend Pytest Unit & Integration Testing
 
-Executes **138 comprehensive test cases** across 34 test files covering authentication, database repositories, exam pipelines, bulk ingestion, plagiarism detection, rate limiting, and WebSocket events:
+Executes **427 comprehensive test cases** across 44 test files covering authentication, database repositories, AI interview flows, LLM gateways, bulk ingestion, plagiarism detection, rate limiting, and WebSocket events:
 
 ```bash
 # Run backend test suite
 .\server_py\.venv\Scripts\python.exe -m pytest server_py/tests
 
 # Run backend test suite with code coverage
-.\server_py\.venv\Scripts\python.exe -m pytest server_py/tests --cov=server_py/app --cov-report=term-missing --cov-fail-under=60
+.\server_py\.venv\Scripts\python.exe -m pytest server_py/tests --cov=server_py/app --cov-report=term-missing --cov-fail-under=70
 
 # Run Bandit AST security scan
 bandit -q -r server_py/app -s B101,B104,B105 -ll
@@ -964,7 +964,7 @@ bandit -q -r server_py/app -s B101,B104,B105 -ll
 
 ### 3. Playwright End-to-End (E2E) Browser Suite
 
-Spawns automated Chromium browser sessions verifying real user journeys across Admin, Recruiter, TPO, and Candidate workflows across 9 test suites (26 tests) — including a full exam lifecycle journey (create → assign → attempt → proctoring → override → grade → review):
+Spawns automated Chromium browser sessions verifying real user journeys across Admin, Recruiter, TPO, and Candidate workflows across 10 test suites (31 tests) — including a full exam lifecycle journey (create → assign → attempt → proctoring → override → grade → review) and axe-core WCAG A/AA accessibility scans:
 
 ```bash
 npx playwright test
@@ -1076,7 +1076,7 @@ jobs:
           for sql in database/*.sql; do
             psql -h localhost -U postgres -d intellihire -f "$sql"
           done
-      - run: python -m pytest server_py/tests --cov=server_py/app --cov-report=term-missing --cov-fail-under=60
+      - run: python -m pytest server_py/tests --cov=server_py/app --cov-report=term-missing --cov-fail-under=70
       - run: bandit -q -r server_py/app -s B101,B104,B105 -ll
 
   dependency-audit:

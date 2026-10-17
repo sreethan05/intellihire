@@ -48,8 +48,8 @@ export function useProctorSocket() {
       console.error("[ProctorSocket] Connection error:", err.message);
     });
 
-    socket.on("error", (err: any) => {
-      console.error("[ProctorSocket] Socket server error:", err?.message || err);
+    socket.on("error", (err: unknown) => {
+      console.error("[ProctorSocket] Socket server error:", err instanceof Error ? err.message : String(err));
     });
 
     // Listen for incoming snapshot events (for recruiters monitoring)

@@ -301,7 +301,7 @@ async def build_stage_questions(candidate_id: str, attempt: dict, job: Optional[
             if len(generated) >= 2:
                 technical_questions = generated[:3]
         except Exception as err:
-            logger.warn(f"AI technical question generation failed, using defaults: {err}")
+            logger.warning(f"AI technical question generation failed, using defaults: {err}")
 
     return {
         "stage1": intro_questions,
@@ -411,7 +411,7 @@ async def evaluate_answer(question: str, answer: str, stage: int, job: Optional[
             "feedback": str(result.get("feedback") or fallback_feedback(score)).strip(),
         }
     except Exception as e:
-        logger.warn(f"AI answer scoring failed, using fallback: {e}")
+        logger.warning(f"AI answer scoring failed, using fallback: {e}")
         return {
             "score": fallback_val,
             "feedback": fallback_feedback(fallback_val),
@@ -501,5 +501,5 @@ async def summarize_interview(answers: List[dict], interview_pass_score: int, jo
             "feedback": str(result.get("feedback") or fallback["feedback"]).strip(),
         }
     except Exception as e:
-        logger.warn(f"AI interview summary failed, using fallback: {e}")
+        logger.warning(f"AI interview summary failed, using fallback: {e}")
         return fallback

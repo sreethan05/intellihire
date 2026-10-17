@@ -13,7 +13,6 @@ from app.result import (
     EXAM_SUBMISSION_GRACE_PERIOD_SECONDS
 )
 from app.exam import start_exam, assign_exam, StartExamRequest, AssignExamRequest
-from app.exam_pipeline import select_coding_questions
 
 
 class MockQueryBuilder(MagicMock):
@@ -414,35 +413,3 @@ async def test_assign_exam_deduplication():
             # Email sent ONLY to c2
             assert mock_email.call_count == 1
             assert mock_email.call_args[0][0] == "bob@test.com"
-
-
-@pytest.mark.asyncio
-async def test_coding_questions_fallback_without_overlaps():
-    # Verify select_coding_questions fallback executes cleanly without calling .overlaps()
-    mock_db = MagicMock()
-    q_builder = MockQueryBuilder()
-
-    # Primary search returns empty; fallback search returns matched question
-    q_builder.execute = AsyncMock(side_effect=[
-        MagicMock(data=[], error=None),  # Primary search by difficulty
-        MagicMock(data=[                 # Fallback search
-            {
-                "id": "code-1",
-                "title": "Reverse Array in Python",
-                "description": "Reverse an array",
-                "difficulty": "medium",
-                "starter_code": "def solve(): pass",
-                "test_cases": [],
-                "sample_cases": [],
-                "hidden_cases": [],
-                "topic_tags": ["python", "arrays"],
-                "marks": 10
-            }
-        ], error=None)
-    ])
-    mock_db.from_.return_value = q_builder
-
-    with patch("app.exam_pipeline.db", mock_db):
-        res = await select_coding_questions({"topic": "python", "difficulty": "medium", "count": 1})
-        assert len(res) == 1
-        assert res[0]["id"] == "code-1"

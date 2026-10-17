@@ -87,6 +87,8 @@ export interface ExamQuestion {
   question_id: string;
   marks: number;
   question: Question;
+  /** Optional difficulty passed through from some exam payloads. */
+  difficulty?: string;
 }
 
 export interface CodingQuestion {

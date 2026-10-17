@@ -63,7 +63,7 @@ class BackgroundGradingQueue:
                 asyncio.create_task(self.redis_grading_worker())
                 asyncio.create_task(self.redis_interview_worker())
             except Exception as err:
-                logger.warn(f"Redis unavailable: {err} — using local/disk queue for background grading")
+                logger.warning(f"Redis unavailable: {err} — using local/disk queue for background grading")
                 self.redis_client = None
                 await self.init_local_queue()
         else:
@@ -82,7 +82,7 @@ class BackgroundGradingQueue:
                         if not self.is_local_processing:
                             asyncio.create_task(self.process_local_queue())
         except Exception as e:
-            logger.warn(f"Local queue file not found or invalid: {e}")
+            logger.warning(f"Local queue file not found or invalid: {e}")
 
     async def save_local_queue(self):
         try:
@@ -103,7 +103,7 @@ class BackgroundGradingQueue:
                 logger.info(f"Added attempt {attempt_id} to Redis grading queue")
                 return
             except Exception as e:
-                logger.warn(f"Failed to push to Redis queue: {e}, falling back to local queue")
+                logger.warning(f"Failed to push to Redis queue: {e}, falling back to local queue")
 
         if attempt_id not in self.local_queue:
             self.local_queue.append(attempt_id)
@@ -123,7 +123,7 @@ class BackgroundGradingQueue:
                 logger.info(f"Added interview {interview_id} to Redis interview queue")
                 return
             except Exception as e:
-                logger.warn(f"Failed to push to Redis interview queue: {e}, running inline")
+                logger.warning(f"Failed to push to Redis interview queue: {e}, running inline")
 
         logger.info(f"Running interview evaluation inline (fallback) for interview={interview_id}")
         async def run_inline():
@@ -306,7 +306,7 @@ class BackgroundGradingQueue:
                 try:
                     test_cases = json.loads(test_cases)
                 except Exception:
-                    logger.warn(f"Failed to parse test cases for question {question.get('id')}")
+                    logger.warning(f"Failed to parse test cases for question {question.get('id')}")
                     test_cases = []
 
             if not isinstance(test_cases, list) or len(test_cases) == 0:
@@ -473,7 +473,7 @@ class BackgroundGradingQueue:
                         ),
                     }).execute()
         except Exception as shortlist_err:
-            logger.warn(f"Auto-shortlist warning (non-fatal): {shortlist_err}")
+            logger.warning(f"Auto-shortlist warning (non-fatal): {shortlist_err}")
 
         # 8. Trigger the plagiarism checker
         logger.info(f"Triggering plagiarism check for attempt {attempt_id}")

@@ -61,11 +61,11 @@ async def provision_candidate_accounts(rows: List[StudentRow], college_id: str, 
                 
             if user:
                 if user.get("role") != "candidate":
-                    failed.append({"row": row.dict(), "reason": f"Email/Roll matches an existing non-candidate user ({user.get('role')})"})
+                    failed.append({"row": row.model_dump(), "reason": f"Email/Roll matches an existing non-candidate user ({user.get('role')})"})
                     continue
                 # If they are linked to a different college, fail it
                 if user.get("college_id") and user["college_id"] != college_id:
-                    failed.append({"row": row.dict(), "reason": "Candidate already registered under a different college"})
+                    failed.append({"row": row.model_dump(), "reason": "Candidate already registered under a different college"})
                     continue
             
             # Create user if not exists
@@ -85,7 +85,7 @@ async def provision_candidate_accounts(rows: List[StudentRow], college_id: str, 
                 }).select().single()
                 
                 if user_res.error or not user_res.data:
-                    failed.append({"row": row.dict(), "reason": user_res.error.message if user_res.error else "Failed to create user"})
+                    failed.append({"row": row.model_dump(), "reason": user_res.error.message if user_res.error else "Failed to create user"})
                     continue
                 user = user_res.data
                 
@@ -107,13 +107,13 @@ async def provision_candidate_accounts(rows: List[StudentRow], college_id: str, 
                 # Update profile
                 upd_res = await db.from_("candidate_profiles").update(profile_data).eq("id", profile["id"]).select().single()
                 if upd_res.error:
-                    failed.append({"row": row.dict(), "reason": f"Profile update failed: {upd_res.error.message}"})
+                    failed.append({"row": row.model_dump(), "reason": f"Profile update failed: {upd_res.error.message}"})
                     continue
             else:
                 # Insert profile
                 ins_res = await db.from_("candidate_profiles").insert(profile_data).select().single()
                 if ins_res.error:
-                    failed.append({"row": row.dict(), "reason": f"Profile creation failed: {ins_res.error.message}"})
+                    failed.append({"row": row.model_dump(), "reason": f"Profile creation failed: {ins_res.error.message}"})
                     continue
                     
             # Mark user profile complete
@@ -121,7 +121,7 @@ async def provision_candidate_accounts(rows: List[StudentRow], college_id: str, 
             created.append(user)
             
         except Exception as exc:
-            failed.append({"row": row.dict(), "reason": f"Unexpected error: {str(exc)}"})
+            failed.append({"row": row.model_dump(), "reason": f"Unexpected error: {str(exc)}"})
             
     return created, failed
 

@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { candidateApi } from "../lib/api";
 
+type CandidateOnboardingPayload = Parameters<typeof candidateApi.completeOnboarding>[0];
+
 export function useCandidateProfile() {
   return useQuery({
     queryKey: ["candidate", "profile"],
@@ -25,7 +27,7 @@ export function useCandidateDashboard() {
 export function useUpdateCandidateProfile() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: Record<string, unknown>) => {
       const res = await candidateApi.updateProfile(data);
       return res.data;
     },
@@ -39,7 +41,7 @@ export function useUpdateCandidateProfile() {
 export function useCompleteCandidateOnboarding() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: CandidateOnboardingPayload) => {
       const res = await candidateApi.completeOnboarding(data);
       return res.data;
     },

@@ -1,21 +1,26 @@
-export function exportToCSV(data: any[], keys: string[], filename: string, displayHeaders?: string[]) {
+export function exportToCSV<T extends object>(
+  data: T[],
+  keys: string[],
+  filename: string,
+  displayHeaders?: string[]
+) {
   if (!data || !data.length) return;
-  
-  const csvRows = [];
-  
+
+  const csvRows: string[] = [];
+
   // Headers row
   csvRows.push((displayHeaders || keys).join(","));
-  
+
   // Values rows
   for (const row of data) {
-    const values = keys.map(key => {
+    const values = keys.map((key) => {
       // Support nested paths (e.g. user.name)
-      let val = row;
+      let val: unknown = row as Record<string, unknown>;
       const parts = key.split(".");
       for (const part of parts) {
-        val = val?.[part];
+        val = (val as Record<string, unknown> | null | undefined)?.[part];
       }
-      
+
       const escaped = ("" + (val === null || val === undefined ? "" : val))
         .replace(/"/g, '""')
         .replace(/\n/g, " ");

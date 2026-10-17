@@ -183,7 +183,7 @@ export default function Layout() {
           </div>
           <div>
             <div className="text-base font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">IntelliHire</div>
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider capitalize leading-none mt-0.5">{user?.role}</div>
+            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider capitalize leading-none mt-0.5">{user?.role}</div>
           </div>
         </div>
 
@@ -252,6 +252,7 @@ export default function Layout() {
               <div className="flex items-center gap-2">
                 <Landmark className="h-4.5 w-4.5 text-violet-600" />
                 <select
+                  aria-label="Filter by campus"
                   value={selectedCollegeId || ""}
                   onChange={(e) => setSelectedCollegeId(e.target.value || null)}
                   className="h-9 rounded-lg border border-slate-200 bg-slate-50/50 px-2.5 pr-8 text-xs font-bold text-slate-700 outline-none focus:border-violet-500 focus:bg-white cursor-pointer transition-all duration-200"
@@ -297,7 +298,7 @@ export default function Layout() {
                 </div>
                 <div className="hidden md:block text-left">
                   <div className="text-xs font-extrabold leading-tight text-slate-900">{user?.name}</div>
-                  <div className="text-[10px] capitalize text-slate-400 font-semibold leading-none mt-0.5">{user?.role}</div>
+                  <div className="text-[10px] capitalize text-slate-500 font-semibold leading-none mt-0.5">{user?.role}</div>
                 </div>
                 <ChevronDown className="h-4 w-4 text-slate-400 transition-transform duration-200" style={{ transform: showProfileDropdown ? 'rotate(180deg)' : 'rotate(0deg)' }} />
               </button>
@@ -321,7 +322,7 @@ export default function Layout() {
 
                     <div className="mt-3">
                       <div className="text-sm font-extrabold text-slate-800 dark:text-slate-100 leading-tight">{user?.name}</div>
-                      <div className="text-xs font-medium text-slate-400 mt-0.5">{user?.email}</div>
+                      <div className="text-xs font-medium text-slate-500 mt-0.5">{user?.email}</div>
                       <div className="mt-2 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-violet-50 dark:bg-violet-950/40 border border-violet-100 dark:border-violet-900/20 text-violet-700 dark:text-violet-400 uppercase tracking-wider">
                         <UserCheck className="h-2.5 w-2.5" /> {user?.role} ACCOUNT
                       </div>
@@ -332,7 +333,7 @@ export default function Layout() {
                     {/* LeetCode / Study Style Statistics */}
                     {profileStats && (
                       <div className="bg-slate-50/80 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 rounded-xl p-3.5 text-left mb-4">
-                        <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-2.5">
+                        <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 mb-2.5">
                           <Award className="h-3 w-3 text-amber-500" /> {profileStats.title}
                         </div>
                         <div className="grid grid-cols-2 gap-3.5">

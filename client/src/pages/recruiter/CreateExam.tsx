@@ -573,7 +573,7 @@ export default function CreateExam() {
           </div>
           <div>
             <div className={`text-sm font-bold ${step >= 2 ? "text-slate-900" : "text-slate-400"}`}>Questions</div>
-            <div className={`text-xs ${step >= 2 ? "text-violet-650 font-medium" : "text-slate-400"}`}>Add MCQ & coding questions</div>
+            <div className={`text-xs ${step >= 2 ? "text-violet-700 font-medium" : "text-slate-400"}`}>Add MCQ & coding questions</div>
           </div>
         </div>
 
@@ -585,12 +585,12 @@ export default function CreateExam() {
           </div>
           <div>
             <div className={`text-sm font-bold ${step >= 3 ? "text-slate-900" : "text-slate-400"}`}>Complete</div>
-            <div className={`text-xs ${step >= 3 ? "text-violet-650 font-medium" : "text-slate-400"}`}>Review and publish</div>
+            <div className={`text-xs ${step >= 3 ? "text-violet-700 font-medium" : "text-slate-400"}`}>Review and publish</div>
           </div>
         </div>
       </div>
 
-      {error && <div className="mb-4 p-3.5 text-sm text-red-650 bg-red-50 border border-red-100 rounded-xl font-medium">{error}</div>}
+      {error && <div className="mb-4 p-3.5 text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl font-medium">{error}</div>}
 
       {step === 1 && (
         <div className="space-y-6">

@@ -8,7 +8,7 @@ async function loginAsCandidate(page: import("@playwright/test").Page) {
   await page.goto("/login");
   await page.getByRole("button", { name: "Student" }).click();
   await page.getByLabel(/Email|Username/i).fill("candidate@example.com");
-  await page.getByLabel("Password").fill("candidate123");
+  await page.getByLabel("Password", { exact: true }).fill("candidate123");
   await page.getByRole("button", { name: "Sign In" }).click();
 }
 
@@ -16,7 +16,7 @@ test.describe("Accessibility and performance", () => {
   test("login form has accessible labels and keyboard navigation", async ({ page }) => {
     await page.goto("/login");
     await expect(page.getByLabel(/Email|Username/i)).toBeVisible();
-    await expect(page.getByLabel("Password")).toBeVisible();
+    await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
 
     await page.keyboard.press("Tab");
     await expect(page.getByRole("button", { name: "Admin" })).toBeFocused();

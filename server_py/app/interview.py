@@ -246,11 +246,11 @@ async def evaluate_answer(question: str, answer: str, stage: int, job: dict = No
     examples = []
     
     if job and job.get("company_description"):
-        desc, ai_config = deserialize_drive_colleges(job["company_description"])
-        if ai_config:
-            persona = ai_config.get("persona") or ""
-            custom_rubric = ai_config.get("rubric") or ""
-            examples = ai_config.get("examples") or []
+        parsed_desc = deserialize_drive_colleges(job["company_description"])
+        ai_config = parsed_desc.get("aiConfig") or {}
+        persona = ai_config.get("persona") or ""
+        custom_rubric = ai_config.get("rubric") or ""
+        examples = ai_config.get("examples") or []
             
     try:
         import json
@@ -485,11 +485,11 @@ async def build_stage_questions(candidate_id: str, attempt: dict, job: dict = No
             persona = ""
             custom_instructions = ""
             if job:
-                desc, ai_config = deserialize_drive_colleges(job.get("company_description") or "")
-                job_desc = desc
-                if ai_config:
-                    persona = ai_config.get("persona") or ""
-                    custom_instructions = ai_config.get("instructions") or ""
+                parsed_desc = deserialize_drive_colleges(job.get("company_description") or "")
+                job_desc = parsed_desc["description"]
+                ai_config = parsed_desc.get("aiConfig") or {}
+                persona = ai_config.get("persona") or ""
+                custom_instructions = ai_config.get("instructions") or ""
                     
             job_context = f"Job title: {job.get('title')}\nCompany: {job.get('company_name')}\nDescription: {job_desc}\nRequired skills: {', '.join(job.get('required_skills') or [])}" if job else f"Exam: {attempt['examTitle']}\nExam description: {attempt.get('examDescription') or 'Not provided'}"
             
@@ -612,9 +612,9 @@ async def summarize_interview(answers: List[dict], pass_score: int, job: dict = 
         
     persona = ""
     if job and job.get("company_description"):
-        _, ai_config = deserialize_drive_colleges(job["company_description"])
-        if ai_config:
-            persona = ai_config.get("persona") or ""
+        parsed_desc = deserialize_drive_colleges(job["company_description"])
+        ai_config = parsed_desc.get("aiConfig") or {}
+        persona = ai_config.get("persona") or ""
             
     try:
         transcript = "\n\n".join([f"Stage {a['stage']} Q{i+1}: {a['question']}\nAnswer: {a['answer']}\nScore: {a['score']}" for i, a in enumerate(answers)])
