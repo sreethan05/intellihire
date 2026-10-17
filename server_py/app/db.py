@@ -44,6 +44,7 @@ KNOWN LIMITATIONS
 import asyncio
 import os
 import re
+import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
@@ -82,6 +83,22 @@ def close_pool() -> None:
 
 
 EMPTY_UUID = "00000000-0000-0000-0000-000000000000"
+
+
+def normalize_row_values(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Stringify value types that the rest of the app treats as text.
+
+    psycopg returns ``uuid`` columns as ``uuid.UUID`` objects, while the JWT
+    identity (``user["id"]``) is always a string. Every ownership check like
+    ``row["candidate_id"] != user["id"]`` silently failed because of that
+    mismatch (e.g. candidates could not submit answers). Normalizing UUIDs at
+    the DB boundary removes the entire bug class and keeps JSON responses
+    serializable.
+    """
+    return {
+        key: str(value) if isinstance(value, uuid.UUID) else value
+        for key, value in row.items()
+    }
 
 
 @contextmanager
@@ -608,8 +625,10 @@ class DBBuilder:
 
     def _project_row(self, row: Dict[str, Any], parsed: ParsedSelect) -> Dict[str, Any]:
         if parsed.include_all:
-            return dict(row)
-        return {column: row.get(column) for column in parsed.columns}
+            projected = dict(row)
+        else:
+            projected = {column: row.get(column) for column in parsed.columns}
+        return normalize_row_values(projected)
 
     def _hydrate_embeds(self, conn, raw_rows: List[Dict[str, Any]], rows: List[Dict[str, Any]], embeds: List[SelectEmbed]) -> None:
         for embed in embeds:

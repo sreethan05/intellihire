@@ -23,7 +23,9 @@ export default defineConfig([
       },
     },
     rules: {
-      '@typescript-eslint/no-explicit-any': 'off',
+      // Surface type-safety debt without failing the build; catch clauses and
+      // boundary code should use `unknown` + narrowing helpers.
+      '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': ['warn', {
         argsIgnorePattern: '^_',
         varsIgnorePattern: '^_',

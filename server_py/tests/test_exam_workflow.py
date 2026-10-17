@@ -208,9 +208,17 @@ async def test_submit_mcq_scoring_and_case_insensitivity():
         # 1. Lowercase "b" matches uppercase "B" and receives custom exam marks (3.0)
         req_correct = SubmitMcqRequest(attempt_id="attempt-1", question_id="q-1", selected_option="b")
         res = await submit_mcq(req_correct, user)
-        assert res["answer"]["is_correct"] is True
 
-        # Check upsert payload
+        # The response is an echo only — never an answer oracle.
+        assert res["answer"] == {
+            "attempt_id": "attempt-1",
+            "question_id": "q-1",
+            "selected_option": "b",
+        }
+        assert "is_correct" not in res["answer"]
+        assert "marks_obtained" not in res["answer"]
+
+        # Scoring is still persisted correctly.
         upsert_call = mock_ans_builder.upsert_calls[-1]
         assert upsert_call["is_correct"] is True
         assert upsert_call["marks_obtained"] == 3.0

@@ -17,6 +17,7 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { aiApi, examApi, recruiterApi } from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/errors";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -147,8 +148,8 @@ export default function RecruiterAIStudio() {
 
       await recruiterApi.saveDriveAiConfig(selectedJobId, configToSave);
       toast.success("AI Interviewer Model trained and deployed successfully for this drive!");
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || "Failed to train AI model");
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, "Failed to train AI model"));
     } finally {
       setSavingConfig(false);
     }
@@ -185,8 +186,8 @@ export default function RecruiterAIStudio() {
         feedback: data.feedback,
       });
       toast.success("Sandbox evaluation complete!");
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || "Sandbox testing failed");
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, "Sandbox testing failed"));
     } finally {
       setTestingSandbox(false);
     }
@@ -228,8 +229,8 @@ export default function RecruiterAIStudio() {
     try {
       await examApi.saveBankMcqs(mcq);
       toast.success("All 5 MCQs successfully saved to the Question Bank!");
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || "Could not save MCQs to Bank");
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, "Could not save MCQs to Bank"));
     } finally {
       setSavingMcq(false);
     }
@@ -241,8 +242,8 @@ export default function RecruiterAIStudio() {
     try {
       await examApi.saveBankCoding(coding);
       toast.success("Coding question successfully saved to the Question Bank!");
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || "Could not save Coding question to Bank");
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, "Could not save Coding question to Bank"));
     } finally {
       setSavingCoding(false);
     }

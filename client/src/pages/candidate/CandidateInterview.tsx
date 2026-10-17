@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { interviewApi, proctoringApi } from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/errors";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -312,8 +313,8 @@ export default function CandidateInterview() {
       setEligibility(eligRes.data);
       setHistory(histRes.data.interviews || []);
       setPendingInterview(((pendingRes.data.interviews || [])[0] as PendingInterview) || null);
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || "Could not load AI interview status");
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Could not load AI interview status"));
     } finally {
       setEligibilityLoading(false);
     }
@@ -393,9 +394,9 @@ export default function CandidateInterview() {
       const histRes = await interviewApi.mine();
       setHistory(histRes.data.interviews || []);
       toast.success("AI interview submitted and evaluated successfully");
-    } catch (error: any) {
+    } catch (error: unknown) {
       submittedRef.current = false;
-      toast.error(error.response?.data?.error || "Could not submit interview");
+      toast.error(getApiErrorMessage(error, "Could not submit interview"));
     } finally {
       setLoading(false);
     }
@@ -500,8 +501,8 @@ export default function CandidateInterview() {
       } else {
         speak(nextQuestion);
       }
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || "Could not submit answer");
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Could not submit answer"));
     } finally {
       setLoading(false);
     }
@@ -631,9 +632,9 @@ export default function CandidateInterview() {
       if (nextQuestions[0]) {
         speak(welcomeText);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       stopDevices();
-      toast.error(error.response?.data?.error || "Could not start AI interview");
+      toast.error(getApiErrorMessage(error, "Could not start AI interview"));
     } finally {
       setLoading(false);
     }

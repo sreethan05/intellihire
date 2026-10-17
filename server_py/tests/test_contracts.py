@@ -27,37 +27,10 @@ from app.interview import (
 )
 from app.main import app
 from app.tpo import ScanMarksheetsRequest, scan_marksheets
+from tests.db_mocks import db_routing as _db_routing
+from tests.db_mocks import query as _query
 
 client = TestClient(app)
-
-
-class _Awaitable(MagicMock):
-    def __init__(self, await_result=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._await_result = await_result
-
-    def __await__(self):
-        async def _async_func():
-            return self._await_result
-        return _async_func().__await__()
-
-
-def _query(data=None, error=None):
-    """Mock one ``db.from_(...)`` query builder chain."""
-    mock = _Awaitable(MagicMock(data=data, error=error))
-    for name in (
-        "select", "eq", "neq", "in_", "is_", "or_", "order", "limit",
-        "single", "maybeSingle", "update", "insert",
-    ):
-        getattr(mock, name).return_value = mock
-    return mock
-
-
-def _db_routing(routes):
-    """Return a db mock whose ``from_(table)`` returns ``routes[table]``."""
-    mock_db = MagicMock()
-    mock_db.from_.side_effect = lambda table: routes.get(table, _query(data=[]))
-    return mock_db
 
 
 # ---------------------------------------------------------------------------
@@ -241,6 +214,93 @@ async def test_scan_marksheets_rejects_empty_payload():
         with pytest.raises(HTTPException) as exc:
             await scan_marksheets(ScanMarksheetsRequest(files=[]), user={"id": "t1"})
     assert exc.value.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Answer-key containment in the candidate attempt view
+# ---------------------------------------------------------------------------
+
+from app.result import get_attempt as get_attempt_view  # noqa: E402
+
+
+def _attempt_row(status: str, candidate_id: str = "c1", recruiter_id: str = "r1"):
+    return {
+        "id": "attempt-1",
+        "candidate_id": candidate_id,
+        "recruiter_id": recruiter_id,
+        "status": status,
+        "exam_id": "e1",
+    }
+
+
+def _answer_row():
+    return {
+        "id": "ans-1",
+        "attempt_id": "attempt-1",
+        "is_correct": True,
+        "marks_obtained": 2.0,
+        "questions": {"id": "q1", "question_text": "2+2?", "correct_option": "B", "marks": 2},
+    }
+
+
+@pytest.mark.asyncio
+async def test_candidate_attempt_view_hides_key_and_correctness_mid_attempt():
+    mock_db = _db_routing({
+        "attempts": _query(data=_attempt_row("in_progress")),
+        "answers": _query(data=[_answer_row()]),
+        "coding_submissions": _query(data=[]),
+    })
+    with patch("app.result.db", mock_db):
+        result = await get_attempt_view("attempt-1", user={"id": "c1", "role": "candidate"})
+
+    answer = result["answers"][0]
+    assert "correct_option" not in answer["questions"]
+    assert "is_correct" not in answer
+    assert "marks_obtained" not in answer
+
+
+@pytest.mark.asyncio
+async def test_candidate_attempt_view_reveals_correctness_only_after_completion():
+    mock_db = _db_routing({
+        "attempts": _query(data=_attempt_row("completed")),
+        "answers": _query(data=[_answer_row()]),
+        "coding_submissions": _query(data=[]),
+    })
+    with patch("app.result.db", mock_db):
+        result = await get_attempt_view("attempt-1", user={"id": "c1", "role": "candidate"})
+
+    answer = result["answers"][0]
+    assert "correct_option" not in answer["questions"]
+    assert answer["is_correct"] is True
+    assert answer["marks_obtained"] == 2.0
+
+
+@pytest.mark.asyncio
+async def test_recruiter_attempt_view_keeps_answer_key():
+    mock_db = _db_routing({
+        "attempts": _query(data=_attempt_row("in_progress")),
+        "answers": _query(data=[_answer_row()]),
+        "coding_submissions": _query(data=[]),
+    })
+    with patch("app.result.db", mock_db):
+        result = await get_attempt_view("attempt-1", user={"id": "r1", "role": "recruiter"})
+
+    answer = result["answers"][0]
+    assert answer["questions"]["correct_option"] == "B"
+    assert answer["is_correct"] is True
+
+
+@pytest.mark.asyncio
+async def test_candidate_cannot_read_another_candidates_attempt():
+    mock_db = _db_routing({
+        "attempts": _query(data=_attempt_row("in_progress", candidate_id="someone-else")),
+        "answers": _query(data=[]),
+        "coding_submissions": _query(data=[]),
+    })
+    with patch("app.result.db", mock_db):
+        with pytest.raises(HTTPException) as exc:
+            await get_attempt_view("attempt-1", user={"id": "c1", "role": "candidate"})
+    assert exc.value.status_code == 403
 
 
 # ---------------------------------------------------------------------------

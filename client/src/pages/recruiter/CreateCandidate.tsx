@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { recruiterApi } from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/errors";
 import { toast } from "sonner";
 import { UserPlus, Mail, Lock, User } from "lucide-react";
 
@@ -16,8 +17,8 @@ export default function CreateCandidate() {
       await recruiterApi.createCandidate({ name, email, password });
       toast.success("Candidate created successfully!");
       setName(""); setEmail(""); setPassword("");
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || "Failed to create candidate");
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, "Failed to create candidate"));
     } finally { setLoading(false); }
   };
 

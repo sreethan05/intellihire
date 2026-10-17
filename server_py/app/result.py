@@ -131,11 +131,21 @@ async def submit_mcq(req: SubmitMcqRequest, user: Dict[str, Any] = Depends(get_c
         "is_correct": is_correct,
         "marks_obtained": marks_obtained
     }, on_conflict="attempt_id,question_id")
-    
-    # Retrieve updated answer
-    sel_res = await db.from_("answers").select("*").eq("attempt_id", req.attempt_id).eq("question_id", req.question_id).single()
-    
-    return {"message": "Answer submitted", "answer": sel_res.data}
+    if ins_res.error:
+        raise HTTPException(status_code=400, detail=ins_res.error.get("message") or "Failed to save answer")
+
+    # Echo only what the candidate sent. Returning ``is_correct`` /
+    # ``marks_obtained`` would turn this endpoint into a per-option oracle:
+    # answers are saved with upsert, so a candidate could probe options until
+    # the response says "correct" and score 100%.
+    return {
+        "message": "Answer submitted",
+        "answer": {
+            "attempt_id": req.attempt_id,
+            "question_id": req.question_id,
+            "selected_option": req.selected_option,
+        },
+    }
 
 @router.post("/submit-code")
 async def submit_code(req: SubmitCodeRequest, user: Dict[str, Any] = Depends(get_current_user)):
@@ -549,11 +559,33 @@ async def get_attempt(attemptId: str, user: Dict[str, Any] = Depends(get_current
         raise HTTPException(status_code=403, detail="Forbidden")
 
     ans_res = await db.from_("answers").select("*, questions:question_id(*)").eq("attempt_id", attemptId)
+
+    answers = ans_res.data or []
+    if role == "candidate":
+        # Answer-key safety for the candidate's own view:
+        # - ``correct_option`` is never returned (candidates could resubmit
+        #   answers via upsert after reading the key).
+        # - ``is_correct`` / ``marks_obtained`` are hidden until the attempt is
+        #   completed, otherwise they form the same guess-and-check oracle.
+        attempt_completed = att_res.data.get("status") == "completed"
+        sanitized = []
+        for answer in answers:
+            row = dict(answer)
+            question = row.get("questions")
+            if isinstance(question, dict):
+                question = {k: v for k, v in question.items() if k != "correct_option"}
+                row["questions"] = question
+            if not attempt_completed:
+                row.pop("is_correct", None)
+                row.pop("marks_obtained", None)
+            sanitized.append(row)
+        answers = sanitized
+
     subs_res = await db.from_("coding_submissions").select("*, coding_questions:coding_question_id(*)").eq("attempt_id", attemptId)
     
     return {
         "attempt": att_res.data,
-        "answers": ans_res.data or [],
+        "answers": answers,
         "codingSubmissions": subs_res.data or []
     }
 

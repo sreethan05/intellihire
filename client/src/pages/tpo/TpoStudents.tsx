@@ -4,6 +4,7 @@ import { FileImage, RefreshCw, ScanLine, ShieldCheck, XCircle, Search, Sparkles,
 
 import { toast } from "sonner";
 import { tpoApi } from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/errors";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -67,8 +68,8 @@ export default function TpoStudents() {
       const { data } = await tpoApi.uploadStudents(rows);
       toast.success(data.message || "Students uploaded successfully!");
       loadStudents();
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || "Upload failed");
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, "Upload failed"));
     } finally {
       setUploading(false);
     }
@@ -111,8 +112,8 @@ export default function TpoStudents() {
 
       toast.success(`${allScanned.length} marksheet(s) scanned. Review the rows and upload to create accounts.`);
       loadStudents();
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || "Marksheet scan failed. Check AI API Key configuration.");
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, "Marksheet scan failed. Check AI API Key configuration."));
     } finally {
       setScanProgress("");
       setScanning(false);
@@ -131,8 +132,8 @@ export default function TpoStudents() {
       await tpoApi.verifyDocuments(student.id, !student.documents_verified);
       setStudents((current) => current.map((item) => item.id === student.id ? { ...item, documents_verified: !item.documents_verified } : item));
       toast.success(`Verification status updated for ${student.user?.name || student.roll_number}`);
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || "Verification update failed");
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, "Verification update failed"));
     }
   };
  
@@ -157,8 +158,8 @@ export default function TpoStudents() {
       toast.success(`Successfully batch ${verifyStatus ? "verified" : "unverified"} ${selectedIds.length} students!`);
       setSelectedIds([]);
       loadStudents();
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || "Batch update failed");
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, "Batch update failed"));
     }
   };
 

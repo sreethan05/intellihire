@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { candidateApi } from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/errors";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -69,8 +70,8 @@ export default function CandidateOnboarding() {
       }
       toast.success("Profile completed. Your assigned exams are now available.");
       navigate("/candidate/overview");
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || "Could not complete onboarding");
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, "Could not complete onboarding"));
     } finally {
       setLoading(false);
     }

@@ -53,7 +53,7 @@ export default function RecruiterProctoring() {
       if (selectedAttempt) {
         void loadAttemptTimeline(selectedAttempt);
       }
-    } catch (_err: any) {
+    } catch (_err: unknown) {
       toast.error("Failed to override severity");
     }
   };

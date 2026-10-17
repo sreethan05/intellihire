@@ -100,11 +100,11 @@ pipeline {
                 script {
                     if (isUnix()) {
                         sh 'mkdir -p reports'
-                        sh 'python3 -m pytest server_py/tests --cov=server_py/app --cov-report=term-missing --cov-report=xml:reports/coverage.xml --junitxml=reports/pytest.xml --cov-fail-under=40'
+                        sh 'python3 -m pytest server_py/tests --cov=server_py/app --cov-report=term-missing --cov-report=xml:reports/coverage.xml --junitxml=reports/pytest.xml --cov-fail-under=60'
                         sh 'bandit -q -r server_py/app -s B101,B104,B105 -ll'
                     } else {
                         bat 'if not exist reports mkdir reports'
-                        bat 'python -m pytest server_py/tests --cov=server_py/app --cov-report=term-missing --cov-report=xml:reports/coverage.xml --junitxml=reports/pytest.xml --cov-fail-under=40'
+                        bat 'python -m pytest server_py/tests --cov=server_py/app --cov-report=term-missing --cov-report=xml:reports/coverage.xml --junitxml=reports/pytest.xml --cov-fail-under=60'
                         bat 'bandit -q -r server_py/app -s B101,B104,B105 -ll'
                     }
                 }

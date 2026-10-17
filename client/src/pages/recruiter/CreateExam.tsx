@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { examApi, aiApi, recruiterApi } from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/errors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -303,9 +304,9 @@ export default function CreateExam() {
       setMcqQuestions(generatedMcqsList);
       setCodingQuestions(generatedCodingListTemp);
       toast.success(`Successfully generated ${generatedMcqsList.length} MCQs and ${generatedCodingListTemp.length} coding questions totaling exactly ${totalMarks} marks!`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      toast.error(err.message || "Failed to generate complete exam with AI.");
+      toast.error(getApiErrorMessage(err, "Failed to generate complete exam with AI."));
     } finally {
       setUnifiedLoading(false);
     }
@@ -466,8 +467,8 @@ export default function CreateExam() {
       await recruiterApi.assignDriveExam(selectedDriveId, examId);
       toast.success("Exam successfully assigned to the Job Drive!");
       navigate("/recruiter/dashboard");
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || "Could not assign exam to drive");
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, "Could not assign exam to drive"));
     } finally {
       setAssigningDrive(false);
     }
@@ -518,7 +519,7 @@ export default function CreateExam() {
         negative_marking: negativeMarking,
       });
       setExamId(data.exam.id); setStep(2);
-    } catch (err: any) { setError(err.response?.data?.error || "Failed to create exam"); }
+    } catch (err: unknown) { setError(getApiErrorMessage(err, "Failed to create exam")); }
     finally { setLoading(false); }
   };
 
@@ -533,7 +534,7 @@ export default function CreateExam() {
       if (selectedBankMcq.size > 0) await examApi.linkBankMcq({ exam_id: examId, question_ids: Array.from(selectedBankMcq) });
       if (selectedBankCoding.size > 0) await examApi.linkBankCoding({ exam_id: examId, coding_question_ids: Array.from(selectedBankCoding) });
       setStep(3);
-    } catch (err: any) { setError(err.response?.data?.error || "Failed to add questions"); }
+    } catch (err: unknown) { setError(getApiErrorMessage(err, "Failed to add questions")); }
     finally { setLoading(false); }
   };
 

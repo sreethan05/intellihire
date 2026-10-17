@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { recruiterApi, examApi } from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/errors";
 import { toast } from "sonner";
 import { Search, UserCheck } from "lucide-react";
 import type { User, Exam } from "@/types";
@@ -35,8 +36,8 @@ export default function ViewCandidates() {
       const res = await examApi.assignExam({ exam_id: selectedExam, candidate_ids: Array.from(selectedCandidates) });
       toast.success(res.data?.message || "Exam assigned successfully!");
       setSelectedCandidates(new Set()); setSelectedExam("");
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || "Failed to assign exam");
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, "Failed to assign exam"));
     } finally { setAssigning(false); }
   };
 

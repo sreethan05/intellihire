@@ -384,10 +384,12 @@ intellihire/
 │   ├── 09_seed_data.sql                # Comprehensive development seed dataset
 │   ├── 10_indexes.sql ... 20_cleanup.sql # Performance indexing, audit logs, retention & refresh tokens
 │   └── 21_bulk_import.sql              # Bulk student import batches, staging & conflict resolution
-├── e2e/                                # Playwright End-to-End Test Suite (7 spec suites)
+├── e2e/                                # Playwright End-to-End Test Suite (9 spec suites)
 │   ├── admin.spec.ts                   # Admin workflows & management E2E tests
 │   ├── api.spec.ts                     # Backend API health & response contract E2E tests
 │   ├── candidate.spec.ts               # Candidate exam flow & sandbox E2E tests
+│   ├── contracts.spec.ts               # Cross-role API contract & authorization E2E tests
+│   ├── exam-journey.spec.ts            # Full exam lifecycle: create → assign → take → proctor → grade → review
 │   ├── hub-smoke.spec.ts               # Multi-role dashboard smoke E2E tests
 │   ├── login.spec.ts                   # Authentication flow & session persistence E2E tests
 │   ├── quality.spec.ts                 # Page health & visual smoke E2E tests
@@ -923,10 +925,10 @@ IntelliHire maintains an exhaustive automated testing suite across four distinct
 ├───────────────────────┬──────────────────────────────────────────────────────────┤
 │ Client Type Checking  │ `npm --prefix client run check` (tsc -b)                 │
 │ Client Code Linting   │ `npm --prefix client run lint` (ESLint)                  │
-│ Client Unit Testing   │ `npm --prefix client test` (Vitest - 21 test cases)      │
-│ Backend Pytest Suite  │ `.\server_py\.venv\Scripts\python.exe -m pytest` (138)   │
+│ Client Unit Testing   │ `npm --prefix client test` (Vitest - 40 test cases)      │
+│ Backend Pytest Suite  │ `.\server_py\.venv\Scripts\python.exe -m pytest` (392)   │
 │ Security AST Scanning │ `bandit -q -r server_py/app -s B101,B104,B105 -ll`       │
-│ Playwright E2E Suite  │ `npx playwright test` (7 automated browser test suites)  │
+│ Playwright E2E Suite  │ `npx playwright test` (9 suites, 26 browser tests)       │
 └───────────────────────┴──────────────────────────────────────────────────────────┘
 ```
 
@@ -962,7 +964,7 @@ bandit -q -r server_py/app -s B101,B104,B105 -ll
 
 ### 3. Playwright End-to-End (E2E) Browser Suite
 
-Spawns automated Chromium browser sessions verifying real user journeys across Admin, Recruiter, TPO, and Candidate workflows across 7 test suites:
+Spawns automated Chromium browser sessions verifying real user journeys across Admin, Recruiter, TPO, and Candidate workflows across 9 test suites (26 tests) — including a full exam lifecycle journey (create → assign → attempt → proctoring → override → grade → review):
 
 ```bash
 npx playwright test

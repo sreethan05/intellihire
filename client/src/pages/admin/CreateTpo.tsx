@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { Landmark, Lock, Mail, MapPin, School, User, GraduationCap, Check, Send } from "lucide-react";
 import { toast } from "sonner";
 import { adminApi } from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/errors";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -32,8 +33,8 @@ export default function CreateTpo() {
       await adminApi.createTpo(form);
       toast.success("TPO and college created successfully");
       setForm({ name: "", email: "", password: "", college_name: "", college_code: "", location: "" });
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || "Failed to create TPO");
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, "Failed to create TPO"));
     } finally {
       setLoading(false);
     }

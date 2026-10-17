@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { examApi, recruiterApi } from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/errors";
 import { useCollege } from "@/context/CollegeContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -106,8 +107,8 @@ export default function CreateDrive() {
       toast.success("Drive created and eligible students registered");
       fetchDrives(); // Refresh the list of drives
       setSelectedColleges([]); // Clear colleges selection
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || "Could not create drive");
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, "Could not create drive"));
     } finally {
       setLoading(false);
     }

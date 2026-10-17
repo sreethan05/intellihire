@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { adminApi } from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/errors";
 import { toast } from "sonner";
 import { UserPlus, Mail, Lock, User, Shield, Check, Send } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
@@ -23,8 +24,8 @@ export default function CreateRecruiter() {
       await adminApi.createRecruiter({ name, email, password });
       toast.success("Recruiter created successfully!");
       setName(""); setEmail(""); setPassword("");
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || "Failed to create recruiter");
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, "Failed to create recruiter"));
     } finally { setLoading(false); }
   };
 
