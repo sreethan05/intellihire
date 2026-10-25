@@ -1,9 +1,21 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import axios from "axios";
+import axios, { type AxiosResponse } from "axios";
 import api from "../lib/api";
 
-function make401(config: unknown) {
-  const error: any = new Error("Request failed with status code 401");
+interface AxiosLikeError extends Error {
+  config?: unknown;
+  isAxiosError?: boolean;
+  response?: {
+    status: number;
+    statusText: string;
+    headers: Record<string, unknown>;
+    data: Record<string, unknown>;
+    config?: unknown;
+  };
+}
+
+function make401(config: unknown): AxiosLikeError {
+  const error = new Error("Request failed with status code 401") as AxiosLikeError;
   error.config = config;
   error.isAxiosError = true;
   error.response = {
@@ -28,7 +40,7 @@ describe("api network client", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    (api.defaults as any).adapter = undefined;
+    api.defaults.adapter = undefined;
   });
 
   it("has xsrf cookie and header configurations set", () => {
@@ -44,9 +56,9 @@ describe("api network client", () => {
       config: { url: "/api/candidate/profile" },
     };
 
-    const interceptor = (api.interceptors.response as any).handlers[0].rejected;
+    const interceptor = api.interceptors.response.handlers?.[0]?.rejected;
     
-    await expect(interceptor(error)).rejects.toEqual(error);
+    await expect(interceptor!(error)).rejects.toEqual(error);
 
     expect(localStorage.getItem("user")).toBeNull();
     expect(window.location.href).toBe("/login");
@@ -61,17 +73,22 @@ describe("api 401 refresh-and-retry", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    (api.defaults as any).adapter = undefined;
+    api.defaults.adapter = undefined;
   });
 
-  function stubAdapter(handler: (config: any) => unknown) {
-    (api.defaults as any).adapter = async (config: any) => handler(config);
+  interface StubRequestConfig {
+    _retry?: boolean;
+    url?: string;
+  }
+
+  function stubAdapter(handler: (config: StubRequestConfig) => unknown) {
+    api.defaults.adapter = async (config) => handler(config) as AxiosResponse;
   }
 
   it("refreshes once and replays the original request", async () => {
     const postSpy = vi
       .spyOn(axios, "post")
-      .mockResolvedValue({ status: 200, data: {} } as any);
+      .mockResolvedValue({ status: 200, data: {} } as unknown as AxiosResponse);
 
     let firstAttempts = 0;
     stubAdapter((config) => {
@@ -94,7 +111,7 @@ describe("api 401 refresh-and-retry", () => {
       releaseRefresh = resolve;
     });
     const postSpy = vi.spyOn(axios, "post").mockImplementation(
-      () => refreshGate.then(() => ({ status: 200, data: {} })) as any
+      () => refreshGate.then(() => ({ status: 200, data: {} }) as unknown as AxiosResponse)
     );
 
     stubAdapter((config) => {
@@ -131,7 +148,7 @@ describe("api 401 refresh-and-retry", () => {
     localStorage.setItem("user", "test-user");
     const postSpy = vi
       .spyOn(axios, "post")
-      .mockResolvedValue({ status: 200, data: {} } as any);
+      .mockResolvedValue({ status: 200, data: {} } as unknown as AxiosResponse);
     stubAdapter((config) => {
       throw make401(config);
     });

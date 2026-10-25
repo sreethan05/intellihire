@@ -63,6 +63,9 @@ services:
       - S3_ACCESS_KEY_ID=minioadmin
       - S3_SECRET_ACCESS_KEY=minioadminpass
       - NODE_ENV=production
+      - APP_URL=${APP_URL:?Set APP_URL to your HTTPS frontend origin before starting}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:?Set CORS_ALLOWED_ORIGINS to your HTTPS frontend origin before starting}
+      - METRICS_TOKEN=${METRICS_TOKEN:?Set METRICS_TOKEN before starting}
       # Never commit a real secret: docker compose reads JWT_SECRET from the
       # environment (or the git-ignored .env file) and refuses to start without it.
       - JWT_SECRET=${JWT_SECRET:?Set JWT_SECRET (min 32 chars) in the environment or a .env file before starting}

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { toast } from "sonner";
-import type { AxiosError } from "axios";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -41,6 +40,19 @@ function formatMaybeDateTime(iso?: string | null) {
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString();
 }
 
+/** Narrow an unknown thrown value to the backend's `{ error: string }` response envelope. */
+function getResponseErrorMessage(err: unknown, fallback: string): string {
+  if (
+    typeof err === "object" &&
+    err !== null &&
+    "response" in err &&
+    typeof (err as { response?: { data?: { error?: string } } }).response?.data?.error === "string"
+  ) {
+    return (err as { response?: { data?: { error?: string } } }).response?.data?.error || fallback;
+  }
+  return fallback;
+}
+
 export default function AIInterviewScheduling() {
   const { selectedCollegeId } = useCollege();
   const [pending, setPending] = useState<Interview[]>([]);
@@ -69,9 +81,8 @@ export default function AIInterviewScheduling() {
 
       setPending(pendingInterviews);
       setCompleted(summaries.filter((i) => i.status === "completed"));
-    } catch (err) {
-      const e = err as AxiosError<any>;
-      toast.error(e.response?.data?.error || "Failed to load interviews");
+    } catch (err: unknown) {
+      toast.error(getResponseErrorMessage(err, "Failed to load interviews"));
     } finally {
       setLoading(false);
     }
@@ -106,9 +117,8 @@ export default function AIInterviewScheduling() {
       await interviewApi.schedule(interview.id, { scheduled_start: startIso, scheduled_end: endIso });
       toast.success("Interview scheduled successfully.");
       await refresh();
-    } catch (err) {
-      const e = err as AxiosError<any>;
-      toast.error(e.response?.data?.error || "Failed to schedule interview");
+    } catch (err: unknown) {
+      toast.error(getResponseErrorMessage(err, "Failed to schedule interview"));
     } finally {
       setSavingId(null);
     }

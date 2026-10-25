@@ -6,12 +6,35 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Exam } from "@/types";
 import { toast } from "sonner";
 
+interface ProctoringSummaryRow {
+  attemptId: string;
+  candidateId?: string | null;
+  candidateName: string;
+  candidateEmail: string;
+  status?: string | null;
+  snapshots: number;
+  violations: number;
+  lastViolation?: string | null;
+  lastViolationAt?: string | null;
+}
+
+interface ProctoringTimelineEvent {
+  id: string;
+  event_type: string;
+  violation_severity?: string | null;
+  message?: string | null;
+  snapshot_data?: string | null;
+  typing_speed_wpm?: number | null;
+  captured_at?: string | null;
+  relativeTime?: string | null;
+}
+
 export default function RecruiterProctoring() {
   const [exams, setExams] = useState<Exam[]>([]);
   const [selectedExam, setSelectedExam] = useState("");
-  const [summary, setSummary] = useState<any[]>([]);
-  const [selectedAttempt, setSelectedAttempt] = useState<any | null>(null);
-  const [timeline, setTimeline] = useState<any[]>([]);
+  const [summary, setSummary] = useState<ProctoringSummaryRow[]>([]);
+  const [selectedAttempt, setSelectedAttempt] = useState<ProctoringSummaryRow | null>(null);
+  const [timeline, setTimeline] = useState<ProctoringTimelineEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [eventsLoading, setEventsLoading] = useState(false);
 
@@ -33,7 +56,7 @@ export default function RecruiterProctoring() {
   const totalViolations = summary.reduce((sum, item) => sum + (item.violations || 0), 0);
   const flagged = summary.filter((item) => item.violations > 0).length;
 
-  const loadAttemptTimeline = async (item: any) => {
+  const loadAttemptTimeline = async (item: ProctoringSummaryRow) => {
     setSelectedAttempt(item);
     setEventsLoading(true);
     try {

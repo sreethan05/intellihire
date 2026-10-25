@@ -11,6 +11,7 @@
     "build": "npm --prefix client run build",
     "check": "npm --prefix client run check",
     "lint": "npm --prefix client run lint",
+    "test": "npm --prefix client run test",
     "preview": "npm --prefix client run preview",
     "start": "node scripts/run-uvicorn.js server_py.app.main:app --port 5000 --host 0.0.0.0",
     "test:e2e": "npx playwright test",

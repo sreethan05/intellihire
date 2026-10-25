@@ -2,13 +2,18 @@
 
 Each role gets a tailored aggregation payload. These tests drive the
 role dispatch plus the rich data paths (deadlines, rankings, spotlights) and
-the empty-data fallbacks the dashboard renders.
+the empty-data fallbacks the dashboard renders. They also cover the
+failure-surfacing contract: a failing sub-source must not silently look like
+empty data — the payload carries a ``degraded`` section list and the failure
+is logged with a stable event name.
 """
 import datetime
+import logging
 
 import pytest
 from fastapi import HTTPException
 
+from app.db import QueryError
 from app.hub import (
     get_admin_hub_data,
     get_candidate_hub_data,
@@ -18,13 +23,17 @@ from app.hub import (
 )
 from tests.db_mocks import db_routing, query, sequence_db
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 NOW = datetime.datetime.now(datetime.timezone.utc)
 
 
 def _future(hours=3):
     return (NOW + datetime.timedelta(hours=hours)).isoformat()
+
+
+def _warning_messages(caplog, logger_name="app.hub"):
+    return [r.getMessage() for r in caplog.records if r.name == logger_name]
 
 
 # ---------------------------------------------------------------------------
@@ -84,6 +93,8 @@ async def test_candidate_hub_rich_payload():
     assert result["insights"]["trendData"] == [{"name": "Qualifier", "score": 80}]
     assert result["insights"]["trackers"][0]["currentStage"] == "shortlisted"
     assert result["insights"]["peerPercentile"] == 50
+    # Happy path: every sub-source healthy -> no degraded sections.
+    assert result["degraded"] == []
 
 
 @pytest.mark.asyncio
@@ -103,6 +114,93 @@ async def test_candidate_hub_incomplete_profile_short_circuits():
     assert result["actionItems"][0]["id"] == "profile_incomplete"
     assert result["insights"]["peerPercentile"] == 0
     assert result["stats"]["completedExams"] == 0
+    assert result["degraded"] == []
+
+
+@pytest.mark.asyncio
+async def test_candidate_hub_surfaces_degraded_source(caplog):
+    """A sub-source returning an error must not pass as empty data: the
+    endpoint still returns the payload with the failed section listed."""
+    profile = {"profile_complete": True, "resume_url": "r.pdf", "marksheet_url": "m.pdf"}
+    mock_db = sequence_db(
+        query(data=profile),                                        # 1 profile (no college -> no peers)
+        query(data=[{"id": "att-1", "exam_id": "e1", "score": 90, "status": "completed"}]),  # 2 attempts
+        query(data=None, error=QueryError("relation does not exist")),  # 3 assignments FAILS
+        query(data=[]),                                             # 4 scheduled interviews
+        query(data=[]),                                             # 5 activity feed
+        query(data=[]),                                             # 6 answers
+        query(data=[]),                                             # 7 completed interviews
+        query(data=[]),                                             # 8 coding submissions
+        query(data=[{"score": 90, "exam": {"title": "Qualifier"}}]),  # 9 trend attempts
+        query(data=[]),                                             # 10 trackers
+    )
+    with patch("app.hub.db", mock_db), caplog.at_level(logging.WARNING, logger="app.hub"):
+        result = await get_candidate_hub_data("user-1")
+
+    assert result["role"] == "candidate"
+    assert result["stats"]["completedExams"] == 1
+    assert result["insights"]["trendData"] == [{"name": "Qualifier", "score": 90}]
+    assert result["degraded"] == ["assignments"]
+    messages = _warning_messages(caplog)
+    assert any(
+        "hub_overview.source_failed section=assignments user_id=user-1" in m
+        for m in messages
+    )
+
+
+@pytest.mark.asyncio
+async def test_candidate_hub_surfaces_raising_source(caplog):
+    """A sub-source that raises (instead of returning an error response) is
+    caught and surfaced the same way, instead of a 500 or silent omission."""
+    profile = {"profile_complete": True, "resume_url": "r.pdf", "marksheet_url": "m.pdf"}
+    mock_db = MagicMock()
+    mock_db.from_.side_effect = [
+        query(data=profile),            # 1 profile
+        RuntimeError("db unavailable"),  # 2 attempts RAISES
+        query(data=[]),                 # 3 assignments
+        query(data=[]),                 # 4 scheduled interviews
+        query(data=[]),                 # 5 activity feed
+        query(data=[]),                 # 6 completed interviews
+        query(data=[]),                 # 7 trend attempts
+        query(data=[]),                 # 8 trackers
+    ]
+    with patch("app.hub.db", mock_db), caplog.at_level(logging.WARNING, logger="app.hub"):
+        result = await get_candidate_hub_data("user-1")
+
+    assert result["role"] == "candidate"
+    assert result["stats"]["completedExams"] == 0
+    assert result["degraded"] == ["attempts"]
+    assert any(
+        "hub_overview.source_failed section=attempts user_id=user-1" in m
+        for m in _warning_messages(caplog)
+    )
+
+
+@pytest.mark.asyncio
+async def test_hub_deadline_parse_failure_is_logged(caplog):
+    """An unparsable deadline keeps the existing fallback rendering but is
+    logged with the stable event name and the offending exam id."""
+    profile = {"profile_complete": True, "resume_url": "r.pdf", "marksheet_url": "m.pdf"}
+    mock_db = sequence_db(
+        query(data=profile),                        # 1 profile (no college -> no peers)
+        query(data=[]),                             # 2 attempts
+        query(data=[{"exam_id": "e9", "exam": {"title": "Broken", "available_until": "not-a-date"}}]),  # 3 assignments
+        query(data=[]),                             # 4 scheduled interviews
+        query(data=[]),                             # 5 activity feed
+        query(data=[]),                             # 6 completed interviews
+        query(data=[]),                             # 7 trend attempts
+        query(data=[]),                             # 8 trackers
+    )
+    with patch("app.hub.db", mock_db), caplog.at_level(logging.WARNING, logger="app.hub"):
+        result = await get_candidate_hub_data("user-1")
+
+    item = next(i for i in result["actionItems"] if i["id"] == "exam_e9")
+    assert item["description"] == "Deadline expired."  # success-path behavior unchanged
+    assert result["degraded"] == []  # a bad row is not a failed source
+    assert any(
+        "hub_overview.deadline_parse_failed candidate_id=user-1 exam_id=e9" in m
+        for m in _warning_messages(caplog)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -143,6 +241,36 @@ async def test_tpo_hub_aggregates_placement_stats():
     assert result["insights"]["topPerformers"][0] == {"name": "Asha", "score": "80%"}
     assert result["insights"]["atRiskStudents"] == [{"name": "R2", "reason": "Low CGPA: 6.0"}]
     assert result["insights"]["funnel"][1] == {"label": "Eligible", "count": 1}
+    assert result["degraded"] == []
+
+
+@pytest.mark.asyncio
+async def test_tpo_hub_surfaces_degraded_jobs_source(caplog):
+    """A failing jobs query must not silently zero out drive counts."""
+    profiles = [
+        {"user_id": "s1", "cgpa": 8.0, "roll_number": "R1", "profile_complete": True, "documents_verified": True},
+    ]
+    mock_db = sequence_db(
+        query(data={"college_id": "col-1"}),                             # tpo user
+        query(data=[{"id": "s1"}]),                                      # students count
+        query(data=profiles),                                            # profiles
+        query(data=None, error=QueryError("jobs unavailable")),          # jobs FAILS
+        query(data=[{"id": "cs-1"}]),                                    # placed count
+        query(data=[]),                                                  # activity feed
+        query(data=[]),                                                  # exam attempts
+    )
+    with patch("app.hub.db", mock_db), caplog.at_level(logging.WARNING, logger="app.hub"):
+        result = await get_tpo_hub_data("tpo-1")
+
+    assert result["role"] == "tpo"
+    assert result["stats"]["totalRegistered"] == 1
+    assert result["stats"]["placed"] == 1
+    assert result["insights"]["funnel"][2] == {"label": "Offers", "count": 1}
+    assert result["degraded"] == ["jobs"]
+    assert any(
+        "hub_overview.source_failed section=jobs user_id=tpo-1" in m
+        for m in _warning_messages(caplog)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -183,6 +311,7 @@ async def test_recruiter_hub_action_items_and_spotlight():
         {"name": "Asha", "score": "80% Match"},
         {"name": "Ben", "score": "40% Match"},
     ]
+    assert result["degraded"] == []
 
 
 # ---------------------------------------------------------------------------
@@ -203,6 +332,26 @@ async def test_admin_hub_counts_and_fallback_feed():
     assert result["stats"]["totalExams"] == 1
     assert result["stats"]["activeSessions"] == 1
     assert result["recentActivity"][0]["title"] == "Platform Administration Panel Active"
+    assert result["degraded"] == []
+
+
+@pytest.mark.asyncio
+async def test_admin_hub_surfaces_degraded_users_source(caplog):
+    mock_db = db_routing({
+        "users": query(data=None, error=QueryError("users unavailable")),
+        "exams": query(data=[{"id": "e1"}]),
+        "attempts": query(data=[]),
+        "activity_feed": query(data=[]),
+    })
+    with patch("app.hub.db", mock_db), caplog.at_level(logging.WARNING, logger="app.hub"):
+        result = await get_admin_hub_data("admin-1")
+    assert result["stats"]["totalUsers"] == 0  # degraded, not fabricated
+    assert result["stats"]["totalExams"] == 1
+    assert result["degraded"] == ["users"]
+    assert any(
+        "hub_overview.source_failed section=users user_id=admin-1" in m
+        for m in _warning_messages(caplog)
+    )
 
 
 @pytest.mark.asyncio

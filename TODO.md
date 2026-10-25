@@ -1,10 +1,29 @@
-# TODO - Redis graceful degradation
+# IntelliHire — Roadmap / TODO
 
-- [x] Update `server/src/lib/queue.ts` to avoid process crash when Redis/Bull is unreachable; keep local/disk fallback queue.
-- [x] Update `server/src/websocket.ts` to keep Socket.IO working without Redis adapter when Redis is unavailable; preserve auth + rooms.
-- [x] Restart server and verify:
-  - [x] `GET /api/health` returns 200/503 without crashing
-  - [x] Client can load UI and make API calls
-  - [x] No repeated `MaxRetriesPerRequestError` crash loop when Redis is offline
+Living checklist for the next iterations. Completed items move to git history.
 
+## Platform hardening
+- [ ] Migrate remaining flat routers (`tpo.py`, `exam_pipeline.py`, `ai.py`) into `app/routers/` + `app/repositories/` (refactor in progress).
+- [ ] Replace the hand-rolled query builder in `db.py` with the repository layer everywhere, then SQLAlchemy 2.0 async (see `docs/database_migration_evaluation.md`).
+- [ ] Replace remaining `# nosec` SQL suppressions with reviewed, parameterized query paths plus dedicated tests.
+- [ ] CI: report coverage trends; keep pip-audit + npm audit + bandit green on every PR.
 
+## Code health
+- [ ] Break up oversized frontend components into focused components + hooks: `CreateExam.tsx` (~1.5k lines), `CandidateInterview.tsx`, `RecruiterCandidateAnalytics.tsx`, `TakeExam.tsx`.
+- [ ] Generate locked, reproducible Python builds; keep prod and dev dependencies separated in `requirements.txt`.
+
+## Reliability & operations
+- [ ] Load tests for login, dashboards, code execution, WebSockets, and concurrent exam candidates.
+- [ ] Centralized error monitoring, structured log dashboards, and alerting (Prometheus instrumentation exists; wire alert rules + Sentry DSN).
+- [ ] Document SLOs; schedule backup-restore drills for the production database.
+
+## Product
+- [ ] Self-serve onboarding: college/workspace signup wizard (currently seed-script based).
+- [ ] Real face/gaze detection to replace the YCbCr heuristic proctoring (TensorFlow.js BlazeFace or similar).
+- [ ] Retrain the ML candidate ranker on real drive outcomes (interview pass/fail labels) once live drives produce data; keep automated ranking advisory-only with human review.
+
+## Trust & compliance
+- [ ] Tenant-isolation test suite across all college-scoped endpoints (extends `test_authz_matrix.py`).
+- [ ] GDPR/DPDP flows: consent capture, data export, data deletion, retention schedule enforcement surfaced in Admin UI.
+- [ ] Proctoring bias review + candidate appeal workflow for flagged attempts.
+- [ ] SOC 2 readiness checklist doc (audit logging exists; formalize controls).

@@ -8,16 +8,76 @@ import {
   AreaChart, Area, ResponsiveContainer, XAxis, CartesianGrid
 } from "recharts";
 
+interface LiveLog {
+  text: string;
+  time: string;
+}
+
+interface RecentAttempt {
+  id: string;
+  users: { name?: string; email?: string };
+  exams: { title?: string };
+  status: string;
+  submitted_at: string;
+}
+
+interface MonitoringPoint {
+  hour: string;
+  activeCandidates: number;
+}
+
+interface SuspiciousStats {
+  totalFlags: number;
+  tabSwitches: number;
+  faceMissing: number;
+  cameraOffline: number;
+}
+
+interface RecentSubmissionPayload {
+  attemptId: string;
+  candidateName: string;
+  examTitle: string;
+  submittedAt: string;
+}
+
+interface RecentProctoringEventPayload {
+  candidateName: string;
+  eventType: string;
+  severity: string;
+}
+
+interface ExamStartPayload {
+  candidateName: string;
+  examTitle: string;
+  startedAt: string;
+}
+
+interface ExamSubmissionPayload {
+  attemptId: string;
+  candidateName: string;
+  examTitle: string;
+  score: number;
+  submittedAt: string;
+}
+
+interface ProctorViolationPayload {
+  candidateName: string;
+  message: string;
+  examTitle: string;
+  timestamp: string;
+  violationCount?: number;
+}
+
 export default function AdminExamActivity() {
   const [loading, setLoading] = useState(true);
-  const [liveLogs, setLiveLogs] = useState<any[]>([]);
-  const [recentAttempts, setRecentAttempts] = useState<any[]>([]);
-  const [proctorAlerts, setProctorAlerts] = useState<any[]>([]);
+  const [liveLogs, setLiveLogs] = useState<LiveLog[]>([]);
+  const [recentAttempts, setRecentAttempts] = useState<RecentAttempt[]>([]);
+  const [proctorAlerts, setProctorAlerts] = useState<string[]>([]);
   
   // Stats
   const [activeCandidates, setActiveCandidates] = useState(0);
-  const [monitoringData, setMonitoringData] = useState<any[]>([]);
-  const [suspiciousStats, setSuspiciousStats] = useState<any>({ totalFlags: 0, tabSwitches: 0, faceMissing: 0, cameraOffline: 0 });
+  const [monitoringData, setMonitoringData] = useState<MonitoringPoint[]>([]);
+  const [suspiciousStats, setSuspiciousStats] = useState<SuspiciousStats>({ totalFlags: 0, tabSwitches: 0, faceMissing: 0, cameraOffline: 0 });
 
   useEffect(() => {
     setLoading(true);
@@ -27,7 +87,7 @@ export default function AdminExamActivity() {
         setActiveCandidates(data.liveAttempts || 0);
         
         // Map submissions
-        setRecentAttempts(data.recentSubmissions?.map((s: any) => ({
+        setRecentAttempts(data.recentSubmissions?.map((s: RecentSubmissionPayload) => ({
           id: s.attemptId,
           users: { name: s.candidateName },
           exams: { title: s.examTitle },
@@ -36,14 +96,14 @@ export default function AdminExamActivity() {
         })) || []);
 
         // Map initial alerts
-        setProctorAlerts(data.recentProctoringEvents?.map((e: any) => 
+        setProctorAlerts(data.recentProctoringEvents?.map((e: RecentProctoringEventPayload) => 
           `Proctor Alert: ${e.candidateName} - ${String(e.eventType).replace("_", " ")} flagged (${e.severity} severity)`
         ) || []);
 
         // Map initial logs
-        const initialLogs: any[] = [];
+        const initialLogs: LiveLog[] = [];
         if (data.recentSubmissions) {
-          data.recentSubmissions.forEach((s: any) => {
+          data.recentSubmissions.forEach((s: RecentSubmissionPayload) => {
             initialLogs.push({
               text: `Candidate "${s.candidateName}" submitted exam "${s.examTitle}"`,
               time: new Date(s.submittedAt).toLocaleTimeString(),
@@ -71,7 +131,7 @@ export default function AdminExamActivity() {
     });
 
     // Handle student starting exam
-    socket.on("admin:exam_start", (data: any) => {
+    socket.on("admin:exam_start", (data: ExamStartPayload) => {
       setActiveCandidates((prev) => prev + 1);
       
       const newLog = {
@@ -93,7 +153,7 @@ export default function AdminExamActivity() {
     });
 
     // Handle student submitting exam
-    socket.on("admin:exam_submission", (data: any) => {
+    socket.on("admin:exam_submission", (data: ExamSubmissionPayload) => {
       setActiveCandidates((prev) => Math.max(0, prev - 1));
       
       const newLog = {
@@ -113,7 +173,7 @@ export default function AdminExamActivity() {
     });
 
     // Handle proctor warning violation
-    socket.on("admin:proctor_violation", (data: any) => {
+    socket.on("admin:proctor_violation", (data: ProctorViolationPayload) => {
       const alertMsg = `Proctor Alert: ${data.candidateName} - ${data.message} in "${data.examTitle}"`;
       setProctorAlerts((prev) => [alertMsg, ...prev.slice(0, 9)]);
 
@@ -124,7 +184,7 @@ export default function AdminExamActivity() {
       setLiveLogs((prev) => [newLog, ...prev.slice(0, 15)]);
 
       // Update counters
-      setSuspiciousStats((prev: any) => {
+      setSuspiciousStats((prev) => {
         const msg = String(data.message).toLowerCase();
         return {
           totalFlags: prev.totalFlags + (data.violationCount || 1),

@@ -42,15 +42,15 @@ export default function ViewResults() {
     name: (r.users?.name || "Candidate").split(" ")[0],
     fullName: r.users?.name || "Candidate",
     score: r.score || 0,
-    total: (r as any).exams?.total_marks || 0,
-    passed: (r.score || 0) >= ((r as any).exams?.pass_marks || 0),
+    total: r.exams?.total_marks || 0,
+    passed: (r.score || 0) >= (r.exams?.pass_marks || 0),
   }));
   const statusData = [
     { name: "Completed", value: completedResults.length },
     { name: "In Progress", value: inProgressResults.length },
   ].filter(d => d.value > 0);
   const avgScore = completedResults.length > 0 ? Math.round(completedResults.reduce((s, r) => s + (r.score || 0), 0) / completedResults.length) : 0;
-  const passCount = completedResults.filter(r => (r.score || 0) >= ((r as any).exams?.pass_marks || 0)).length;
+  const passCount = completedResults.filter(r => (r.score || 0) >= (r.exams?.pass_marks || 0)).length;
   const passRate = completedResults.length > 0 ? Math.round((passCount / completedResults.length) * 100) : 0;
 
   if (loading) return <div style={{ height: 300, background: "#e2e8f0", borderRadius: 12, animation: "pulse 1.5s infinite" }} />;
@@ -108,7 +108,7 @@ export default function ViewResults() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                     <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
-                    <Tooltip formatter={(v: any, _: any, p: any) => [`${v} / ${p.payload.total}`, p.payload.fullName]} contentStyle={{ borderRadius: 8, border: "1px solid #e8ecf0", fontSize: 12 }} />
+                    <Tooltip formatter={(v, _, p) => [`${v} / ${p.payload.total}`, p.payload.fullName]} contentStyle={{ borderRadius: 8, border: "1px solid #e8ecf0", fontSize: 12 }} />
                     <Bar dataKey="score" radius={[5, 5, 0, 0]}>
                       {chartData.map((entry, i) => <Cell key={i} fill={entry.passed ? "#10b981" : "#ef4444"} />)}
                     </Bar>
@@ -140,7 +140,7 @@ export default function ViewResults() {
                     name: r.users?.name || "Unknown",
                     email: r.users?.email || "Unknown",
                     status: r.status === "completed" ? "Completed" : "In Progress",
-                    score: r.status === "completed" ? `${r.score ?? 0} / ${(r as any).exams?.total_marks ?? ""}` : "—",
+                    score: r.status === "completed" ? `${r.score ?? 0} / ${r.exams?.total_marks ?? ""}` : "—",
                     submitted: r.submitted_at ? new Date(r.submitted_at).toLocaleString() : "—"
                   }));
                   exportToCSV(formatted, ["name", "email", "status", "score", "submitted"], `exam_results_${selectedExam}`, ["Candidate Name", "Email", "Status", "Score", "Submitted At"]);
@@ -160,7 +160,7 @@ export default function ViewResults() {
               </thead>
               <tbody>
                 {results.map(result => {
-                  const passed = result.status === "completed" && (result.score || 0) >= ((result as any).exams?.pass_marks || 0);
+                  const passed = result.status === "completed" && (result.score || 0) >= (result.exams?.pass_marks || 0);
                   return (
                     <tr key={result.id} style={{ borderBottom: "1px solid #f1f5f9" }}
                       onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "#f8fafc"}
@@ -175,7 +175,7 @@ export default function ViewResults() {
                         </span>
                       </td>
                       <td style={{ padding: "13px 16px", fontSize: 13, fontWeight: 700, color: "#0f172a", fontFamily: "monospace" }}>
-                        {result.status === "completed" ? `${result.score ?? 0} / ${(result as any).exams?.total_marks ?? "?"}` : "—"}
+                        {result.status === "completed" ? `${result.score ?? 0} / ${result.exams?.total_marks ?? "?"}` : "—"}
                       </td>
                       <td style={{ padding: "13px 16px" }}>
                         {result.status === "completed" ? (
@@ -212,14 +212,14 @@ export default function ViewResults() {
 
               <PlagiarismHeatmap
                 candidateA={{
-                  id: (completedResults[0] as any)?.user_id || "1",
+                  id: completedResults[0]?.user_id || "1",
                   name: completedResults[0]?.users?.name || "Candidate A",
-                  rollNumber: (completedResults[0]?.users as any)?.roll_number || "REG-101",
+                  rollNumber: completedResults[0]?.users?.roll_number || "REG-101",
                 }}
                 candidateB={{
-                  id: (completedResults[1] as any)?.user_id || "2",
+                  id: completedResults[1]?.user_id || "2",
                   name: completedResults[1]?.users?.name || "Candidate B",
-                  rollNumber: (completedResults[1]?.users as any)?.roll_number || "REG-102",
+                  rollNumber: completedResults[1]?.users?.roll_number || "REG-102",
                 }}
                 similarity={74}
                 matchedTokensCount={128}

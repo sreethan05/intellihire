@@ -1,5 +1,6 @@
 import os
 import datetime
+import logging
 import bcrypt
 from fastapi import APIRouter, Request, Response, HTTPException, Depends, UploadFile, File
 from pydantic import BaseModel
@@ -11,6 +12,8 @@ from .ai import MarksheetFile, extract_marksheet_result
 from .utils import hash_password, check_password
 from .pipeline import parse_file, ParserError, normalize_dataframe, ingest_students
 from .repositories import bulk_import_repo
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/api/tpo", tags=["tpo"])
@@ -377,7 +380,10 @@ async def get_dashboard_summary(user: Dict[str, Any] = Depends(require_roles(["t
                         "action_url": "/tpo/drives"
                     })
             except Exception:
-                pass
+                logger.warning(
+                    "tpo_dashboard.drive_deadline_parse_failed drive_id=%s value=%r",
+                    drive.get("id"), drive.get("drive_date"), exc_info=True,
+                )
                 
     return {
         "summary": {

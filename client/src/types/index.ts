@@ -133,9 +133,10 @@ export interface Attempt {
   score: number | null;
   started_at: string;
   submitted_at: string | null;
+  user_id?: string | null;
   exam?: Exam;
   exams?: { title: string; total_marks?: number; pass_marks?: number };
-  users?: { name: string; email: string };
+  users?: { name: string; email: string; roll_number?: string | null };
 }
 
 export interface InterviewStageResult {

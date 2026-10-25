@@ -1,5 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { AxiosResponse } from "axios";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useCandidateProfile, useUpdateCandidateProfile } from "./useCandidate";
@@ -30,7 +31,7 @@ describe("useCandidateProfile", () => {
 
   it("fetches profile data", async () => {
     const mockData = { user: { id: "1", name: "Test" }, profile: { branch: "CSE" } };
-    (candidateApi.getProfile as any).mockResolvedValue({ data: mockData });
+    vi.mocked(candidateApi.getProfile).mockResolvedValue({ data: mockData } as AxiosResponse);
 
     const { result } = renderHook(() => useCandidateProfile(), { wrapper: createWrapper() });
 
@@ -39,7 +40,7 @@ describe("useCandidateProfile", () => {
   });
 
   it("handles error state", async () => {
-    (candidateApi.getProfile as any).mockRejectedValue(new Error("Network error"));
+    vi.mocked(candidateApi.getProfile).mockRejectedValue(new Error("Network error"));
 
     const { result } = renderHook(() => useCandidateProfile(), { wrapper: createWrapper() });
 
@@ -49,7 +50,7 @@ describe("useCandidateProfile", () => {
 
 describe("useUpdateCandidateProfile", () => {
   it("invalidates profile query on success", async () => {
-    (candidateApi.updateProfile as any).mockResolvedValue({ data: { success: true } });
+    vi.mocked(candidateApi.updateProfile).mockResolvedValue({ data: { success: true } } as AxiosResponse);
 
     const { result } = renderHook(() => useUpdateCandidateProfile(), { wrapper: createWrapper() });
 

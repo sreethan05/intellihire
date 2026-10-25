@@ -2,10 +2,12 @@ import os
 import datetime
 import bcrypt
 import jwt
+import smtplib
+from email.message import EmailMessage
 from typing import Optional, Dict, Any
 from .db import db, get_connection
 
-from .config import JWT_SECRET, NODE_ENV, FILE_STORAGE_DIR
+from .config import JWT_SECRET, NODE_ENV, FILE_STORAGE_DIR, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
 from .logger import logger
 from .date_utils import now_iso
 
@@ -18,7 +20,9 @@ def is_production() -> bool:
     return NODE_ENV == "production"
 
 def hash_password(password: str) -> str:
-    pw_bytes = password.encode("utf-8")[:72]
+    pw_bytes = password.encode("utf-8")
+    if not pw_bytes or len(pw_bytes) > 72:
+        raise ValueError("password must be between 1 and 72 UTF-8 bytes")
     return bcrypt.hashpw(pw_bytes, bcrypt.gensalt()).decode("utf-8")
 
 def check_password(password: str, hashed: str) -> bool:
@@ -26,7 +30,9 @@ def check_password(password: str, hashed: str) -> bool:
         h = hashed
         if isinstance(h, str):
             h = h.encode("utf-8")
-        pw_bytes = password.encode("utf-8")[:72]
+        pw_bytes = password.encode("utf-8")
+        if not pw_bytes or len(pw_bytes) > 72:
+            return False
         return bcrypt.checkpw(pw_bytes, h)
     except Exception:
         return False
@@ -152,8 +158,30 @@ def render_email_template(template_name: str, **kwargs) -> tuple:
     return subject, html
 
 def send_email(to: str, subject: str, body: str, html: str = None) -> bool:
-    logger.info(f"[Email] Sending email to {to} | Subject: {subject} | Body: {body[:100]}...")
-    return True
+    if not (SMTP_HOST and SMTP_USER and SMTP_PASS):
+        logger.warning("[Email] SMTP is not configured; notification was skipped")
+        return False
+
+    message = EmailMessage()
+    message["From"] = SMTP_FROM
+    message["To"] = to
+    message["Subject"] = subject
+    message.set_content(body or "")
+    if html:
+        message.add_alternative(html, subtype="html")
+
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as smtp:
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.ehlo()
+            smtp.login(SMTP_USER, SMTP_PASS)
+            smtp.send_message(message)
+        logger.info("[Email] Notification delivered to configured provider")
+        return True
+    except (OSError, smtplib.SMTPException) as exc:
+        logger.error("[Email] Notification delivery failed: %s", exc)
+        return False
 
 async def send_email_async(to: str, subject: str, body: str, html: str = None) -> bool:
     return await asyncio.to_thread(send_email, to, subject, body, html)

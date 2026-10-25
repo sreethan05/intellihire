@@ -94,6 +94,23 @@ type InterviewResult = {
   summary?: string;
   feedback?: string;
   started_at?: string;
+  submitted_at?: string | null;
+};
+
+// Extra `audio` field is sent for transcription support; the server ignores
+// unknown fields, so it is optional alongside the InterviewAnswerRequest body.
+type SubmitAnswerPayload = {
+  question: string;
+  answer: string;
+  stage: number;
+  audio?: string;
+};
+
+type ProctoringEventRow = {
+  id?: string;
+  event_type?: string;
+  message?: string | null;
+  captured_at?: string | null;
 };
 
 type RecognitionResult = { isFinal: boolean; 0?: { transcript?: string } };
@@ -438,7 +455,7 @@ export default function CandidateInterview() {
 
     try {
       const stage = getStageForIndex(currentIndex);
-      const payload: any = {
+      const payload: SubmitAnswerPayload = {
         question: currentQuestion,
         answer,
         stage,
@@ -705,8 +722,8 @@ export default function CandidateInterview() {
         if (!isSubscribed) return;
 
         const events = data.events || [];
-        const latestOverride = events.find((event: any) => event.event_type === "admin_override");
-        const latestViolation = events.find((event: any) => event.event_type === "violation");
+        const latestOverride = events.find((event: ProctoringEventRow) => event.event_type === "admin_override");
+        const latestViolation = events.find((event: ProctoringEventRow) => event.event_type === "violation");
         const isUnlocked = Boolean(latestOverride && latestViolation) &&
           String(latestOverride?.captured_at || "") >= String(latestViolation?.captured_at || "");
 
@@ -1476,7 +1493,7 @@ function InterviewHistory({ history, compact }: { history: InterviewResult[]; co
     <Card className="rounded-lg">
       <CardHeader><CardTitle className="text-base">Past Interviews</CardTitle></CardHeader>
       <CardContent className="space-y-3">
-        {history.slice(0, compact ? 3 : undefined).map((item: any, index: number) => (
+        {history.slice(0, compact ? 3 : undefined).map((item: InterviewResult, index: number) => (
           <div key={item.id || index} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
             <div>
               <div className="text-sm font-semibold text-slate-900">

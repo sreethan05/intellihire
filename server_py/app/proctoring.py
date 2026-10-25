@@ -12,13 +12,15 @@ from .rate_limit import limiter
 
 router = APIRouter(prefix="/api/proctoring", tags=["proctoring"])
 
+MAX_SNAPSHOT_DATA_LENGTH = 500_000
+
 
 class ProctoringEventRequest(BaseModel):
     attempt_id: str = Field(min_length=1, max_length=128)
     exam_id: str = Field(min_length=1, max_length=128)
     event_type: Literal["camera_check", "snapshot", "violation", "submission"]
     message: Optional[str] = Field(default=None, max_length=2_000)
-    snapshot_data: Optional[str] = Field(default=None, max_length=1_500_000)
+    snapshot_data: Optional[str] = Field(default=None, max_length=MAX_SNAPSHOT_DATA_LENGTH)
     typing_speed_wpm: Optional[int] = Field(default=0, ge=0, le=500)
 
 

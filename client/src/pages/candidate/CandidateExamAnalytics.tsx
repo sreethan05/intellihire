@@ -25,24 +25,140 @@ interface HeatmapDay {
   day: number;
 }
 
+interface TopicAccuracyStat {
+  topic: string;
+  accuracy: number;
+  difficulty?: string;
+  attempted?: number;
+}
+
+interface TopicMasteryData {
+  topics: TopicAccuracyStat[];
+  strongest: TopicAccuracyStat | null;
+  weakest: TopicAccuracyStat | null;
+  peerAverage: TopicAccuracyStat[];
+}
+
+interface CodingLanguageStat {
+  language: string;
+  successRate: number;
+}
+
+interface CodingDifficultyStat {
+  level: string;
+  successRate: number;
+  total: number;
+  avgScore: number;
+}
+
+interface CodingAnalyticsData {
+  languages: CodingLanguageStat[];
+  difficulty: CodingDifficultyStat[];
+  problemTypes: Array<{ type: string; count: number }>;
+}
+
+interface InterviewDimensions {
+  technical: number;
+  relevance: number;
+  communication: number;
+  speaking: number;
+  pronunciation: number;
+  intro: number;
+}
+
+interface InterviewAnalyticsEntry {
+  id: string;
+  jobTitle: string;
+  submittedAt: string;
+  summary?: string;
+  dimensions: InterviewDimensions;
+}
+
+interface InterviewAnalyticsData {
+  interviews: InterviewAnalyticsEntry[];
+  averages: Record<string, number>;
+  count: number;
+}
+
+interface PipelineJobEntry {
+  jobId: string;
+  jobTitle: string;
+  companyName: string;
+  status: string;
+  recruiterNotes?: string;
+}
+
+interface PipelineData {
+  pipeline: PipelineJobEntry[];
+  stages: Array<{ stage: string; count: number }>;
+}
+
+interface StreakData {
+  currentStreak: number;
+  longestStreak: number;
+  heatmap: HeatmapDay[];
+  dayNames: string[];
+}
+
+interface ReadinessComponents {
+  exam?: number;
+  coding?: number;
+  interview?: number;
+  consistency?: number;
+  breadth?: number;
+}
+
+interface ReadinessData {
+  readinessScore: number;
+  zone: string;
+  components: ReadinessComponents;
+}
+
+interface ProctoringSummary {
+  totalViolations: number;
+  byType: Array<{ type: string; count: number }>;
+  recentExams: Array<{ examId: string; title: string; violations: number }>;
+}
+
+interface PeerComparisonEntry {
+  topic: string;
+  myAccuracy: number;
+  peerAccuracy: number;
+  percentile: number;
+}
+
+interface PeerComparisonData {
+  comparisons: PeerComparisonEntry[];
+  overall: { percentile?: number };
+}
+
+interface InterviewAnswer {
+  id: string;
+  question: string;
+  answer?: string;
+  correct_concepts?: string;
+  gaps?: string;
+  speaking_duration_sec?: number;
+}
+
 export default function CandidateExamAnalytics() {
   const [activeTab, setActiveTab] = useState<"overview" | "topics" | "coding" | "interviews" | "gaps">("overview");
   const [loading, setLoading] = useState(true);
 
   // States for all analytics data
   
-  const [topicMastery, setTopicMastery] = useState<any>({ topics: [], strongest: null, weakest: null, peerAverage: [] });
-  const [codingAnalytics, setCodingAnalytics] = useState<any>({ languages: [], difficulty: [], problemTypes: [] });
-  const [interviewAnalytics, setInterviewAnalytics] = useState<any>({ interviews: [], averages: {}, count: 0 });
-  const [pipelineData, setPipelineData] = useState<any>({ pipeline: [], stages: [] });
-  const [streakData, setStreakData] = useState<any>({ currentStreak: 0, longestStreak: 0, heatmap: [], dayNames: [] });
-  const [readinessData, setReadinessData] = useState<any>({ readinessScore: 0, zone: "needs_work", components: {} });
-  const [proctoringData, setProctoringData] = useState<any>({ totalViolations: 0, byType: [], recentExams: [] });
-  const [peerComparison, setPeerComparison] = useState<any>({ comparisons: [], overall: {} });
+  const [topicMastery, setTopicMastery] = useState<TopicMasteryData>({ topics: [], strongest: null, weakest: null, peerAverage: [] });
+  const [codingAnalytics, setCodingAnalytics] = useState<CodingAnalyticsData>({ languages: [], difficulty: [], problemTypes: [] });
+  const [interviewAnalytics, setInterviewAnalytics] = useState<InterviewAnalyticsData>({ interviews: [], averages: {}, count: 0 });
+  const [pipelineData, setPipelineData] = useState<PipelineData>({ pipeline: [], stages: [] });
+  const [streakData, setStreakData] = useState<StreakData>({ currentStreak: 0, longestStreak: 0, heatmap: [], dayNames: [] });
+  const [readinessData, setReadinessData] = useState<ReadinessData>({ readinessScore: 0, zone: "needs_work", components: {} });
+  const [proctoringData, setProctoringData] = useState<ProctoringSummary>({ totalViolations: 0, byType: [], recentExams: [] });
+  const [peerComparison, setPeerComparison] = useState<PeerComparisonData>({ comparisons: [], overall: {} });
 
   // Voice interview deep dive states
   const [selectedInterviewId, setSelectedInterviewId] = useState<string>("");
-  const [interviewAnswers, setInterviewAnswers] = useState<any[]>([]);
+  const [interviewAnswers, setInterviewAnswers] = useState<InterviewAnswer[]>([]);
   const [answersLoading, setAnswersLoading] = useState(false);
   const [openAccordionIdx, setOpenAccordionIdx] = useState<number | null>(null);
 
@@ -116,7 +232,7 @@ export default function CandidateExamAnalytics() {
   const strokeDashoffset = circumference - (readinessScore / 100) * circumference;
 
   // Selected interview dimensions data for radar chart
-  const selectedInterview = interviewAnalytics.interviews?.find((i: any) => i.id === selectedInterviewId);
+  const selectedInterview = interviewAnalytics.interviews?.find((i) => i.id === selectedInterviewId);
   const interviewRadarData = selectedInterview ? [
     { subject: "Technical", score: selectedInterview.dimensions.technical, fullMark: 100 },
     { subject: "Relevance", score: selectedInterview.dimensions.relevance, fullMark: 100 },
@@ -127,8 +243,8 @@ export default function CandidateExamAnalytics() {
   ] : [];
 
   // Topic mastery radar data combining candidate and peer averages
-  const topicRadarData = topicMastery.topics?.map((topicObj: any) => {
-    const peerObj = topicMastery.peerAverage?.find((p: any) => p.topic === topicObj.topic);
+  const topicRadarData = topicMastery.topics?.map((topicObj) => {
+    const peerObj = topicMastery.peerAverage?.find((p) => p.topic === topicObj.topic);
     return {
       topic: topicObj.topic,
       "You (%)": topicObj.accuracy,
@@ -148,19 +264,19 @@ export default function CandidateExamAnalytics() {
 
       {/* Tab Navigation Controls */}
       <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-px">
-        {[
+        {([
           { id: "overview", label: "Readiness & Overview", icon: Target },
           { id: "topics", label: "Topic Mastery Radar", icon: BarChart3 },
           { id: "coding", label: "Coding Analytics", icon: Languages },
           { id: "interviews", label: "AI Interview Breakdown", icon: MessageSquareText },
           { id: "gaps", label: "Skill Gaps & Recommendations", icon: Target },
-        ].map((tab) => {
+        ] as const).map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold transition-all border-b-2 -mb-px outline-none ${
                 isActive
                   ? "border-violet-600 text-violet-700 font-extrabold"
@@ -317,7 +433,7 @@ export default function CandidateExamAnalytics() {
                 </div>
               ) : (
                 <div className="space-y-6 max-h-[380px] overflow-y-auto pr-1">
-                  {pipelineData.pipeline.map((job: any) => {
+                  {pipelineData.pipeline.map((job) => {
                     const currentStage = job.status;
                     const allStages = ["registered", "exam_taken", "passed", "shortlisted", "offered"];
                     const stageIndex = allStages.indexOf(currentStage === "rejected" || currentStage === "on_hold" ? "shortlisted" : currentStage);
@@ -401,7 +517,7 @@ export default function CandidateExamAnalytics() {
                   { label: "Face Missing", key: "face_missing", bg: "bg-amber-50", text: "text-amber-600", border: "border-amber-100" },
                   { label: "Camera Offline", key: "camera_offline", bg: "bg-slate-50", text: "text-slate-600", border: "border-slate-200" },
                 ].map((violation) => {
-                  const valObj = proctoringData.byType?.find((t: any) => t.type === violation.key);
+                  const valObj = proctoringData.byType?.find((t) => t.type === violation.key);
                   const count = valObj?.count || 0;
                   return (
                     <div key={violation.label} className={`rounded-xl border ${violation.border} ${violation.bg} p-3.5 text-center`}>
@@ -482,7 +598,7 @@ export default function CandidateExamAnalytics() {
                     No topic benchmark comparisons yet.
                   </div>
                 ) : (
-                  peerComparison.comparisons.map((c: any) => {
+                  peerComparison.comparisons.map((c) => {
                     const isTop = c.percentile >= 75;
                     const isBottom = c.percentile < 40;
                     return (
@@ -579,7 +695,7 @@ export default function CandidateExamAnalytics() {
                     No difficulty breakdown details yet.
                   </div>
                 ) : (
-                  codingAnalytics.difficulty.map((diff: any) => {
+                  codingAnalytics.difficulty.map((diff) => {
                     const isEasy = String(diff.level).toLowerCase() === "easy";
                     const barColor = isEasy ? "bg-emerald-500" : "bg-rose-500";
                     const textColor = isEasy ? "text-emerald-700" : "text-rose-700";
@@ -645,7 +761,7 @@ export default function CandidateExamAnalytics() {
                   {interviewAnalytics.interviews?.length === 0 ? (
                     <option value="">No interviews found</option>
                   ) : (
-                    interviewAnalytics.interviews.map((int: any) => (
+                    interviewAnalytics.interviews.map((int) => (
                       <option key={int.id} value={int.id}>
                         {int.jobTitle} ({new Date(int.submittedAt).toLocaleDateString()})
                       </option>
@@ -778,10 +894,10 @@ export default function CandidateExamAnalytics() {
               <div className="space-y-4">
                 {/* Weakest Topics Highlighted */}
                 {topicMastery.topics
-                  ?.filter((t: any) => t.accuracy < 60)
-                  .sort((a: any, b: any) => a.accuracy - b.accuracy)
-                  .map((topic: any) => {
-                    const peerObj = topicMastery.peerAverage?.find((p: any) => p.topic === topic.topic);
+                  ?.filter((t) => t.accuracy < 60)
+                  .sort((a, b) => a.accuracy - b.accuracy)
+                  .map((topic) => {
+                    const peerObj = topicMastery.peerAverage?.find((p) => p.topic === topic.topic);
                     const peerAcc = peerObj?.accuracy || 50;
                     const gap = peerAcc - topic.accuracy;
                     return (
@@ -823,10 +939,10 @@ export default function CandidateExamAnalytics() {
 
                 {/* Strong Topics */}
                 {topicMastery.topics
-                  ?.filter((t: any) => t.accuracy >= 60)
-                  .sort((a: any, b: any) => b.accuracy - a.accuracy)
+                  ?.filter((t) => t.accuracy >= 60)
+                  .sort((a, b) => b.accuracy - a.accuracy)
                   .slice(0, 3)
-                  .map((topic: any) => (
+                  .map((topic) => (
                     <div key={topic.topic} className="border border-emerald-100 rounded-xl p-4 bg-emerald-50/30 flex items-center justify-between">
                       <div>
                         <div className="font-extrabold text-slate-900 text-sm">{topic.topic}</div>
@@ -840,7 +956,7 @@ export default function CandidateExamAnalytics() {
                   ))}
 
                 {/* No weak topics */}
-                {topicMastery.topics?.every((t: any) => t.accuracy >= 60) && (
+                {topicMastery.topics?.every((t) => t.accuracy >= 60) && (
                   <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-100 rounded-xl p-4">
                     <CheckCircle2 className="h-5 w-5 text-emerald-500" />
                     <span className="text-sm font-bold text-emerald-700">
@@ -866,7 +982,7 @@ export default function CandidateExamAnalytics() {
                   No coding submissions yet. Try the practice sandbox!
                 </div>
               ) : (
-                codingAnalytics.languages?.map((lang: any) => (
+                codingAnalytics.languages?.map((lang) => (
                   <div key={lang.language} className="flex items-center gap-4">
                     <span className="text-xs font-bold text-slate-700 w-20">{lang.language}</span>
                     <div className="flex-1 bg-slate-100 rounded-full h-3 overflow-hidden">

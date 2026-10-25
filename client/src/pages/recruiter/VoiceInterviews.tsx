@@ -16,7 +16,32 @@ import { useCollege } from "@/context/CollegeContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 
-function parseFeedback(feedback: string | undefined): { text: string; audioUrl?: string } {
+interface VoiceInterviewSummary {
+  id: string;
+  status: string;
+  score?: number | null;
+  selected?: boolean | null;
+  intro_score?: number | null;
+  speaking_score?: number | null;
+  pronunciation_score?: number | null;
+  technical_score?: number | null;
+  communication_score?: number | null;
+  submitted_at?: string | null;
+  summary?: string | null;
+  feedback?: string | null;
+  candidate?: { name?: string | null; email?: string | null } | null;
+  job?: { title: string; company_name: string } | null;
+}
+
+interface VoiceInterviewAnswer {
+  id?: string;
+  question: string;
+  answer?: string | null;
+  score?: number | null;
+  feedback?: string | null;
+}
+
+function parseFeedback(feedback: string | null | undefined): { text: string; audioUrl?: string } {
   if (!feedback) return { text: "" };
   try {
     const parsed = JSON.parse(feedback);
@@ -49,10 +74,10 @@ function ScoreBadge({ value, label }: { value: number; label: string }) {
 
 export default function VoiceInterviews() {
   const { selectedCollegeId } = useCollege();
-  const [interviews, setInterviews] = useState<any[]>([]);
+  const [interviews, setInterviews] = useState<VoiceInterviewSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
-  const [details, setDetails] = useState<Record<string, { answers: any[]; loading: boolean }>>({});
+  const [details, setDetails] = useState<Record<string, { answers: VoiceInterviewAnswer[]; loading: boolean }>>({});
 
   const toggleExpand = (interviewId: string) => {
     setExpandedIds((prev) => {
@@ -99,7 +124,7 @@ export default function VoiceInterviews() {
   const selectedCount = completed.filter((i) => i.selected).length;
   const avgScore =
     completed.length
-      ? Math.round(completed.reduce((s: number, i: any) => s + (i.score || 0), 0) / completed.length)
+      ? Math.round(completed.reduce((s: number, i) => s + (i.score || 0), 0) / completed.length)
       : 0;
 
   if (loading) {
@@ -158,7 +183,7 @@ export default function VoiceInterviews() {
           </div>
         )}
 
-        {interviews.map((interview: any) => {
+        {interviews.map((interview) => {
           const candidate = interview.candidate;
           const job = interview.job;
           const isCompleted = interview.status === "completed";
@@ -287,7 +312,7 @@ export default function VoiceInterviews() {
                           {details[interview.id]?.answers?.length === 0 ? (
                             <p className="text-sm text-slate-500 italic">No answers logged for this session.</p>
                           ) : (
-                            details[interview.id]?.answers?.map((ans: any, idx: number) => {
+                            details[interview.id]?.answers?.map((ans, idx: number) => {
                               const { text: feedbackText, audioUrl } = parseFeedback(ans.feedback);
                               const stageNum = idx < 2 ? 1 : idx < 4 ? 2 : 3;
                               const stageName = stageNum === 1 ? "Introduction" : stageNum === 2 ? "Speaking Skills" : "Technical Round";

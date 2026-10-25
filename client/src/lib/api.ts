@@ -355,7 +355,21 @@ export const interviewApi = {
 export const assetApi = {
   getCertificates: () => api.get("/assets/certificates"),
   getBadges: () => api.get("/assets/badges"),
+  // Mints a short-lived signed URL for a stored asset path
+  // (e.g. "/uploads/resumes/x.pdf") via POST /api/assets/sign.
+  signAsset: (path: string) => api.post<{ url: string; expiresIn: number }>("/assets/sign", { path }),
 };
+
+// Uploaded private files (resumes, offer letters) are no longer publicly
+// served under /uploads; the backend exposes them only through the
+// authenticated endpoint GET /api/assets/files/{path}, which the browser
+// fetches with the session cookie. Stored DB URLs ("/uploads/...") are
+// rewritten onto that endpoint here so every "View" link keeps working.
+export function assetFileUrl(storedUrl: string): string {
+  const base = (import.meta.env.VITE_API_URL || "").replace(/\/api$/, "");
+  const rel = storedUrl.replace(/^\/uploads\//, "");
+  return `${base}/api/assets/files/${rel}`;
+}
 
 export const badgeApi = {
   getCandidateBadges: () => api.get("/candidate/badges"),

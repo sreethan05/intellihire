@@ -57,6 +57,8 @@ Thumbs.db
 __pycache__/
 **/__pycache__/
 *.pyc
+.hypothesis/
+.pytest_cache/
 
 # Test coverage
 coverage/
@@ -66,4 +68,10 @@ htmlcov/
 
 # CI report artifacts (junit xml, coverage xml, exported OpenAPI schema)
 reports/
+
+# Local audit artifacts
+eslint-report.json
+eslint-warnings.txt
+cov_full.txt
+.coverage.*
 

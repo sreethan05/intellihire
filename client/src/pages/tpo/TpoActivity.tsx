@@ -1,10 +1,19 @@
 import { useEffect, useState } from "react";
 import { Activity, CheckCircle, Clock, Upload, ScanLine } from "lucide-react";
 import { tpoApi } from "@/lib/api";
+import type { CandidateProfile } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+type TpoActivityStudent = CandidateProfile & {
+  user?: {
+    name?: string | null;
+    email?: string | null;
+    profile_complete?: boolean | null;
+  } | null;
+};
+
 export default function TpoActivity() {
-  const [students, setStudents] = useState<any[]>([]);
+  const [students, setStudents] = useState<TpoActivityStudent[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

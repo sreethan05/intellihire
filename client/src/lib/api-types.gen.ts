@@ -300,6 +300,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assets/files/{asset_path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Asset
+         * @description Authenticated download for private uploaded files.
+         *
+         *     Supersedes the removed public /uploads static mount. Access is granted via
+         *     either a valid session (cookie/bearer JWT) checked against the DB rows
+         *     that own the file, or a short-lived signed URL (exp + sig query params)
+         *     minted by POST /api/assets/sign.
+         */
+        get: operations["download_asset_api_assets_files__asset_path__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assets/sign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign Asset
+         * @description Mint a short-lived signed download URL for an asset the caller may access.
+         *
+         *     Signed-token query param approach (exp + HMAC in the URL itself, verified
+         *     by GET /api/assets/files/{path}) rather than opaque one-time URLs, so the
+         *     resulting link works with plain <a href> navigations and curl alike. The
+         *     React client's normal download links carry the session cookie and do not
+         *     need this endpoint; it exists for non-cookie clients.
+         */
+        post: operations["sign_asset_api_assets_sign_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/login": {
         parameters: {
             query?: never;
@@ -3221,6 +3272,11 @@ export interface components {
             /** Scheduled Start */
             scheduled_start: string;
         };
+        /** SignAssetRequest */
+        SignAssetRequest: {
+            /** Path */
+            path: string;
+        };
         /** StartExamRequest */
         StartExamRequest: {
             /** Exam Id */
@@ -3813,6 +3869,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    download_asset_api_assets_files__asset_path__get: {
+        parameters: {
+            query?: {
+                exp?: number | null;
+                sig?: string;
+            };
+            header?: never;
+            path: {
+                asset_path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sign_asset_api_assets_sign_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignAssetRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

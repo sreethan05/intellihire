@@ -1,11 +1,14 @@
 import datetime
+import logging
 from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..auth_router import get_current_user, require_roles
 from ..db import db, get_connection
 from ..date_utils import parse_datetime
-from .recruiter_drives import deserialize_drive_colleges
+from ..utils import deserialize_drive_colleges
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/recruiter", tags=["recruiter_dashboard"])
 
@@ -455,6 +458,10 @@ async def get_time_to_complete(user: Dict[str, Any] = Depends(require_roles(["re
             dur = max(0.0, submitted - started)
         except Exception:
             dur = 0.0
+            logger.warning(
+                "recruiter_dashboard.duration_parse_failed attempt_id=%s started_at=%r submitted_at=%r",
+                a.get("id"), a.get("started_at"), a.get("submitted_at"), exc_info=True,
+            )
         allotted = float(exam.get("duration") or 0.0) * 60.0
         pct = round((dur / allotted) * 100) if allotted else 0
         data.append({

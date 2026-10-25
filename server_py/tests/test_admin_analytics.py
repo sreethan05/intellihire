@@ -3,13 +3,16 @@
 The dashboard endpoint uses raw psycopg via ``get_connection``; the
 ``fake_connection`` harness replays one result set per ``execute()``. The
 growth/activity endpoints use the db builder and are exercised with the shared
-db mocks.
+db mocks. Failure-surfacing tests assert the ``degraded`` response field and
+the stable log event names emitted instead of silent swallowing.
 """
 import datetime
+import logging
 
 import pytest
 from unittest.mock import MagicMock, patch
 
+from app.db import QueryError
 from app.routers.admin_analytics import (
     get_dashboard,
     get_platform_growth,
@@ -24,6 +27,12 @@ from tests.db_mocks import db_routing, fake_connection, query, sequence_db
 
 ADMIN = {"id": "admin-1", "role": "admin"}
 NOW = datetime.datetime.now(datetime.timezone.utc)
+
+ANALYTICS_LOGGER = "app.routers.admin_analytics"
+
+
+def _log_messages(caplog, logger_name=ANALYTICS_LOGGER):
+    return [r.getMessage() for r in caplog.records if r.name == logger_name]
 
 
 def _dashboard_fixtures():
@@ -138,6 +147,35 @@ async def test_platform_growth_buckets_by_week_and_month():
     # Ancient exam is outside the 12-week window.
     assert sum(w["examsCreated"] for w in result["weekly"]) == 1
     assert sum(m["examsCreated"] for m in result["monthly"]) == 1
+    # The unparsable "not-a-date" user row is surfaced, not silently dropped.
+    assert result["degraded"] == ["users"]
+
+
+@pytest.mark.asyncio
+async def test_platform_growth_surfaces_degraded_sources(caplog):
+    """A failed query response and an unparsable timestamp are reported via
+    the ``degraded`` field plus stable log events; other sources stay intact."""
+    mock_db = db_routing({
+        "users": query(data=None, error=QueryError("permission denied")),
+        "exams": query(data=[{"id": "e1", "created_at": "garbage"}]),
+        "attempts": query(data=[]),
+        "jobs": query(data=[]),
+        "ai_interviews": query(data=[]),
+    })
+    with patch("app.routers.admin_analytics.db", mock_db), \
+         caplog.at_level(logging.WARNING, logger=ANALYTICS_LOGGER):
+        result = await get_platform_growth(user=ADMIN)
+
+    assert result["totals"]["totalUsers"] == 0  # degraded, not fabricated
+    assert result["totals"]["totalAttempts"] == 0
+    assert result["degraded"] == ["exams", "users"]
+    assert len(result["weekly"]) == 12  # bucket skeleton is still returned
+    messages = _log_messages(caplog)
+    assert any("platform_growth.source_failed section=users" in m for m in messages)
+    assert any(
+        "platform_growth.bucket_parse_failed source=exams entity_id=e1" in m
+        for m in messages
+    )
 
 
 @pytest.mark.asyncio
@@ -167,6 +205,30 @@ async def test_system_health_counts_stuck_attempts():
     assert result["grading"]["failed24h"] == 1
     assert result["grading"]["last24hCompleted"] == 1
     assert set(result["apis"]) == {"judge0", "groq"}
+
+
+@pytest.mark.asyncio
+async def test_system_health_logs_unparsable_started_at(caplog):
+    """An unparsable started_at keeps the attempt uncounted but is logged with
+    the attempt id instead of being silently dropped."""
+    broken = {
+        "id": "a9",
+        "status": "in_progress",
+        "started_at": "not-a-date",
+    }
+    mock_db = sequence_db(
+        query(data=[broken]),
+        query(data=[]),
+    )
+    with patch("app.routers.admin_analytics.db", mock_db), \
+         caplog.at_level(logging.WARNING, logger=ANALYTICS_LOGGER):
+        result = await get_system_health(user=ADMIN)
+
+    assert result["grading"]["pendingJobs"] == 0
+    messages = _log_messages(caplog)
+    assert any(
+        "system_health.started_at_parse_failed attempt_id=a9" in m for m in messages
+    )
 
 
 @pytest.mark.asyncio
@@ -227,3 +289,32 @@ async def test_system_readiness_reports_dependencies():
     assert result["checks"]["smtp"] == {"status": "configured", "host": "smtp.example.com"}
     assert result["checks"]["groq"] == {"status": "configured"}
     assert result["overall"] == "degraded"
+    # Happy path: no synthetic failure entry is injected.
+    assert "platform_counts" not in result["checks"]
+
+
+@pytest.mark.asyncio
+async def test_system_readiness_surfaces_count_failure(caplog):
+    """When the platform-count queries fail, readiness must report the failed
+    check and log it instead of pretending the counts are fine."""
+    from contextlib import contextmanager
+
+    @contextmanager
+    def failing_connection():
+        raise RuntimeError("pool exhausted")
+        yield  # pragma: no cover
+
+    redis_stub = MagicMock()
+    redis_stub.ping.return_value = True
+    with patch("app.routers.admin_analytics.get_connection", new=failing_connection), \
+         patch("app.utils.redis_client", redis_stub), \
+         patch("app.config.JUDGE0_API_URL", ""), \
+         patch("app.config.SMTP_HOST", ""), \
+         patch("app.config.GROQ_API_KEY", ""), \
+         caplog.at_level(logging.ERROR, logger=ANALYTICS_LOGGER):
+        result = await get_system_readiness(user=ADMIN)
+
+    assert result["checks"]["postgres"]["status"] == "unhealthy"
+    assert result["checks"]["platform_counts"] == {"status": "degraded", "error": "pool exhausted"}
+    assert result["overall"] == "degraded"
+    assert any("system_readiness.counts_failed" in m for m in _log_messages(caplog))

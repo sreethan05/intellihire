@@ -1,14 +1,11 @@
 """Tests for the AI interview flow: app.interview router and app.interview_service.
 
-Two live modules implement the interview domain:
-
-- ``app.interview`` — FastAPI router (mounted in main.py) with its own copies
-  of scoring/summary helpers and a fire-and-forget background grader.
-- ``app.interview_service`` — repository-based service used by the queue
-  worker (``queue_manager.gradingQueue``) and other internal callers.
-
-Both are exercised here. AI calls are patched at the module boundary
-(``has_ai_key`` / ``generate_json``); DB access uses the shared mock harness.
+The interview domain logic itself now lives once in ``app.interview_core``;
+``app.interview`` (FastAPI router) and ``app.interview_service`` (repository
+service used by the queue worker) are thin adapters that inject their own
+collaborators. Both adapters are exercised here end-to-end. AI calls are
+patched at the adapter boundary (``has_ai_key`` / ``generate_json``); DB
+access uses the shared mock harness.
 """
 import asyncio
 
@@ -50,7 +47,7 @@ def test_router_score_and_clamp_helpers():
     assert detailed == 35 + 13 + 10 + 8
     assert iv.score_answer("word " * 200) == 95  # capped
 
-    assert iv.clamp_score("77.6", 0) == 77  # float -> int truncation
+    assert iv.clamp_score("77.6", 0) == 78  # rounds to nearest int (unified semantics)
     assert iv.clamp_score(-5, 3) == 0
     assert iv.clamp_score(150, 0) == 100
     assert iv.clamp_score("not-a-number", 42) == 42

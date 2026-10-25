@@ -3,7 +3,7 @@ import {
   BarChart3, TrendingUp, Users, GraduationCap, CheckCircle, 
   Landmark, UploadCloud, Search, Mail, Target, Download
 } from "lucide-react";
-import { tpoApi, examApi, resultApi, tpoAnalyticsApi } from "@/lib/api";
+import { assetFileUrl, tpoApi, examApi, resultApi, tpoAnalyticsApi } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { exportToCSV } from "@/lib/csvExport";
@@ -16,23 +16,117 @@ import {
 
 const BRANCH_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#06b6d4"];
 
+interface Student {
+  id?: string;
+  name?: string;
+  email?: string;
+  roll_number?: string;
+  branch?: string;
+  cgpa?: number | string;
+  graduation_year?: number | string;
+  documents_verified?: boolean;
+  profile_complete?: boolean;
+  user?: { name?: string; email?: string; profile_complete?: boolean };
+}
+
+interface ExamSummary {
+  id: string;
+  title: string;
+}
+
+interface ExamAttempt {
+  id: string;
+  status: string;
+  score?: number | null;
+  submitted_at?: string | null;
+  users?: { name?: string; email?: string };
+  exams?: { pass_marks?: number; total_marks?: number };
+}
+
+interface PlacementBranchStat {
+  branch: string;
+  totalStudents: number;
+  placed: number;
+  placementRate: number;
+  avgSalary?: number | null;
+  avgCgpa?: number | string;
+}
+
+interface PlacementStats {
+  byBranch: PlacementBranchStat[];
+  byYear: Array<{ year: number | string; totalStudents: number; placed: number; placementRate: number }>;
+  topCompanies: Array<{ company: string; offers: number; avgSalary?: number | null }>;
+}
+
+interface ReadinessStudent {
+  candidateId: string;
+  name: string;
+  roll_number: string;
+  branch: string;
+  cgpa?: number | string;
+  graduation_year?: number | string;
+  resume_url?: string;
+  resume_ats_analysis?: { atsScore?: number };
+  readinessScore: number;
+  zone: string;
+}
+
+interface ReadinessData {
+  students: ReadinessStudent[];
+  zoneCounts: { ready?: number; approaching?: number; needs_work?: number };
+}
+
+interface CompanyPerformanceEntry {
+  company: string;
+  drives: number;
+  registered: number;
+  examTaken: number;
+  shortlisted: number;
+  offered: number;
+  conversionRate: number;
+}
+
+interface CompanyData {
+  companies: CompanyPerformanceEntry[];
+}
+
+interface UploadBatch {
+  id: string;
+  fileName: string;
+  rowsTotal: number;
+  rowsCreated: number;
+  rowsFailed: number;
+  successRate: number;
+  createdAt: string;
+}
+
+interface UploadTrendPoint {
+  month: string;
+  successRate: number;
+}
+
+interface UploadData {
+  uploads: UploadBatch[];
+  trend: UploadTrendPoint[];
+}
+
 export default function TpoReports() {
   const [activeTab, setActiveTab] = useState<"placement" | "readiness" | "upload" | "academic">("placement");
   const [loading, setLoading] = useState(true);
 
   // Existing student lists
-  const [students, setStudents] = useState<any[]>([]);
-  const [exams, setExams] = useState<any[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [exams, setExams] = useState<ExamSummary[]>([]);
   const [selectedExam, setSelectedExam] = useState("");
-  const [examAttempts, setExamAttempts] = useState<any[]>([]);
+  const [examAttempts, setExamAttempts] = useState<ExamAttempt[]>([]);
   const [attemptsLoading, setAttemptsLoading] = useState(false);
   const [activeAttemptId, setActiveAttemptId] = useState<string | null>(null);
 
   // New Analytics States
-  const [placementStats, setPlacementStats] = useState<any>({ byBranch: [], byYear: [], topCompanies: [] });
-  const [readinessData, setReadinessData] = useState<any>({ students: [], zoneCounts: { ready: 0, approaching: 0, needs_work: 0 } });
-  const [companyData, setCompanyData] = useState<any>({ companies: [] });
-  const [uploadData, setUploadData] = useState<any>({ uploads: [], trend: [] });
+  const [placementStats, setPlacementStats] = useState<PlacementStats>({ byBranch: [], byYear: [], topCompanies: [] });
+  const [readinessData, setReadinessData] = useState<ReadinessData>({ students: [], zoneCounts: { ready: 0, approaching: 0, needs_work: 0 } });
+  const [companyData, setCompanyData] = useState<CompanyData>({ companies: [] });
+  const [uploadData, setUploadData] = useState<UploadData>({ uploads: [], trend: [] });
 
   // Filter States for Heatmap
   const [filterBranch, setFilterBranch] = useState("");
@@ -135,7 +229,7 @@ export default function TpoReports() {
     .map(([name, count]) => ({ name, count }));
 
   // Filter student readiness heatmap list
-  const filteredReadiness = readinessData.students?.filter((s: any) => {
+  const filteredReadiness = readinessData.students?.filter((s) => {
     const matchesBranch = filterBranch ? s.branch === filterBranch : true;
     const matchesYear = filterYear ? String(s.roll_number || "").includes(filterYear) || String(s.graduation_year || "").includes(filterYear) : true;
     const matchesSearch = searchQuery 
@@ -183,18 +277,18 @@ export default function TpoReports() {
 
       {/* Tab Navigation Controls */}
       <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-px">
-        {[
+        {([
           { id: "placement", label: "Placement & Company Drive Stats", icon: Landmark },
           { id: "readiness", label: "Student Readiness Heatmap", icon: Target },
           { id: "upload", label: "Upload success tracking", icon: UploadCloud },
           { id: "academic", label: "Academic Distributions", icon: BarChart3 },
-        ].map((tab) => {
+        ] as const).map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold transition-all border-b-2 -mb-px outline-none ${
                 isActive
                   ? "border-violet-600 text-violet-700 font-extrabold"
@@ -236,7 +330,7 @@ export default function TpoReports() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-semibold text-slate-600">
-                      {placementStats.byBranch.map((b: any) => (
+                      {placementStats.byBranch.map((b) => (
                         <tr key={b.branch} className="hover:bg-slate-50/20">
                           <td className="p-3 font-extrabold text-slate-900 capitalize">{b.branch}</td>
                           <td className="p-3 text-slate-500">{b.totalStudents}</td>
@@ -280,7 +374,7 @@ export default function TpoReports() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-semibold text-slate-600">
-                      {companyData.companies.map((c: any) => (
+                      {companyData.companies.map((c) => (
                         <tr key={c.company} className="hover:bg-slate-50/20">
                           <td className="p-3 font-extrabold text-slate-900">{c.company}</td>
                           <td className="p-3 text-slate-500">{c.drives}</td>
@@ -385,7 +479,7 @@ export default function TpoReports() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
-                    {filteredReadiness.map((student: any) => {
+                    {filteredReadiness.map((student) => {
                       const isReady = student.zone === "ready";
                       const isNeedsWork = student.zone === "needs_work";
                       
@@ -408,7 +502,7 @@ export default function TpoReports() {
                                   {student.resume_ats_analysis?.atsScore || 0}%
                                 </span>
                                  <a 
-                                   href={student.resume_url ? (import.meta.env.VITE_API_URL || "").replace(/\/api$/, "") + student.resume_url : ""}
+                                   href={student.resume_url ? assetFileUrl(student.resume_url) : ""}
                                    target="_blank"
                                    rel="noreferrer"
                                    className="text-[10px] font-black text-violet-600 hover:underline"
@@ -531,7 +625,7 @@ export default function TpoReports() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
-                    {uploadData.uploads.map((u: any) => (
+                    {uploadData.uploads.map((u) => (
                       <tr key={u.id} className="hover:bg-slate-50/20">
                         <td className="p-3.5 font-bold text-slate-900 truncate max-w-48">{u.fileName}</td>
                         <td className="p-3.5 text-slate-500">{u.rowsTotal}</td>

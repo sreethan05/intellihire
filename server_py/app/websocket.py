@@ -228,7 +228,18 @@ async def on_proctor_join(sid, data: Any):
                 session["attempt_id"] = attempt_id
         except KeyError:
             return
-    elif role not in ["recruiter", "admin"]:
+    elif role == "recruiter":
+        try:
+            # Recruiters may only join attempt rooms for attempts assigned to them
+            res = await db.from_("attempts").select("recruiter_id").eq("id", attempt_id).single()
+            if res.error or not res.data or res.data.get("recruiter_id") != user.get("id"):
+                await sio.emit("error", {"message": "Unauthorized attempt room join"}, to=sid)
+                return
+        except Exception as exc:
+            logger.error(f"[WebSocket] DB error checking recruiter attempt ownership for {sid}: {exc}")
+            await sio.emit("error", {"message": "Database error validating attempt"}, to=sid)
+            return
+    elif role != "admin":
         await sio.emit("error", {"message": "Unauthorized attempt room join"}, to=sid)
         return
 
@@ -356,6 +367,16 @@ async def on_proctor_snapshot(sid, data: Any):
             except Exception as exc:
                 logger.error(f"[WebSocket] DB error checking snapshot attempt for {sid}: {exc}")
                 return
+    elif user.get("role") == "recruiter":
+        # Recruiters may only emit snapshots into monitor rooms for exams they own
+        try:
+            res = await db.from_("exams").select("created_by").eq("id", validated.examId).single()
+            if res.error or not res.data or res.data.get("created_by") != user.get("id"):
+                await sio.emit("error", {"message": "Unauthorized snapshot emission"}, to=sid)
+                return
+        except Exception as exc:
+            logger.error(f"[WebSocket] DB error checking snapshot exam ownership for {sid}: {exc}")
+            return
 
     # Broadcast snapshot to monitoring room
     exam_id = validated.examId
@@ -404,6 +425,16 @@ async def on_proctor_violation(sid, data: Any):
             except Exception as exc:
                 logger.error(f"[WebSocket] DB error checking violation attempt for {sid}: {exc}")
                 return
+    elif user.get("role") == "recruiter":
+        # Recruiters may only emit violations into monitor rooms for exams they own
+        try:
+            res = await db.from_("exams").select("created_by").eq("id", exam_id).single()
+            if res.error or not res.data or res.data.get("created_by") != user.get("id"):
+                await sio.emit("error", {"message": "Unauthorized violation emission"}, to=sid)
+                return
+        except Exception as exc:
+            logger.error(f"[WebSocket] DB error checking violation exam ownership for {sid}: {exc}")
+            return
 
     # Broadcast to monitoring room
     monitor_room = f"monitor:{exam_id}"

@@ -32,6 +32,12 @@ type ScannedStudent = {
   warnings?: string[];
 };
 
+type ScanFailure = {
+  file?: string;
+  reason?: string;
+  row?: { roll_number?: string; source_file?: string } | null;
+};
+
 export default function TpoStudents() {
   const [csv, setCsv] = useState("roll_number,name,branch,cgpa,graduation_year,email\n21CSE001,Asha Rao,CSE,8.6,2026,asha@example.com\n21CSE002,Karan Dev,CSE,7.9,2026,karan@example.com\n21ECE045,Sana Khan,ECE,9.1,2026,sana@example.com");
   const [files, setFiles] = useState<File[]>([]);
@@ -102,7 +108,7 @@ export default function TpoStudents() {
         const payload = await Promise.all(batch.map(fileToPayload));
         const { data } = await tpoApi.scanMarksheets(payload);
         allScanned.push(...(data.students || []));
-        allFailed.push(...((data.failed || []).map((failure: any) => ({
+        allFailed.push(...((data.failed || []).map((failure: ScanFailure) => ({
           file: failure.file || failure.row?.roll_number || failure.row?.source_file || "unknown",
           reason: failure.reason || "Needs review",
         }))));

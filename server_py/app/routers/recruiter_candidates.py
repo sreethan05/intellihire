@@ -1,16 +1,23 @@
 import bcrypt
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from ..auth_router import get_current_user, require_roles
 from ..db import db, get_connection, transaction
-from .recruiter_drives import deserialize_drive_colleges
+from ..utils import deserialize_drive_colleges
 
 class CreateCandidateRequest(BaseModel):
     name: str
     email: str
     password: str
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_length(cls, value: str) -> str:
+        if not value or len(value.encode("utf-8")) > 72:
+            raise ValueError("password must be between 1 and 72 UTF-8 bytes")
+        return value
 
 router = APIRouter(prefix="/api/recruiter", tags=["recruiter_candidates"])
 

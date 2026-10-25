@@ -37,7 +37,11 @@ export default defineConfig({
     {
       command: "npm run server:py",
       url: "http://127.0.0.1:5000/api/health",
-      reuseExistingServer: !process.env.CI,
+      // Never reuse an existing server: Vite's SPA fallback answers /api/health
+      // with HTTP 200 HTML, so an impostor process on this port passes the
+      // readiness check and every API test then runs against the wrong site
+      // (a stray vite from another project caused exactly that). Fail fast instead.
+      reuseExistingServer: false,
       timeout: 120 * 1000,
       env: {
         DISABLE_RATE_LIMITS: "true",
@@ -52,7 +56,7 @@ export default defineConfig({
       // another port if the E2E port is already occupied.
       command: `npm --prefix client run dev -- --port ${E2E_CLIENT_PORT} --strictPort`,
       url: BASE_URL,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
       timeout: 120 * 1000,
       env: {
         DISABLE_RATE_LIMITS: "true",

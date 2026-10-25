@@ -42,6 +42,7 @@ from .websocket import socket_app
 from .utils import storage_root
 from .migration_runner import run_migrations
 from .ml_ranker import ranker
+from .sentry_integration import init_sentry
 
 class RankCandidateRequest(BaseModel):
     mcq_score_pct: Optional[float] = 50.0
@@ -54,6 +55,7 @@ IS_PRODUCTION = NODE_ENV == "production"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    init_sentry()
     # Startup migrations runner
     try:
         run_migrations()
@@ -83,6 +85,8 @@ app = FastAPI(
     openapi_url=None if IS_PRODUCTION else "/openapi.json",
 )
 
+# Prometheus metrics are exposed at /metrics. MetricsGuardMiddleware (added
+# below) optionally requires a bearer token when METRICS_TOKEN is set.
 from prometheus_fastapi_instrumentator import Instrumentator
 Instrumentator().instrument(app).expose(app)
 
@@ -112,12 +116,16 @@ from .middleware.audit_logger import AuditLoggerMiddleware
 from .middleware.error_handler import add_exception_handlers
 from .middleware.security_headers import SecurityHeadersMiddleware
 from .middleware.request_id import RequestIdMiddleware
+from .middleware.metrics_guard import MetricsGuardMiddleware
 
 app.add_middleware(RequestIdMiddleware)
 app.add_middleware(LoggerMiddleware)
 app.add_middleware(CSRFMiddleware)
 app.add_middleware(AuditLoggerMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
+# Added last so it runs first: the /metrics guard short-circuits before rate
+# limiting, CSRF, audit logging, or header injection.
+app.add_middleware(MetricsGuardMiddleware)
 
 add_exception_handlers(app)
 
@@ -158,9 +166,14 @@ app.include_router(proctoring_router)
 # Mount Socket.IO app
 app.mount("/socket.io", socket_app)
 
-# Ensure storage root exists and mount it
+# Ensure the storage root exists. It holds only private documents (candidate
+# resumes under resumes/, recruiter offer letters under offers/, and the
+# internal grading queue file), so unlike before it is deliberately NOT
+# mounted with StaticFiles at /uploads — unauthenticated downloads of resumes
+# and offers were possible that way. Access goes exclusively through
+# GET /api/assets/files/{path}, which requires a session or a short-lived
+# signed URL and enforces per-row authorization (see app/assets.py).
 os.makedirs(storage_root, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=storage_root), name="uploads")
 
 from pydantic import BaseModel
 from .websocket import send_realtime_notification

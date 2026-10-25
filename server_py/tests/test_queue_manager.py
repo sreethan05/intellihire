@@ -103,6 +103,8 @@ def test_push_prefers_redis_and_falls_back_to_local():
     assert queue.local_queue == ["a2"]
     # one task to persist the queue, one to start the worker
     assert create_task.call_count == 2
+    for call in create_task.call_args_list:
+        call.args[0].close()
 
 
 @pytest.mark.asyncio

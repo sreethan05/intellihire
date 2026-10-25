@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Trash2, Save, ArrowRight, CheckCircle, Database, PenLine, Sparkles, FileText, Type, Clock, Trophy, ShieldCheck, Calendar, Info } from "lucide-react";
 import { toast } from "sonner";
+import type { JobDrive } from "@/types";
 
 interface MCQQuestion {
   question_text: string; option_a: string; option_b: string;
@@ -19,6 +20,26 @@ interface MCQQuestion {
 interface CodingQuestionForm {
   title: string; description: string; difficulty: string;
   starter_code: string; test_cases: { input: string; expected_output: string }[]; marks: number;
+}
+
+interface BankMcqQuestion {
+  id: string;
+  question_text: string;
+  option_a: string;
+  option_b: string;
+  option_c: string;
+  option_d: string;
+  correct_option: string;
+  marks: number;
+}
+
+interface BankCodingQuestion {
+  id: string;
+  title: string;
+  description: string;
+  difficulty: string;
+  marks: number;
+  test_cases?: Array<{ input: string; expected_output: string }>;
 }
 
 const AVAILABLE_TOPICS = [
@@ -132,14 +153,14 @@ export default function CreateExam() {
   const [error, setError] = useState("");
 
   // Question bank state
-  const [bankMcq, setBankMcq] = useState<any[]>([]);
-  const [bankCoding, setBankCoding] = useState<any[]>([]);
+  const [bankMcq, setBankMcq] = useState<BankMcqQuestion[]>([]);
+  const [bankCoding, setBankCoding] = useState<BankCodingQuestion[]>([]);
   const [selectedBankMcq, setSelectedBankMcq] = useState<Set<string>>(new Set());
   const [selectedBankCoding, setSelectedBankCoding] = useState<Set<string>>(new Set());
   const [bankLoading, setBankLoading] = useState(false);
 
   // Job drive assignment state
-  const [drives, setDrives] = useState<any[]>([]);
+  const [drives, setDrives] = useState<JobDrive[]>([]);
   const [selectedDriveId, setSelectedDriveId] = useState("");
   const [assigningDrive, setAssigningDrive] = useState(false);
 
@@ -478,7 +499,7 @@ export default function CreateExam() {
   const updateMcqQuestion = (i: number, f: keyof MCQQuestion, v: string | number) => { const u = [...mcqQuestions]; u[i] = { ...u[i], [f]: v }; setMcqQuestions(u); };
   const removeMcqQuestion = (i: number) => setMcqQuestions(mcqQuestions.filter((_, idx) => idx !== i));
   const addCodingQuestion = () => setCodingQuestions([...codingQuestions, { title: "", description: "", difficulty: "medium", starter_code: "", test_cases: [{ input: "", expected_output: "" }], marks: 10 }]);
-  const updateCodingQuestion = (i: number, f: keyof CodingQuestionForm, v: any) => { const u = [...codingQuestions]; u[i] = { ...u[i], [f]: v }; setCodingQuestions(u); };
+  const updateCodingQuestion = (i: number, f: keyof CodingQuestionForm, v: string | number) => { const u = [...codingQuestions]; u[i] = { ...u[i], [f]: v }; setCodingQuestions(u); };
   const updateTestCase = (qi: number, ti: number, f: string, v: string) => { const u = [...codingQuestions]; u[qi].test_cases[ti] = { ...u[qi].test_cases[ti], [f]: v }; setCodingQuestions(u); };
   const addTestCase = (qi: number) => { const u = [...codingQuestions]; u[qi].test_cases.push({ input: "", expected_output: "" }); setCodingQuestions(u); };
   const removeCodingQuestion = (i: number) => setCodingQuestions(codingQuestions.filter((_, idx) => idx !== i));
@@ -538,7 +559,7 @@ export default function CreateExam() {
     finally { setLoading(false); }
   };
 
-  const diffColor: any = { easy: "#16a34a", medium: "#d97706", hard: "#dc2626" };
+  const diffColor: Record<string, string> = { easy: "#16a34a", medium: "#d97706", hard: "#dc2626" };
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 p-4 md:p-6 text-left">
@@ -921,7 +942,7 @@ export default function CreateExam() {
                     <div className="space-y-4 text-left">
                       <div className="space-y-1.5">
                         <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Generation Mode</Label>
-                        <Select value={unifiedMode} onValueChange={(v: any) => setUnifiedMode(v)}>
+                        <Select value={unifiedMode} onValueChange={(v) => setUnifiedMode(v as "balanced" | "mcq" | "coding")}>
                           <SelectTrigger className="h-9 bg-white"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="balanced">Balanced Mix (60% Coding, 40% MCQ)</SelectItem>
@@ -992,10 +1013,10 @@ export default function CreateExam() {
                         </div>
                         <div className="space-y-2"><Label htmlFor={`mcq-${index}-q`}>Question</Label><Textarea id={`mcq-${index}-q`} value={q.question_text} onChange={e => updateMcqQuestion(index, "question_text", e.target.value)} /></div>
                         <div className="grid grid-cols-2 gap-3">
-                          {["a","b","c","d"].map(opt => (
+                          {(["a","b","c","d"] as const).map(opt => (
                             <div key={opt} className="space-y-1">
                               <Label htmlFor={`mcq-${index}-opt-${opt}`} className="capitalize">Option {opt}</Label>
-                              <Input id={`mcq-${index}-opt-${opt}`} value={(q as any)[`option_${opt}`]} onChange={e => updateMcqQuestion(index, `option_${opt}` as any, e.target.value)} />
+                              <Input id={`mcq-${index}-opt-${opt}`} value={q[`option_${opt}`]} onChange={e => updateMcqQuestion(index, `option_${opt}`, e.target.value)} />
                             </div>
                           ))}
                         </div>
@@ -1027,7 +1048,7 @@ export default function CreateExam() {
                   ) : (
                     <div className="space-y-2">
                       <p className="text-sm text-gray-500 mb-3">Select questions to add to this exam:</p>
-                      {bankMcq.map((q: any) => {
+                      {bankMcq.map((q) => {
                         const checked = selectedBankMcq.has(q.id);
                         return (
                           <div key={q.id} onClick={() => toggleBankMcq(q.id)} className="cursor-pointer"
@@ -1039,7 +1060,7 @@ export default function CreateExam() {
                               <div className="flex-1">
                                 <p className="text-sm font-medium text-gray-800">{q.question_text}</p>
                                 <div className="grid grid-cols-2 gap-1 mt-2">
-                                  {["a","b","c","d"].map(o => (
+                                  {(["a","b","c","d"] as const).map(o => (
                                     <p key={o} className="text-xs text-gray-500">
                                       <span className={`font-semibold ${q.correct_option === o.toUpperCase() ? "text-green-600" : ""}`}>{o.toUpperCase()}.</span> {q[`option_${o}`]}
                                     </p>
@@ -1265,7 +1286,7 @@ export default function CreateExam() {
                   ) : (
                     <div className="space-y-2">
                       <p className="text-sm text-gray-500 mb-3">Select problems to add to this exam:</p>
-                      {bankCoding.map((q: any) => {
+                      {bankCoding.map((q) => {
                         const checked = selectedBankCoding.has(q.id);
                         return (
                           <div key={q.id} onClick={() => toggleBankCoding(q.id)} className="cursor-pointer"
@@ -1471,7 +1492,7 @@ export default function CreateExam() {
                   <Select value={selectedDriveId} onValueChange={setSelectedDriveId}>
                     <SelectTrigger className="flex-1"><SelectValue placeholder="Select active drive..." /></SelectTrigger>
                     <SelectContent>
-                      {drives.map((d: any) => (
+                      {drives.map((d) => (
                         <SelectItem key={d.id} value={d.id}>
                           {d.title} ({d.company_name})
                         </SelectItem>

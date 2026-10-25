@@ -8,9 +8,25 @@ import CreateRecruiter from "./CreateRecruiter";
 import CreateTpo from "./CreateTpo";
 import { toast } from "sonner";
 
+interface AdminRecruiterRow {
+  id: string;
+  name: string;
+  email: string;
+  created_at?: string;
+}
+
+interface AdminTpoRow {
+  id: string;
+  name: string;
+  email: string;
+  college_id?: string | null;
+  created_at?: string | null;
+  college?: { name: string | null; code: string | null } | null;
+}
+
 export default function AdminManage() {
-  const [recruiters, setRecruiters] = useState<any[]>([]);
-  const [tpos, setTpos] = useState<any[]>([]);
+  const [recruiters, setRecruiters] = useState<AdminRecruiterRow[]>([]);
+  const [tpos, setTpos] = useState<AdminTpoRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Search and filter states

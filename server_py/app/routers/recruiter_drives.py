@@ -1,4 +1,3 @@
-import datetime
 import json
 import os
 import shutil
@@ -6,12 +5,18 @@ import uuid
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel
-from psycopg.rows import dict_row
 
 from ..auth_router import get_current_user, require_roles
-from ..db import db, get_connection
+from ..db import db
+from ..repositories.drives_repo import find_eligible_candidates
 from ..upload_validation import read_validated_pdf
-from ..utils import record_pipeline_stage, send_drive_registered_email, storage_root
+from ..utils import (
+    deserialize_drive_colleges,
+    record_pipeline_stage,
+    send_drive_registered_email,
+    serialize_drive_colleges,
+    storage_root,
+)
 from ..websocket import send_realtime_notification
 from ..ai import generate_json, has_ai_key
 from ..validation import get_drive_validation_error
@@ -43,65 +48,6 @@ class SaveAiConfigRequest(BaseModel):
 
 class AiShortlistRequest(BaseModel):
     criteria: str
-
-def serialize_drive_colleges(description: str, college_ids: list, ai_config: dict = None) -> str:
-    metadata = {"college_ids": college_ids, "aiConfig": ai_config}
-    return f"{description}\n\n===METADATA===\n{json.dumps(metadata)}"
-
-def deserialize_drive_colleges(description: str) -> dict:
-    parts = (description or "").split("\n\n===METADATA===\n")
-    if len(parts) > 1:
-        try:
-            metadata = json.loads(parts[1])
-            return {
-                "description": parts[0],
-                "college_ids": metadata.get("college_ids") or [],
-                "aiConfig": metadata.get("aiConfig") or {
-                    "persona": "", "instructions": "", "rubric": "", "examples": [], "temperature": 0.4
-                }
-            }
-        except Exception:
-            pass
-    return {
-        "description": description or "",
-        "college_ids": [],
-        "aiConfig": {
-            "persona": "", "instructions": "", "rubric": "", "examples": [], "temperature": 0.4
-        }
-    }
-
-def get_drive_college_ids(drive: any) -> list:
-    if drive.get("company_description"):
-        parsed = deserialize_drive_colleges(drive["company_description"])
-        if parsed["college_ids"]:
-            return parsed["college_ids"]
-    return [drive["college_id"]] if drive.get("college_id") else []
-
-async def find_eligible_candidates(drive: any) -> list:
-    branches = drive.get("allowed_branches") or []
-    college_ids = get_drive_college_ids(drive)
-    if not college_ids:
-        return []
-        
-    query = """
-        SELECT cp.*, u.id as user_id, u.name, u.email, u.roll_number, u.profile_complete
-        FROM candidate_profiles cp
-        JOIN users u ON u.id = cp.user_id
-        WHERE cp.college_id IN %s AND cp.cgpa >= %s
-    """
-    params = [tuple(college_ids), float(drive.get("min_cgpa") or 0.0)]
-    
-    if branches:
-        query += " AND cp.branch IN %s"
-        params.append(tuple(branches))
-        
-    query += " ORDER BY cp.cgpa DESC"
-    
-    with get_connection() as conn:
-        with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute(query, params)
-            rows = cur.fetchall()
-            return [dict(r) for r in rows]
 
 @router.post("/drives")
 async def create_drive(req: CreateJobRequest, user: Dict[str, Any] = Depends(require_roles(["recruiter"]))):

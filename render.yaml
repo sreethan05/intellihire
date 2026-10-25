@@ -15,5 +15,13 @@ services:
         generateValue: true
       - key: DATABASE_URL
         sync: false
+      - key: APP_URL
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: METRICS_TOKEN
+        generateValue: true
+      - key: SENTRY_DSN
+        sync: false
       - key: GROQ_API_KEY
         sync: false

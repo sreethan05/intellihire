@@ -1,4 +1,5 @@
 import datetime
+import logging
 from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -6,7 +7,9 @@ from ..auth_router import get_current_user, require_roles
 from ..db import db, get_connection
 from ..date_utils import parse_datetime, now_iso
 from ..config import JUDGE0_API_KEY, GROQ_API_KEY
-from .recruiter_drives import deserialize_drive_colleges
+from ..utils import deserialize_drive_colleges
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin", tags=["admin_analytics"])
 
@@ -265,7 +268,27 @@ async def get_platform_growth(user: Dict[str, Any] = Depends(require_roles(["adm
     attempts_res = await db.from_("attempts").select("id, status, submitted_at, started_at")
     drives_res = await db.from_("jobs").select("id, created_at")
     interviews_res = await db.from_("ai_interviews").select("id, status, submitted_at")
-    
+
+    # Sources whose rows could not be bucketed (query errors or unparsable
+    # timestamps) are surfaced instead of silently treated as empty data.
+    degraded = set()
+
+    def _note_source(section: str, res, entity_id: str = "-") -> None:
+        error = getattr(res, "error", None)
+        if error is None:
+            return
+        degraded.add(section)
+        logger.warning(
+            "platform_growth.source_failed section=%s entity_id=%s error=%s",
+            section, entity_id, getattr(error, "message", None) or str(error),
+        )
+
+    _note_source("users", users_res)
+    _note_source("exams", exams_res)
+    _note_source("attempts", attempts_res)
+    _note_source("drives", drives_res)
+    _note_source("interviews", interviews_res)
+
     user_list = users_res.data or []
     exam_list = exams_res.data or []
     attempt_list = attempts_res.data or []
@@ -298,7 +321,11 @@ async def get_platform_growth(user: Dict[str, Any] = Depends(require_roles(["adm
                 if w_key in weekly:
                     weekly[w_key]["newUsers"] += 1
             except Exception:
-                pass
+                degraded.add("users")
+                logger.warning(
+                    "platform_growth.bucket_parse_failed source=users entity_id=%s value=%r",
+                    u.get("id"), u.get("created_at"), exc_info=True,
+                )
                 
     for e in exam_list:
         if e.get("created_at"):
@@ -308,7 +335,11 @@ async def get_platform_growth(user: Dict[str, Any] = Depends(require_roles(["adm
                 if w_key in weekly:
                     weekly[w_key]["examsCreated"] += 1
             except Exception:
-                pass
+                degraded.add("exams")
+                logger.warning(
+                    "platform_growth.bucket_parse_failed source=exams entity_id=%s value=%r",
+                    e.get("id"), e.get("created_at"), exc_info=True,
+                )
                 
     for a in completed_attempts:
         if a.get("submitted_at"):
@@ -318,7 +349,11 @@ async def get_platform_growth(user: Dict[str, Any] = Depends(require_roles(["adm
                 if w_key in weekly:
                     weekly[w_key]["attemptsCompleted"] += 1
             except Exception:
-                pass
+                degraded.add("attempts")
+                logger.warning(
+                    "platform_growth.bucket_parse_failed source=attempts entity_id=%s value=%r",
+                    a.get("id"), a.get("submitted_at"), exc_info=True,
+                )
                 
     for d in drive_list:
         if d.get("created_at"):
@@ -328,7 +363,11 @@ async def get_platform_growth(user: Dict[str, Any] = Depends(require_roles(["adm
                 if w_key in weekly:
                     weekly[w_key]["drivesCreated"] += 1
             except Exception:
-                pass
+                degraded.add("drives")
+                logger.warning(
+                    "platform_growth.bucket_parse_failed source=drives entity_id=%s value=%r",
+                    d.get("id"), d.get("created_at"), exc_info=True,
+                )
                 
     for i in completed_interviews:
         if i.get("submitted_at"):
@@ -338,7 +377,11 @@ async def get_platform_growth(user: Dict[str, Any] = Depends(require_roles(["adm
                 if w_key in weekly:
                     weekly[w_key]["interviewsCompleted"] += 1
             except Exception:
-                pass
+                degraded.add("interviews")
+                logger.warning(
+                    "platform_growth.bucket_parse_failed source=interviews entity_id=%s value=%r",
+                    i.get("id"), i.get("submitted_at"), exc_info=True,
+                )
                 
     monthly = {}
     for i in range(11, -1, -1):
@@ -366,7 +409,11 @@ async def get_platform_growth(user: Dict[str, Any] = Depends(require_roles(["adm
                 if m_key in monthly:
                     monthly[m_key]["newUsers"] += 1
             except Exception:
-                pass
+                degraded.add("users")
+                logger.warning(
+                    "platform_growth.bucket_parse_failed source=users entity_id=%s value=%r",
+                    u.get("id"), u.get("created_at"), exc_info=True,
+                )
                 
     for e in exam_list:
         if e.get("created_at"):
@@ -376,7 +423,11 @@ async def get_platform_growth(user: Dict[str, Any] = Depends(require_roles(["adm
                 if m_key in monthly:
                     monthly[m_key]["examsCreated"] += 1
             except Exception:
-                pass
+                degraded.add("exams")
+                logger.warning(
+                    "platform_growth.bucket_parse_failed source=exams entity_id=%s value=%r",
+                    e.get("id"), e.get("created_at"), exc_info=True,
+                )
                 
     for a in completed_attempts:
         if a.get("submitted_at"):
@@ -386,7 +437,11 @@ async def get_platform_growth(user: Dict[str, Any] = Depends(require_roles(["adm
                 if m_key in monthly:
                     monthly[m_key]["attemptsCompleted"] += 1
             except Exception:
-                pass
+                degraded.add("attempts")
+                logger.warning(
+                    "platform_growth.bucket_parse_failed source=attempts entity_id=%s value=%r",
+                    a.get("id"), a.get("submitted_at"), exc_info=True,
+                )
                 
     for d in drive_list:
         if d.get("created_at"):
@@ -396,7 +451,11 @@ async def get_platform_growth(user: Dict[str, Any] = Depends(require_roles(["adm
                 if m_key in monthly:
                     monthly[m_key]["drivesCreated"] += 1
             except Exception:
-                pass
+                degraded.add("drives")
+                logger.warning(
+                    "platform_growth.bucket_parse_failed source=drives entity_id=%s value=%r",
+                    d.get("id"), d.get("created_at"), exc_info=True,
+                )
                 
     for i in completed_interviews:
         if i.get("submitted_at"):
@@ -406,7 +465,11 @@ async def get_platform_growth(user: Dict[str, Any] = Depends(require_roles(["adm
                 if m_key in monthly:
                     monthly[m_key]["interviewsCompleted"] += 1
             except Exception:
-                pass
+                degraded.add("interviews")
+                logger.warning(
+                    "platform_growth.bucket_parse_failed source=interviews entity_id=%s value=%r",
+                    i.get("id"), i.get("submitted_at"), exc_info=True,
+                )
                 
     totals = {
         "totalUsers": len(user_list),
@@ -420,7 +483,8 @@ async def get_platform_growth(user: Dict[str, Any] = Depends(require_roles(["adm
     return {
         "weekly": list(weekly.values()),
         "monthly": list(monthly.values()),
-        "totals": totals
+        "totals": totals,
+        "degraded": sorted(degraded)
     }
 
 @router.get("/system-health")
@@ -443,7 +507,10 @@ async def get_system_health(user: Dict[str, Any] = Depends(require_roles(["admin
                 if diff.total_seconds() > 48 * 3600:
                     failed_24h += 1
             except Exception:
-                pass
+                logger.warning(
+                    "system_health.started_at_parse_failed attempt_id=%s value=%r",
+                    a.get("id"), a.get("started_at"), exc_info=True,
+                )
                 
     completed_res = await db.from_("attempts").select("id, submitted_at").eq("status", "completed").gte("submitted_at", one_day_ago)
     last_24h_completed = len(completed_res.data) if completed_res.data else 0
@@ -540,7 +607,10 @@ async def get_real_time_activity(user: Dict[str, Any] = Depends(require_roles(["
                 label = f"{hour % 12 or 12}{suffix}"
                 hour_map[label] = hour_map.get(label, 0) + 1
             except Exception:
-                pass
+                logger.warning(
+                    "real_time_activity.started_at_parse_failed attempt_id=%s value=%r",
+                    a.get("id"), a.get("started_at"), exc_info=True,
+                )
                 
     active_monitoring = []
     for h in range(24):
@@ -671,7 +741,9 @@ async def get_system_readiness(user: Dict[str, Any] = Depends(require_roles(["ad
                     health["overall"] = "degraded"
                 else:
                     health["checks"]["grading_queue"] = {"status": "healthy", "count": grading_count}
-    except Exception:
-        pass
+    except Exception as e:
+        logger.exception("system_readiness.counts_failed")
+        health["checks"]["platform_counts"] = {"status": "degraded", "error": str(e)[:200]}
+        health["overall"] = "degraded"
 
     return health

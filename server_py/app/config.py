@@ -51,6 +51,15 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+if settings.NODE_ENV == "production":
+    configured_origins = [origin.strip() for origin in settings.CORS_ALLOWED_ORIGINS.split(",") if origin.strip()]
+    if not configured_origins:
+        raise ValueError("CORS_ALLOWED_ORIGINS must be explicitly configured in production")
+    if "*" in configured_origins or any(not origin.startswith("https://") for origin in configured_origins):
+        raise ValueError("Production CORS_ALLOWED_ORIGINS must contain only explicit HTTPS origins")
+    if settings.APP_URL and not settings.APP_URL.startswith("https://"):
+        raise ValueError("APP_URL must use HTTPS in production")
+
 # Export uppercase variables for backward-compatibility with other modules
 DATABASE_URL = settings.DATABASE_URL
 JWT_SECRET = settings.JWT_SECRET
@@ -85,7 +94,7 @@ CORS_ALLOWED_ORIGINS = settings.CORS_ALLOWED_ORIGINS
 
 def get_allowed_origins() -> list:
     """Single source of truth for CORS-allowed origins."""
-    origins = [
+    origins = [] if NODE_ENV == "production" else [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:5173",

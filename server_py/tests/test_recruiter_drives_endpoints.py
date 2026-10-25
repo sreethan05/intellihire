@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi import HTTPException
 
+from app.repositories.drives_repo import find_eligible_candidates, get_drive_college_ids
 from app.routers.recruiter_drives import (
     AiShortlistRequest,
     AssignExamRequest,
@@ -22,19 +23,16 @@ from app.routers.recruiter_drives import (
     ai_shortlist,
     assign_exam_to_drive,
     create_drive,
-    deserialize_drive_colleges,
-    find_eligible_candidates,
     get_ai_config,
-    get_drive_college_ids,
     get_drives,
     get_eligible_candidates_for_drive,
     get_eligible_count,
     get_predictive_shortlist,
     save_ai_config,
-    serialize_drive_colleges,
     test_evaluation as evaluate_test_answer,
     upload_offer_letter,
 )
+from app.utils import deserialize_drive_colleges, serialize_drive_colleges
 from tests.db_mocks import FakeConn, db_routing, fake_connection, query, sequence_db
 
 RECRUITER = {"id": "rec-1", "role": "recruiter"}
@@ -88,7 +86,7 @@ async def test_find_eligible_candidates_applies_branch_and_cgpa_filters():
     rows = [{"user_id": "u1", "name": "Asha", "cgpa": 8.5}]
     drive = dict(DRIVE_ROW, allowed_branches=["CSE", "ECE"], min_cgpa=7.5)
     conn = FakeConn([rows])
-    with patch("app.routers.recruiter_drives.get_connection", new=lambda: conn):
+    with patch("app.repositories.drives_repo.get_connection", new=lambda: conn):
         eligible = await find_eligible_candidates(drive)
     assert eligible == rows
 
@@ -97,7 +95,7 @@ async def test_find_eligible_candidates_applies_branch_and_cgpa_filters():
     assert params == [("col-1",), 7.5, ("CSE", "ECE")]
 
     # No colleges resolves to no candidates without touching the database.
-    with patch("app.routers.recruiter_drives.get_connection", side_effect=AssertionError("must not query")):
+    with patch("app.repositories.drives_repo.get_connection", side_effect=AssertionError("must not query")):
         assert await find_eligible_candidates({"allowed_branches": []}) == []
 
 
@@ -155,7 +153,7 @@ async def test_create_drive_registers_eligible_candidates():
     stage = AsyncMock()
     email = MagicMock()
     with patch("app.routers.recruiter_drives.db", sequence_db(*chains)), \
-         patch("app.routers.recruiter_drives.get_connection",
+         patch("app.repositories.drives_repo.get_connection",
                new=lambda: fake_connection([eligible])), \
          patch("app.routers.recruiter_drives.record_pipeline_stage", stage), \
          patch("app.routers.recruiter_drives.send_drive_registered_email", email):
@@ -229,7 +227,7 @@ async def test_get_eligible_count_breaks_down_branches():
         {"branch": "ECE", "cgpa": 9.0},
     ]
     with patch("app.routers.recruiter_drives.db", sequence_db(query(data=DRIVE_ROW))), \
-         patch("app.routers.recruiter_drives.get_connection",
+         patch("app.repositories.drives_repo.get_connection",
                new=lambda: fake_connection([candidates])):
         result = await get_eligible_count("d1", user=RECRUITER)
 
@@ -258,7 +256,7 @@ async def test_assign_exam_scopes_access_and_upserts_assignments():
         query(data=[{"id": "ea-1"}]),                     # exam_assignments upsert
     ]
     with patch("app.routers.recruiter_drives.db", sequence_db(*chains)), \
-         patch("app.routers.recruiter_drives.get_connection",
+         patch("app.repositories.drives_repo.get_connection",
                new=lambda: fake_connection([eligible])):
         result = await assign_exam_to_drive("d1", AssignExamRequest(exam_id="e2"), user=RECRUITER)
     assert result["message"] == "Exam assigned successfully"

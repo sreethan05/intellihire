@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { resultApi } from "@/lib/api";
+import type { Attempt, Answer, CodingQuestion, CodingSubmission, Question } from "@/types";
 import { X, CheckCircle2, XCircle, Code2, HelpCircle, FileText, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -8,8 +9,22 @@ interface AttemptDetailModalProps {
   onClose: () => void;
 }
 
+interface AttemptAnswerItem extends Answer {
+  questions?: Question;
+}
+
+interface AttemptCodingSubmissionItem extends CodingSubmission {
+  coding_questions?: CodingQuestion;
+}
+
+interface AttemptDetailData {
+  attempt: Attempt;
+  answers?: AttemptAnswerItem[];
+  codingSubmissions?: AttemptCodingSubmissionItem[];
+}
+
 export default function AttemptDetailModal({ attemptId, onClose }: AttemptDetailModalProps) {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<AttemptDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -96,9 +111,9 @@ export default function AttemptDetailModal({ attemptId, onClose }: AttemptDetail
                     Multiple Choice Questions ({data.answers.length})
                   </h3>
                   <div className="space-y-3.5">
-                    {data.answers.map((ans: any, idx: number) => {
+                    {data.answers.map((ans, idx: number) => {
                       const isCorrect = ans.is_correct;
-                      const q = ans.questions || {};
+                      const q: Partial<Question> = ans.questions || {};
                       
                       return (
                         <div key={ans.id || idx} className={`rounded-xl border p-4 text-left ${isCorrect ? "border-emerald-100 bg-emerald-50/10" : "border-rose-100 bg-rose-50/10"}`}>
@@ -160,8 +175,8 @@ export default function AttemptDetailModal({ attemptId, onClose }: AttemptDetail
                     Coding Submissions ({data.codingSubmissions.length})
                   </h3>
                   <div className="space-y-5">
-                    {data.codingSubmissions.map((sub: any, idx: number) => {
-                      const q = sub.coding_questions || {};
+                    {data.codingSubmissions.map((sub, idx: number) => {
+                      const q: Partial<CodingQuestion> = sub.coding_questions || {};
                       
                       return (
                         <div key={sub.id || idx} className="rounded-xl border border-slate-200 p-5 space-y-4 text-left">

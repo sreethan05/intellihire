@@ -31,15 +31,19 @@ test.describe("Accessibility and performance", () => {
     expect(Date.now() - startedAt).toBeLessThan(MAX_LOGIN_MS);
 
     if (page.url().includes("onboarding")) test.skip(true, "Seed candidate requires onboarding");
+    const dashboardStartedAt = Date.now();
     await expect(page.getByRole("heading", { name: /Command Hub/i })).toBeVisible({ timeout: MAX_DASHBOARD_MS });
+    expect(Date.now() - dashboardStartedAt).toBeLessThan(MAX_DASHBOARD_MS);
   });
 
   test("candidate exam entry is keyboard-accessible and responsive", async ({ page }) => {
     await loginAsCandidate(page);
     if (page.url().includes("onboarding")) test.skip(true, "Seed candidate requires onboarding");
 
+    const examPageStartedAt = Date.now();
     await page.getByRole("link", { name: "Manage" }).click();
     await expect(page).toHaveURL(/candidate\/my-exams/, { timeout: MAX_EXAM_PAGE_MS });
     await expect(page.locator("main")).toBeVisible();
+    expect(Date.now() - examPageStartedAt).toBeLessThan(MAX_EXAM_PAGE_MS);
   });
 });

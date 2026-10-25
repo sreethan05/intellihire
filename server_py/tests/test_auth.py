@@ -142,10 +142,9 @@ async def test_require_roles_single_string_normalized():
         await role_dependency(candidate)
     assert exc_info.value.status_code == 403
 
-def test_password_truncation_safety():
+def test_password_length_is_rejected_instead_of_truncated():
     from app.utils import hash_password, check_password
     long_pw = "SuperSecretPassword123!" * 10  # > 72 bytes
-    hashed = hash_password(long_pw)
-    assert isinstance(hashed, str)
-    assert check_password(long_pw, hashed) is True
-    assert check_password("wrong_password", hashed) is False
+    with pytest.raises(ValueError):
+        hash_password(long_pw)
+    assert check_password(long_pw, "$2b$12$C6UzMDM.H6dfI/f/IKcEe.5o2M5R4xX5z8Q5P9D0g1j1y7h6G5Q2K") is False

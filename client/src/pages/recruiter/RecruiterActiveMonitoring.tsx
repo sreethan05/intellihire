@@ -19,11 +19,22 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import type { Exam } from "@/types";
 
+interface ActiveAttempt {
+  attemptId: string;
+  candidateId?: string | null;
+  candidateName: string;
+  candidateEmail: string;
+  startedAt: string;
+  warningCount: number;
+  isLocked: boolean;
+  lastEvent?: string | null;
+}
+
 export default function RecruiterActiveMonitoring() {
   const { selectedCollegeId } = useCollege();
   const [exams, setExams] = useState<Exam[]>([]);
   const [selectedExam, setSelectedExam] = useState("");
-  const [attempts, setAttempts] = useState<any[]>([]);
+  const [attempts, setAttempts] = useState<ActiveAttempt[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);

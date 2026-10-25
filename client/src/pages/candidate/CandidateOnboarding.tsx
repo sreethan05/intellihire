@@ -6,19 +6,31 @@ import {
   FileText, Trash2, Loader2 
 } from "lucide-react";
 import { toast } from "sonner";
-import { candidateApi } from "@/lib/api";
+import { assetFileUrl, candidateApi } from "@/lib/api";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useAuth } from "@/context/AuthContext";
+import type { CandidateProfile } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
+interface ResumeAtsAnalysis {
+  atsScore?: number;
+  tier?: string;
+  summary?: string;
+  suggestedRoles?: string[];
+  gaps?: string[];
+  breakdown?: Record<string, { score: number; feedback: string }>;
+}
+
+type OnboardingProfile = CandidateProfile & { resume_ats_analysis?: ResumeAtsAnalysis | null };
+
 export default function CandidateOnboarding() {
   const navigate = useNavigate();
   const { user, login } = useAuth();
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<OnboardingProfile | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploadingResume, setUploadingResume] = useState(false);
   
@@ -149,7 +161,7 @@ export default function CandidateOnboarding() {
     return filename.replace(/_[0-9]+(?=\.[^.]+$)/, "");
   };
 
-  const atsAnalysis = profile?.resume_ats_analysis || {};
+  const atsAnalysis: ResumeAtsAnalysis = profile?.resume_ats_analysis || {};
   const atsScore = atsAnalysis.atsScore || 0;
 
   return (
@@ -215,7 +227,7 @@ export default function CandidateOnboarding() {
                       <div>
                         <div className="font-extrabold text-slate-800 text-xs truncate max-w-xs">{getResumeFileName(form.resume_url)}</div>
                         <a 
-                          href={form.resume_url ? (import.meta.env.VITE_API_URL || "").replace(/\/api$/, "") + form.resume_url : ""} 
+                          href={form.resume_url ? assetFileUrl(form.resume_url) : ""} 
                           target="_blank" 
                           rel="noreferrer" 
                           className="text-[10px] text-violet-600 font-bold hover:underline mt-0.5 inline-block"
@@ -289,7 +301,7 @@ export default function CandidateOnboarding() {
                     <div className="border-t border-slate-100 pt-4 mt-4 space-y-3">
                       <div className="text-[10px] font-black uppercase text-slate-400 select-none tracking-wider">ATS Score Breakdown Parameters</div>
                       <div className="grid gap-3 sm:grid-cols-2">
-                        {Object.entries(atsAnalysis.breakdown).map(([key, data]: [string, any]) => {
+                        {Object.entries(atsAnalysis.breakdown).map(([key, data]) => {
                           const labelMap: Record<string, string> = {
                             contactInfo: "Contact Detail Completeness",
                             sectionStructure: "Heading Sections Structure",

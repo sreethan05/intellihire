@@ -7,6 +7,13 @@ import type { DashboardStats, ExamAssignment } from "@/types";
 
 const PIE_COLORS = ["#10b981", "#2563eb", "#f59e0b"];
 
+interface ProctoringTimelineEvent {
+  id?: string;
+  event_type?: string;
+  message?: string | null;
+  relativeTime?: string;
+}
+
 const panelStyle: CSSProperties = {
   background: "white",
   borderRadius: 16,
@@ -72,7 +79,7 @@ export default function CandidateMyExams() {
   }, []);
 
   const [activeAttemptIdForTimeline, setActiveAttemptIdForTimeline] = useState<string | null>(null);
-  const [timelineEvents, setTimelineEvents] = useState<any[]>([]);
+  const [timelineEvents, setTimelineEvents] = useState<ProctoringTimelineEvent[]>([]);
   const [timelineLoading, setTimelineLoading] = useState(false);
 
   useEffect(() => {

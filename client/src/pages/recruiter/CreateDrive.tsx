@@ -10,7 +10,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
-import { examApi, recruiterApi } from "@/lib/api";
+import { assetFileUrl, examApi, recruiterApi } from "@/lib/api";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useCollege } from "@/context/CollegeContext";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import type { College, Exam, JobDrive } from "@/types";
+import type { CandidateProfile, College, Exam, JobDrive } from "@/types";
+
+type EligibleCandidateUser = { name?: string | null; email?: string | null };
+
+type EligibleCandidate = CandidateProfile & {
+  user?: EligibleCandidateUser | null;
+};
+
+type DriveWithColleges = JobDrive & {
+  colleges?: Array<{ id: string; name: string; code: string }>;
+};
 
 export default function CreateDrive() {
   const { selectedCollegeId } = useCollege();
@@ -44,10 +54,10 @@ export default function CreateDrive() {
   });
 
   // Drives list and matching state
-  const [drives, setDrives] = useState<JobDrive[]>([]);
+  const [drives, setDrives] = useState<DriveWithColleges[]>([]);
   const [drivesLoading, setDrivesLoading] = useState(true);
   const [selectedDriveId, setSelectedDriveId] = useState<string | null>(null);
-  const [candidates, setCandidates] = useState<any[]>([]);
+  const [candidates, setCandidates] = useState<EligibleCandidate[]>([]);
   const [candidatesLoading, setCandidatesLoading] = useState(false);
 
   const fetchDrives = async () => {
@@ -132,7 +142,7 @@ export default function CreateDrive() {
     }
   };
 
-  const calculateATSScore = (candidateSkills: any, requiredSkills: string[]) => {
+  const calculateATSScore = (candidateSkills: string[] | null | undefined, requiredSkills: string[]) => {
     const skills = Array.isArray(candidateSkills) ? candidateSkills : [];
     if (requiredSkills.length === 0) return { score: 100, matched: [], missing: [] };
 
@@ -307,7 +317,7 @@ export default function CreateDrive() {
                           <div className="space-y-1">
                             <div className="font-extrabold text-slate-900 text-sm">{drive.title}</div>
                             <div className="text-xs font-semibold text-slate-500">
-                              {drive.company_name} · {(drive as any).colleges && (drive as any).colleges.length > 0 ? (drive as any).colleges.map((c: any) => c.name).join(", ") : (drive.college?.name || "Target College")}
+                              {drive.company_name} · {drive.colleges && drive.colleges.length > 0 ? drive.colleges.map((c) => c.name).join(", ") : (drive.college?.name || "Target College")}
                             </div>
                             <div className="flex flex-wrap gap-2 pt-1">
                               <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 uppercase">
@@ -351,7 +361,7 @@ export default function CreateDrive() {
                                 </div>
                                 <div className="max-h-[400px] space-y-3 overflow-y-auto pr-1">
                                   {candidates.map((candProfile) => {
-                                    const candidate = candProfile.user || {};
+                                    const candidate: EligibleCandidateUser = candProfile.user || {};
                                     const { score, matched, missing } = calculateATSScore(
                                       candProfile.skills,
                                       drive.required_skills
@@ -388,7 +398,7 @@ export default function CreateDrive() {
                                             </span>
                                             {candProfile.resume_url && (
                                               <a
-                                                href={candProfile.resume_url ? (import.meta.env.VITE_API_URL || "").replace(/\/api$/, "") + candProfile.resume_url : ""}
+                                                href={candProfile.resume_url ? assetFileUrl(candProfile.resume_url) : ""}
                                                 target="_blank"
                                                 rel="noreferrer"
                                                 className="flex items-center text-[10px] font-bold text-blue-600 hover:underline"

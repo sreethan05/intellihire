@@ -1,7 +1,7 @@
 /**
  * Helper to export an array of JSON objects to a downloadable CSV file.
  */
-export function exportToCsv(filename: string, rows: Record<string, any>[]) {
+export function exportToCsv(filename: string, rows: Record<string, unknown>[]) {
   if (!rows || !rows.length) {
     return;
   }
@@ -14,14 +14,13 @@ export function exportToCsv(filename: string, rows: Record<string, any>[]) {
     ...rows.map((row) =>
       keys
         .map((key) => {
-          let val = row[key];
-          if (val === null || val === undefined) {
-            val = "";
-          } else if (typeof val === "object") {
-            val = JSON.stringify(val);
-          } else {
-            val = String(val);
-          }
+          const raw = row[key];
+          const val =
+            raw === null || raw === undefined
+              ? ""
+              : typeof raw === "object"
+                ? JSON.stringify(raw)
+                : String(raw);
           return `"${val.replace(/"/g, '""')}"`;
         })
         .join(",")

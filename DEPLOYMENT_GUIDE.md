@@ -53,26 +53,23 @@ Render will now build the Docker image (compiling the React Vite SPA and setting
 
 ### Step 3: Automated Database Migrations & Verification
 
-When the container boots up, IntelliHire's built-in migration runner (`server_py/app/migration_runner.py`) automatically runs all 21 modular SQL schema files on your Neon database:
-* Core tables (users, colleges, questions, exams, attempts, proctoring)
-* Pre-seeded default test accounts
-* 780+ aptitude and technical MCQs
-* Bulk student import conflict tables
+Before the web service starts, run only the numbered production schema migrations against your Neon database. Development fixtures, test-user cleanup scripts, and question-bank seed data are intentionally excluded from automatic production startup. Apply seed data separately only in a non-production environment.
+
+Production must also provide:
+
+* `APP_URL` set to the final HTTPS application URL;
+* `CORS_ALLOWED_ORIGINS` containing only explicit HTTPS browser origins;
+* a unique random `JWT_SECRET` of at least 32 characters;
+* a private Judge0 endpoint if code execution is enabled;
+* configured SMTP credentials if notifications are enabled.
 
 Once Render shows **`Live`**, click your assigned URL (e.g., `https://intellihire-xxxx.onrender.com`).
 
 ---
 
-## 🔑 Default Login Credentials
+## 🔑 Initial administrator access
 
-Once deployed, you can immediately log into the live platform using any of the standard test accounts:
-
-| Role | Email | Password | Target Dashboard |
-| :--- | :--- | :--- | :--- |
-| **Super Admin** | `admin@intellihire.com` | `admin123` | `/admin/overview` |
-| **College TPO** | `tpo@intellihire.com` | `admin123` | `/tpo/overview` |
-| **Lead Recruiter** | `recruiter@intellihire.com` | `admin123` | `/recruiter/overview` |
-| **Candidate** | `candidate@intellihire.com` | `admin123` | `/candidate/overview` |
+Do not deploy or document shared default credentials. Create the first administrator through a one-time, controlled provisioning process, require an immediate password change, and enable MFA before granting production access. The development-only seed fixtures must never be applied to a production database.
 
 ---
 

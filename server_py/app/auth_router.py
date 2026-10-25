@@ -175,8 +175,8 @@ async def login(req: LoginRequest, response: Response, request: Request):
         if isinstance(pwd_hash, str):
             pwd_hash = pwd_hash.encode("utf-8")
         # Bcrypt has a hard limit of 72 bytes
-        pwd_bytes = req.password.encode("utf-8")[:72]
-        valid = bcrypt.checkpw(pwd_bytes, pwd_hash)
+        pwd_bytes = req.password.encode("utf-8")
+        valid = len(pwd_bytes) <= 72 and bcrypt.checkpw(pwd_bytes, pwd_hash)
     except Exception as e:
         from .logger import logger
         logger.error(f"Login bcrypt check error for '{lookup}': {e}")

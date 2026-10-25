@@ -1,4 +1,5 @@
 import datetime
+import logging
 import re
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -17,6 +18,8 @@ from ..insights import (
     feed_communication_score,
     generate_insights
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/candidate", tags=["candidate_dashboard"])
 
@@ -501,7 +504,10 @@ async def compute_candidate_stats(user_id: str) -> dict:
                     dt = datetime.fromisoformat(str(dt_str).replace("Z", "+00:00"))
                     dates.add(dt.date())
                 except Exception:
-                    pass
+                    logger.warning(
+                        "candidate_dashboard.streak_date_parse_failed user_id=%s value=%r",
+                        user_id, dt_str, exc_info=True,
+                    )
         sorted_dates = sorted(dates, reverse=True)
         current_streak = 1
         for i in range(1, len(sorted_dates)):

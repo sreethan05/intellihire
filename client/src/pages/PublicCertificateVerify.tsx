@@ -3,10 +3,21 @@ import { useParams, Link } from "react-router";
 import { Award, CheckCircle2, ShieldCheck, ArrowLeft, ExternalLink } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
+interface CertificateData {
+  id: string;
+  candidateName: string;
+  examTitle: string;
+  issuedDate: string;
+  issuer: string;
+  score: string;
+  verificationHash: string;
+  status: string;
+}
+
 export default function PublicCertificateVerify() {
   const { id } = useParams<{ id: string }>();
   const [loading, setLoading] = useState(true);
-  const [certData, setCertData] = useState<any>(null);
+  const [certData, setCertData] = useState<CertificateData | null>(null);
 
   useEffect(() => {
     // Simulated or fetched public certificate verification payload
@@ -42,7 +53,7 @@ export default function PublicCertificateVerify() {
             <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
             <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-slate-400">Verifying Credential Hash...</p>
           </div>
-        ) : (
+        ) : certData ? (
           <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40 p-8 shadow-2xl backdrop-blur-xl animate-in fade-in duration-300">
             {/* Verification Header */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-6">
@@ -104,7 +115,7 @@ export default function PublicCertificateVerify() {
               </a>
             </div>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

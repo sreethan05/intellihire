@@ -1,6 +1,7 @@
 import datetime
 import csv
 import io
+import logging
 from typing import Dict, Any, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -9,6 +10,8 @@ from .db import db
 from .date_utils import parse_datetime
 from .utils import send_email_async, redis_client
 from .websocket import sio
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/exam", tags=["exam"])
 
@@ -94,7 +97,8 @@ def invalidate_pattern(pattern: str):
             if keys:
                 redis_client.delete(*keys)
         except Exception:
-            pass
+            # Failed invalidation would serve stale cached data downstream.
+            logger.warning("exam.cache_invalidate_failed pattern=%s", pattern, exc_info=True)
 
 @router.post("/create")
 async def create_exam(req: CreateExamRequest, user: Dict[str, Any] = Depends(require_roles(["recruiter", "admin"]))):
@@ -353,7 +357,10 @@ async def start_exam(req: StartExamRequest, user: Dict[str, Any] = Depends(get_c
                 except HTTPException:
                     raise
                 except Exception:
-                    pass
+                    logger.warning(
+                        "exam.attempt_elapsed_parse_failed exam_id=%s attempt_id=%s value=%r",
+                        req.exam_id, att.get("id"), started_at_str, exc_info=True,
+                    )
             return {"attempt": {**att, "remaining_seconds": duration_min * 60}}
         
     user_res = await db.from_("users").select("name").eq("id", uid).single()
@@ -367,7 +374,10 @@ async def start_exam(req: StartExamRequest, user: Dict[str, Any] = Depends(get_c
             until_rem = max(0, int((until_dt - now).total_seconds()))
             remaining_seconds = min(remaining_seconds, until_rem)
         except Exception:
-            pass
+            logger.warning(
+                "exam.available_until_parse_failed exam_id=%s value=%r",
+                req.exam_id, exam.get("available_until"), exc_info=True,
+            )
 
     ins_res = await db.from_("attempts").insert({
         "exam_id": req.exam_id,
@@ -390,7 +400,10 @@ async def start_exam(req: StartExamRequest, user: Dict[str, Any] = Depends(get_c
             "startedAt": ins_res.data["started_at"]
         }, room="admin")
     except Exception:
-        pass
+        logger.warning(
+            "exam.start_event_emit_failed attempt_id=%s",
+            ins_res.data.get("id") if ins_res.data else None, exc_info=True,
+        )
         
     return {"attempt": {**ins_res.data, "remaining_seconds": remaining_seconds}}
 

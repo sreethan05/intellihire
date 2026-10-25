@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import type { JobDrive } from "@/types";
 
 type FewShotExample = {
   question: string;
@@ -40,23 +41,49 @@ type AIConfig = {
   temperature: number;
 };
 
+type GeneratedMcq = {
+  question_text: string;
+  option_a: string;
+  option_b: string;
+  option_c: string;
+  option_d: string;
+  correct_option: string;
+  marks?: number;
+};
+
+type GeneratedCodingQuestion = {
+  title: string;
+  description: string;
+  difficulty: string;
+  starter_code: string;
+  marks: number;
+};
+
+type ResumeParseResult = {
+  skills?: string[];
+  matchedSkills?: string[];
+  skillMatchScore: number;
+  summary: string;
+  improvements?: string[];
+};
+
 export default function RecruiterAIStudio() {
   const [activeTab, setActiveTab] = useState<"generator" | "resume" | "train">("generator");
 
   // --- Questions Generator State ---
   const [topic, setTopic] = useState("data structures");
   const [difficulty, setDifficulty] = useState("medium");
-  const [mcq, setMcq] = useState<any[]>([]);
-  const [coding, setCoding] = useState<any>(null);
+  const [mcq, setMcq] = useState<GeneratedMcq[]>([]);
+  const [coding, setCoding] = useState<GeneratedCodingQuestion | null>(null);
   const [savingMcq, setSavingMcq] = useState(false);
   const [savingCoding, setSavingCoding] = useState(false);
 
   // --- Resume Parser State ---
   const [resumeText, setResumeText] = useState("");
-  const [resumeResult, setResumeResult] = useState<any>(null);
+  const [resumeResult, setResumeResult] = useState<ResumeParseResult | null>(null);
 
   // --- Train AI Interviewer State ---
-  const [jobs, setJobs] = useState<any[]>([]);
+  const [jobs, setJobs] = useState<JobDrive[]>([]);
   const [selectedJobId, setSelectedJobId] = useState("");
   const [loadingJobs, setLoadingJobs] = useState(false);
   const [loadingConfig, setLoadingConfig] = useState(false);
@@ -211,7 +238,7 @@ export default function RecruiterAIStudio() {
     }));
   };
 
-  const handleExampleChange = (index: number, field: keyof FewShotExample, value: any) => {
+  const handleExampleChange = (index: number, field: keyof FewShotExample, value: string) => {
     setAiConfig((prev) => {
       const updated = [...prev.examples];
       updated[index] = {

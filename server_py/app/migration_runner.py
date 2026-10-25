@@ -4,6 +4,30 @@ from psycopg import connect
 from .config import DATABASE_URL
 from .logger import logger
 
+
+NON_MIGRATION_FILENAMES = {
+    "09_seed_data.sql",
+    "20_cleanup_test_users.sql",
+}
+
+
+def discover_migration_files(db_dir: str) -> list[str]:
+    """Return schema migrations while excluding development fixtures and reset scripts."""
+    sql_files = sorted(glob.glob(os.path.join(db_dir, "*.sql")))
+    skipped_files = [
+        os.path.basename(filepath)
+        for filepath in sql_files
+        if os.path.basename(filepath) in NON_MIGRATION_FILENAMES
+    ]
+    if skipped_files:
+        logger.info("Skipping non-migration SQL files: %s", ", ".join(skipped_files))
+    return [
+        filepath
+        for filepath in sql_files
+        if os.path.basename(filepath) not in NON_MIGRATION_FILENAMES
+    ]
+
+
 def run_migrations():
     """
     Scans the database/ directory for .sql files,
@@ -18,7 +42,7 @@ def run_migrations():
         logger.warning(f"Migrations directory not found at: {db_dir}")
         return
 
-    sql_files = sorted(glob.glob(os.path.join(db_dir, "*.sql")))
+    sql_files = discover_migration_files(db_dir)
     if not sql_files:
         logger.info("No migration SQL files found.")
         return
@@ -26,6 +50,7 @@ def run_migrations():
     try:
         with connect(DATABASE_URL) as conn:
             with conn.cursor() as cur:
+                cur.execute("SELECT pg_advisory_lock(hashtext('intellihire_schema_migrations'));" )
                 # Create migrations tracking table if not exists
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -63,6 +88,8 @@ def run_migrations():
                         logger.error(f"Failed to apply migration {filename}: {e}")
                         raise e
             conn.commit()
+            with conn.cursor() as cur:
+                cur.execute("SELECT pg_advisory_unlock(hashtext('intellihire_schema_migrations'));" )
         logger.info("All database migrations verified and up to date.")
     except Exception as e:
         logger.error(f"Migration runner encountered database connection failure: {e}")

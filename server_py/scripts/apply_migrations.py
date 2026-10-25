@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(base_dir)
 
-from app.config import DATABASE_URL
+from app.config import DATABASE_URL, NODE_ENV
 from app.logger import logger
 
 def compute_checksum(content: str) -> str:
@@ -26,6 +26,30 @@ def ensure_migrations_table(cur) -> None:
         );
     """)
 
+
+def get_migration_filenames(environment: str) -> list[str]:
+    files = [
+        "01_users_colleges.sql",
+        "02_questions.sql",
+        "03_exams.sql",
+        "04_jobs_pipeline.sql",
+        "05_attempts_submissions.sql",
+        "06_proctoring.sql",
+        "07_interviews_feedback.sql",
+        "08_platform_system.sql",
+        "10_indexes.sql",
+        "11_audit_logs.sql",
+        "12_soft_deletes.sql",
+        "13_refresh_tokens.sql",
+        "14_data_retention.sql",
+        "15_slug_index.sql",
+        "16_add_unique_exam_questions.sql",
+    ]
+    if environment in {"development", "test"}:
+        files.insert(8, "09_seed_data.sql")
+    return files
+
+
 def apply_migrations() -> None:
     if not DATABASE_URL:
         logger.error("Missing PostgreSQL configuration. Set DATABASE_URL in .env file.")
@@ -39,24 +63,9 @@ def apply_migrations() -> None:
         ensure_migrations_table(cur)
         conn.commit()
 
-        files_to_apply = [
-            "01_users_colleges.sql",
-            "02_questions.sql",
-            "03_exams.sql",
-            "04_jobs_pipeline.sql",
-            "05_attempts_submissions.sql",
-            "06_proctoring.sql",
-            "07_interviews_feedback.sql",
-            "08_platform_system.sql",
-            "09_seed_data.sql",
-            "10_indexes.sql",
-            "11_audit_logs.sql",
-            "12_soft_deletes.sql",
-            "13_refresh_tokens.sql",
-            "14_data_retention.sql",
-            "15_slug_index.sql",
-            "16_add_unique_exam_questions.sql",
-        ]
+        files_to_apply = get_migration_filenames(NODE_ENV)
+        if NODE_ENV not in {"development", "test"}:
+            logger.info("Skipping development seed data outside development and test environments.")
 
         database_dir = os.path.join(os.path.dirname(base_dir), "database")
 

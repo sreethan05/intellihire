@@ -1,4 +1,5 @@
 import datetime
+import logging
 import os
 import re
 import uuid
@@ -14,6 +15,8 @@ from ..upload_validation import read_validated_pdf
 from ..utils import storage_root, hash_password
 from ..validation import get_password_validation_error
 from ..date_utils import utc_now, now_iso
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/candidate", tags=["candidate_profile"])
 
@@ -132,7 +135,16 @@ def extract_timeline(text: str) -> dict:
             
     return {"ranges": ranges, "gaps": gaps}
 
-PASSIVE_RE = re.compile(r"\b(was|were|been|being|is|are)\s+\w+ed\b", re.IGNORECASE)
+# Common irregular past participles that do not end in "-ed" (e.g. "was built",
+# "was written") — without these the passive-voice detector undercounts.
+_IRREGULAR_PARTICIPLES = (
+    "written|built|made|done|given|taken|shown|held|sent|found|kept|left|met|paid|put|read|run|said|seen|"
+    "sold|told|won|chosen|driven|broken|brought|caught|cut|drawn|fed|felt|fought|lost|led|sought|taught|understood"
+)
+PASSIVE_RE = re.compile(
+    rf"\b(was|were|been|being|is|are)\s+(?:\w+ed|{_IRREGULAR_PARTICIPLES})\b",
+    re.IGNORECASE,
+)
 def detect_passive_voice(text: str) -> dict:
     matches = PASSIVE_RE.findall(text)
     return {"count": len(matches), "examples": matches[:5]}
@@ -460,7 +472,10 @@ async def delete_resume(user: Dict[str, Any] = Depends(get_current_user)):
         try:
             os.remove(filePath)
         except Exception:
-            pass
+            logger.warning(
+                "candidate_profile.resume_file_delete_failed user_id=%s path=%s",
+                user["id"], filePath, exc_info=True,
+            )
             
     up_res = await db.from_("candidate_profiles").update({
         "resume_url": None,

@@ -1,8 +1,9 @@
 import datetime
+import logging
 from typing import Dict, Any, List
 from fastapi import APIRouter, Depends, HTTPException, Request
 from .auth_router import get_current_user
-from .db import db
+from .db import db, QueryError, QueryResponse
 from .date_utils import parse_datetime
 from .insights import (
     create_topic_scores,
@@ -12,7 +13,37 @@ from .insights import (
     generate_insights
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/hub", tags=["hub"])
+
+
+async def _fetch_source(section: str, degraded: List[str], user_id: str, build_query):
+    """Run one hub sub-source query, surfacing failures instead of swallowing them.
+
+    A failing source must not silently degrade the dashboard to empty data.
+    The failure is logged with a stable event name plus identifying keys, and
+    the section name is recorded in the response-level ``degraded`` list so
+    clients can tell partial data from a genuine empty state.
+    """
+    try:
+        result = await build_query()
+    except Exception as exc:
+        degraded.append(section)
+        logger.warning(
+            "hub_overview.source_failed section=%s user_id=%s error=%s",
+            section, user_id, exc, exc_info=True,
+        )
+        return QueryResponse(error=QueryError(str(exc)))
+    error = getattr(result, "error", None)
+    if error is not None:
+        degraded.append(section)
+        logger.warning(
+            "hub_overview.source_failed section=%s user_id=%s error=%s",
+            section, user_id, getattr(error, "message", None) or str(error),
+        )
+    return result
+
 
 @router.get("/overview")
 async def get_overview(user: Dict[str, Any] = Depends(get_current_user)):
@@ -35,12 +66,20 @@ async def get_overview(user: Dict[str, Any] = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail="Invalid user role")
 
 async def get_candidate_hub_data(user_id: str) -> Dict[str, Any]:
+    degraded: List[str] = []
+
     # 1. Fetch Candidate Profile
-    profile_res = await db.from_("candidate_profiles").select("*, college:college_id(name, code)").eq("user_id", user_id).maybeSingle()
+    profile_res = await _fetch_source(
+        "profile", degraded, user_id,
+        lambda: db.from_("candidate_profiles").select("*, college:college_id(name, code)").eq("user_id", user_id).maybeSingle(),
+    )
     profile = profile_res.data
-    
+
     # 2. Fetch stats
-    attempts_res = await db.from_("attempts").select("score, status").eq("candidate_id", user_id).eq("status", "completed")
+    attempts_res = await _fetch_source(
+        "attempts", degraded, user_id,
+        lambda: db.from_("attempts").select("score, status").eq("candidate_id", user_id).eq("status", "completed"),
+    )
     attempts = attempts_res.data or []
     
     completed_exams_count = len(attempts)
@@ -49,7 +88,10 @@ async def get_candidate_hub_data(user_id: str) -> Dict[str, Any]:
     rank = 0
     total_ranked = 0
     if profile and profile.get("college_id"):
-        peers_res = await db.from_("candidate_profiles").select("cgpa").eq("college_id", profile["college_id"])
+        peers_res = await _fetch_source(
+            "peer_ranking", degraded, user_id,
+            lambda: db.from_("candidate_profiles").select("cgpa").eq("college_id", profile["college_id"]),
+        )
         peers = peers_res.data or []
         if peers:
             total_ranked = len(peers)
@@ -58,6 +100,7 @@ async def get_candidate_hub_data(user_id: str) -> Dict[str, Any]:
                 rank = sum(1 for p in peers if float(p.get("cgpa") or 0.0) > profile_cgpa) + 1
             except Exception:
                 rank = 1
+                logger.warning("hub_overview.rank_parse_failed user_id=%s", user_id, exc_info=True)
                 
     # 3. Action Items
     action_items = []
@@ -87,7 +130,10 @@ async def get_candidate_hub_data(user_id: str) -> Dict[str, Any]:
                 "action_url": "/candidate/profile"
             })
             
-    assign_res = await db.from_("exam_assignments").select("*, exam:exam_id(title, available_until)").eq("candidate_id", user_id)
+    assign_res = await _fetch_source(
+        "assignments", degraded, user_id,
+        lambda: db.from_("exam_assignments").select("*, exam:exam_id(title, available_until)").eq("candidate_id", user_id),
+    )
     assignments = assign_res.data or []
     
     completed_exam_ids = {a["exam_id"] for a in attempts if "exam_id" in a}
@@ -104,7 +150,10 @@ async def get_candidate_hub_data(user_id: str) -> Dict[str, Any]:
                     diff = until_dt - now
                     hours_left = max(0, int(diff.total_seconds() / 3600))
                 except Exception:
-                    pass
+                    logger.warning(
+                        "hub_overview.deadline_parse_failed candidate_id=%s exam_id=%s",
+                        user_id, exam_id, exc_info=True,
+                    )
             action_items.append({
                 "id": f"exam_{exam_id}",
                 "priority": "urgent" if hours_left <= 6 else "normal",
@@ -113,7 +162,10 @@ async def get_candidate_hub_data(user_id: str) -> Dict[str, Any]:
                 "action_url": "/candidate/exams"
             })
             
-    ivs_res = await db.from_("ai_interviews").select("*, job:job_id(title, company_name)").eq("candidate_id", user_id).eq("status", "scheduled")
+    ivs_res = await _fetch_source(
+        "scheduled_interviews", degraded, user_id,
+        lambda: db.from_("ai_interviews").select("*, job:job_id(title, company_name)").eq("candidate_id", user_id).eq("status", "scheduled"),
+    )
     ivs = ivs_res.data or []
     for iv in ivs:
         job = iv.get("job") or {}
@@ -126,7 +178,10 @@ async def get_candidate_hub_data(user_id: str) -> Dict[str, Any]:
         })
         
     # 4. Activity feed
-    feed_res = await db.from_("activity_feed").select("*").eq("target_user_id", user_id).order("created_at", ascending=False).limit(5)
+    feed_res = await _fetch_source(
+        "activity_feed", degraded, user_id,
+        lambda: db.from_("activity_feed").select("*").eq("target_user_id", user_id).order("created_at", ascending=False).limit(5),
+    )
     feed = feed_res.data or []
     recent_activity = [{"title": f["title"], "description": f["description"], "date": f["created_at"]} for f in feed]
     if not recent_activity:
@@ -151,7 +206,10 @@ async def get_candidate_hub_data(user_id: str) -> Dict[str, Any]:
                         "type": "exam"
                     })
             except Exception:
-                pass
+                logger.warning(
+                    "hub_overview.schedule_parse_failed type=exam candidate_id=%s exam_id=%s",
+                    user_id, assign.get("exam_id"), exc_info=True,
+                )
     for iv in ivs:
         start_str = iv.get("scheduled_start") or iv.get("scheduled_start_at")
         job = iv.get("job") or {}
@@ -165,18 +223,27 @@ async def get_candidate_hub_data(user_id: str) -> Dict[str, Any]:
                         "type": "interview"
                     })
             except Exception:
-                pass
+                logger.warning(
+                    "hub_overview.schedule_parse_failed type=interview candidate_id=%s interview_id=%s",
+                    user_id, iv.get("id"), exc_info=True,
+                )
                 
     # 6. Insights radar data compile
     attempt_ids = [att["id"] for att in attempts if att.get("id")]
     mcq_answers = []
     if attempt_ids:
-        ans_res = await db.from_("answers").select("*, question:question_id(topic)").in_("attempt_id", attempt_ids)
+        ans_res = await _fetch_source(
+            "answers", degraded, user_id,
+            lambda: db.from_("answers").select("*, question:question_id(topic)").in_("attempt_id", attempt_ids),
+        )
         mcq_answers = ans_res.data or []
-        
+
     topic_scores = create_topic_scores()
-    
-    completed_ivs_res = await db.from_("ai_interviews").select("communication_score").eq("candidate_id", user_id).eq("status", "completed")
+
+    completed_ivs_res = await _fetch_source(
+        "completed_interviews", degraded, user_id,
+        lambda: db.from_("ai_interviews").select("communication_score").eq("candidate_id", user_id).eq("status", "completed"),
+    )
     completed_ivs = completed_ivs_res.data or []
     for iv in completed_ivs:
         feed_communication_score(topic_scores, float(iv.get("communication_score") or 0.0))
@@ -186,7 +253,10 @@ async def get_candidate_hub_data(user_id: str) -> Dict[str, Any]:
         feed_mcq_answer(topic_scores, bool(ans.get("is_correct")), q.get("topic"))
         
     if attempt_ids:
-        subs_res = await db.from_("coding_submissions").select("score, coding_questions(marks)").in_("attempt_id", attempt_ids).eq("status", "tested")
+        subs_res = await _fetch_source(
+            "coding_submissions", degraded, user_id,
+            lambda: db.from_("coding_submissions").select("score, coding_questions(marks)").in_("attempt_id", attempt_ids).eq("status", "tested"),
+        )
         subs = subs_res.data or []
         for sub in subs:
             q = sub.get("coding_questions") or {}
@@ -195,13 +265,19 @@ async def get_candidate_hub_data(user_id: str) -> Dict[str, Any]:
             
     insights_data = generate_insights(topic_scores, "Profile")
     
-    my_completed_attempts_res = await db.from_("attempts").select("*, exam:exam_id(title)").eq("candidate_id", user_id).eq("status", "completed").order("submitted_at", ascending=True)
+    my_completed_attempts_res = await _fetch_source(
+        "trend_attempts", degraded, user_id,
+        lambda: db.from_("attempts").select("*, exam:exam_id(title)").eq("candidate_id", user_id).eq("status", "completed").order("submitted_at", ascending=True),
+    )
     my_completed_attempts = my_completed_attempts_res.data or []
     trend_data = [{"name": (att.get("exam") or {}).get("title") or f"Exam {idx+1}", "score": att.get("score") or 0} for idx, att in enumerate(my_completed_attempts)]
-    
+
     peer_percentile = 0
     if profile and profile.get("college_id"):
-        peers_res = await db.from_("candidate_profiles").select("cgpa").eq("college_id", profile["college_id"])
+        peers_res = await _fetch_source(
+            "peer_percentile", degraded, user_id,
+            lambda: db.from_("candidate_profiles").select("cgpa").eq("college_id", profile["college_id"]),
+        )
         peers = peers_res.data or []
         if peers:
             try:
@@ -209,9 +285,12 @@ async def get_candidate_hub_data(user_id: str) -> Dict[str, Any]:
                 lower_count = sum(1 for p in peers if float(p.get("cgpa") or 0.0) <= profile_cgpa)
                 peer_percentile = round((lower_count / len(peers)) * 100)
             except Exception:
-                pass
-                
-    trackers_res = await db.from_("candidate_status").select("*, job:job_id(*)").eq("candidate_id", user_id)
+                logger.warning("hub_overview.percentile_parse_failed user_id=%s", user_id, exc_info=True)
+
+    trackers_res = await _fetch_source(
+        "trackers", degraded, user_id,
+        lambda: db.from_("candidate_status").select("*, job:job_id(*)").eq("candidate_id", user_id),
+    )
     trackers_data = trackers_res.data or []
     trackers = []
     for app in trackers_data:
@@ -249,24 +328,39 @@ async def get_candidate_hub_data(user_id: str) -> Dict[str, Any]:
             "strengths": insights_data["strengths"],
             "weaknesses": insights_data["weaknesses"]
         },
-        "quickLinks": quick_links
+        "quickLinks": quick_links,
+        "degraded": degraded
     }
 
 async def get_tpo_hub_data(tpo_user_id: str) -> Dict[str, Any]:
-    tpo_res = await db.from_("users").select("college_id").eq("id", tpo_user_id).single()
+    degraded: List[str] = []
+
+    tpo_res = await _fetch_source(
+        "tpo_profile", degraded, tpo_user_id,
+        lambda: db.from_("users").select("college_id").eq("id", tpo_user_id).single(),
+    )
     college_id = tpo_res.data.get("college_id") if tpo_res.data else None
-    
+
     # Run exact counts in Python using direct queries (select with limit 0 or head check is not strictly required, standard select counts is clean)
-    students_res = await db.from_("users").select("id").eq("college_id", college_id).eq("role", "candidate")
+    students_res = await _fetch_source(
+        "students", degraded, tpo_user_id,
+        lambda: db.from_("users").select("id").eq("college_id", college_id).eq("role", "candidate"),
+    )
     total_students = len(students_res.data) if students_res.data else 0
-    
-    profiles_res = await db.from_("candidate_profiles").select("user_id, cgpa, roll_number, profile_complete, documents_verified").eq("college_id", college_id)
+
+    profiles_res = await _fetch_source(
+        "profiles", degraded, tpo_user_id,
+        lambda: db.from_("candidate_profiles").select("user_id, cgpa, roll_number, profile_complete, documents_verified").eq("college_id", college_id),
+    )
     profiles = profiles_res.data or []
     
     complete_profiles = sum(1 for p in profiles if p.get("profile_complete"))
     pending_verification = sum(1 for p in profiles if not p.get("documents_verified"))
     
-    jobs_res = await db.from_("jobs").select("id, title, status, drive_date, company_name").eq("college_id", college_id)
+    jobs_res = await _fetch_source(
+        "jobs", degraded, tpo_user_id,
+        lambda: db.from_("jobs").select("id, title, status, drive_date, company_name").eq("college_id", college_id),
+    )
     jobs = jobs_res.data or []
     active_drives_count = sum(1 for j in jobs if j.get("status") == "active")
     
@@ -274,7 +368,10 @@ async def get_tpo_hub_data(tpo_user_id: str) -> Dict[str, Any]:
     
     placed_count = 0
     if student_user_ids:
-        placed_res = await db.from_("candidate_status").select("id").in_("candidate_id", student_user_ids).in_("status", ["offered", "placed"])
+        placed_res = await _fetch_source(
+            "placements", degraded, tpo_user_id,
+            lambda: db.from_("candidate_status").select("id").in_("candidate_id", student_user_ids).in_("status", ["offered", "placed"]),
+        )
         placed_count = len(placed_res.data) if placed_res.data else 0
         
     placement_rate = round((placed_count / total_students) * 100) if total_students else 0
@@ -307,9 +404,15 @@ async def get_tpo_hub_data(tpo_user_id: str) -> Dict[str, Any]:
                         "action_url": "/tpo/students"
                     })
             except Exception:
-                pass
-                
-    feed_res = await db.from_("activity_feed").select("*, actor:actor_id(name)").eq("actor_role", "candidate").order("created_at", ascending=False).limit(5)
+                logger.warning(
+                    "hub_overview.drive_deadline_parse_failed tpo_id=%s job_id=%s",
+                    tpo_user_id, job.get("id"), exc_info=True,
+                )
+
+    feed_res = await _fetch_source(
+        "activity_feed", degraded, tpo_user_id,
+        lambda: db.from_("activity_feed").select("*, actor:actor_id(name)").eq("actor_role", "candidate").order("created_at", ascending=False).limit(5),
+    )
     feed = feed_res.data or []
     recent_activity = []
     for f in feed:
@@ -339,13 +442,19 @@ async def get_tpo_hub_data(tpo_user_id: str) -> Dict[str, Any]:
                         "type": "drive"
                     })
             except Exception:
-                pass
-                
+                logger.warning(
+                    "hub_overview.schedule_parse_failed type=drive tpo_id=%s job_id=%s",
+                    tpo_user_id, j.get("id"), exc_info=True,
+                )
+
     eligible_count = sum(1 for p in profiles if float(p.get("cgpa") or 0.0) >= 7.0)
-    
+
     exam_attempts = []
     if student_user_ids:
-        attempts_res = await db.from_("attempts").select("candidate_id, score, candidate:candidate_id(name)").in_("candidate_id", student_user_ids).eq("status", "completed")
+        attempts_res = await _fetch_source(
+            "exam_attempts", degraded, tpo_user_id,
+            lambda: db.from_("attempts").select("candidate_id, score, candidate:candidate_id(name)").in_("candidate_id", student_user_ids).eq("status", "completed"),
+        )
         exam_attempts = attempts_res.data or []
         
     score_map = {}
@@ -376,7 +485,10 @@ async def get_tpo_hub_data(tpo_user_id: str) -> Dict[str, Any]:
                     "reason": f"Low CGPA: {cgpa_val}"
                 })
         except Exception:
-            pass
+            logger.warning(
+                "hub_overview.at_risk_parse_failed tpo_id=%s user_id=%s",
+                tpo_user_id, p.get("user_id"), exc_info=True,
+            )
     at_risk_students = at_risk_students[:5]
     
     quick_links = [
@@ -408,27 +520,45 @@ async def get_tpo_hub_data(tpo_user_id: str) -> Dict[str, Any]:
             "topPerformers": top_performers,
             "atRiskStudents": at_risk_students
         },
-        "quickLinks": quick_links
+        "quickLinks": quick_links,
+        "degraded": degraded
     }
 
 async def get_recruiter_hub_data(recruiter_id: str) -> Dict[str, Any]:
-    drives_res = await db.from_("jobs").select("id, title, status").eq("created_by", recruiter_id)
+    degraded: List[str] = []
+
+    drives_res = await _fetch_source(
+        "drives", degraded, recruiter_id,
+        lambda: db.from_("jobs").select("id, title, status").eq("created_by", recruiter_id),
+    )
     drives = drives_res.data or []
     active_drives_count = sum(1 for d in drives if d.get("status") == "active")
-    
-    candidates_res = await db.from_("users").select("id").eq("role", "candidate")
+
+    candidates_res = await _fetch_source(
+        "candidates", degraded, recruiter_id,
+        lambda: db.from_("users").select("id").eq("role", "candidate"),
+    )
     total_candidates = len(candidates_res.data) if candidates_res.data else 0
-    
-    attempts_res = await db.from_("attempts").select("id, status").eq("recruiter_id", recruiter_id)
+
+    attempts_res = await _fetch_source(
+        "attempts", degraded, recruiter_id,
+        lambda: db.from_("attempts").select("id, status").eq("recruiter_id", recruiter_id),
+    )
     attempts = attempts_res.data or []
     completed_attempts = sum(1 for a in attempts if a.get("status") == "completed")
-    
-    offers_res = await db.from_("candidate_status").select("id").eq("status", "offered")
+
+    offers_res = await _fetch_source(
+        "offers", degraded, recruiter_id,
+        lambda: db.from_("candidate_status").select("id").eq("status", "offered"),
+    )
     offers_count = len(offers_res.data) if offers_res.data else 0
     
     action_items = []
     # Proctoring anomalous review items
-    violations_res = await db.from_("proctoring_snapshots").select("*, candidate:candidate_id(name)").eq("event_type", "violation").in_("violation_severity", ["high", "critical"])
+    violations_res = await _fetch_source(
+        "proctoring_violations", degraded, recruiter_id,
+        lambda: db.from_("proctoring_snapshots").select("*, candidate:candidate_id(name)").eq("event_type", "violation").in_("violation_severity", ["high", "critical"]),
+    )
     violations = violations_res.data or []
     if violations:
         action_items.append({
@@ -439,7 +569,10 @@ async def get_recruiter_hub_data(recruiter_id: str) -> Dict[str, Any]:
             "action_url": "/recruiter/proctoring"
         })
         
-    passers_res = await db.from_("candidate_status").select("*, candidate:candidate_id(name)").eq("status", "passed")
+    passers_res = await _fetch_source(
+        "passers", degraded, recruiter_id,
+        lambda: db.from_("candidate_status").select("*, candidate:candidate_id(name)").eq("status", "passed"),
+    )
     passers = passers_res.data or []
     if passers:
         action_items.append({
@@ -450,7 +583,10 @@ async def get_recruiter_hub_data(recruiter_id: str) -> Dict[str, Any]:
             "action_url": "/recruiter/interview-scheduling"
         })
         
-    feed_res = await db.from_("activity_feed").select("*").eq("actor_role", "candidate").order("created_at", ascending=False).limit(5)
+    feed_res = await _fetch_source(
+        "activity_feed", degraded, recruiter_id,
+        lambda: db.from_("activity_feed").select("*").eq("actor_role", "candidate").order("created_at", ascending=False).limit(5),
+    )
     feed = feed_res.data or []
     recent_activity = [{"title": f["title"], "description": f["description"], "date": f["created_at"]} for f in feed]
     if not recent_activity:
@@ -459,9 +595,12 @@ async def get_recruiter_hub_data(recruiter_id: str) -> Dict[str, Any]:
             "description": "Recruiter campaign portal initialized. Proctoring feeds active.",
             "date": datetime.datetime.now(datetime.timezone.utc).isoformat()
         })
-        
+
     upcoming_schedule = []
-    scheduled_ivs_res = await db.from_("ai_interviews").select("*, candidate:candidate_id(name), job:job_id(title)").eq("scheduled_by", recruiter_id).eq("status", "scheduled").limit(5)
+    scheduled_ivs_res = await _fetch_source(
+        "scheduled_interviews", degraded, recruiter_id,
+        lambda: db.from_("ai_interviews").select("*, candidate:candidate_id(name), job:job_id(title)").eq("scheduled_by", recruiter_id).eq("status", "scheduled").limit(5),
+    )
     scheduled_ivs = scheduled_ivs_res.data or []
     for iv in scheduled_ivs:
         candidate = iv.get("candidate") or {}
@@ -472,7 +611,10 @@ async def get_recruiter_hub_data(recruiter_id: str) -> Dict[str, Any]:
             "type": "interview"
         })
         
-    spotlight_attempts_res = await db.from_("attempts").select("candidate_id, score, candidate:candidate_id(name)").eq("status", "completed")
+    spotlight_attempts_res = await _fetch_source(
+        "spotlight_attempts", degraded, recruiter_id,
+        lambda: db.from_("attempts").select("candidate_id, score, candidate:candidate_id(name)").eq("status", "completed"),
+    )
     spotlight_attempts = spotlight_attempts_res.data or []
     spotlight_map = {}
     for att in spotlight_attempts:
@@ -514,17 +656,29 @@ async def get_recruiter_hub_data(recruiter_id: str) -> Dict[str, Any]:
             "candidateSpotlight": candidate_spotlight,
             "skillGap": None
         },
-        "quickLinks": quick_links
+        "quickLinks": quick_links,
+        "degraded": degraded
     }
 
 async def get_admin_hub_data(admin_id: str) -> Dict[str, Any]:
-    users_res = await db.from_("users").select("id")
+    degraded: List[str] = []
+
+    users_res = await _fetch_source(
+        "users", degraded, admin_id,
+        lambda: db.from_("users").select("id"),
+    )
     total_users = len(users_res.data) if users_res.data else 0
-    
-    exams_res = await db.from_("exams").select("id")
+
+    exams_res = await _fetch_source(
+        "exams", degraded, admin_id,
+        lambda: db.from_("exams").select("id"),
+    )
     exams_count = len(exams_res.data) if exams_res.data else 0
-    
-    active_res = await db.from_("attempts").select("id").eq("status", "in_progress")
+
+    active_res = await _fetch_source(
+        "active_sessions", degraded, admin_id,
+        lambda: db.from_("attempts").select("id").eq("status", "in_progress"),
+    )
     active_sessions = len(active_res.data) if active_res.data else 0
     
     action_items = [
@@ -537,7 +691,10 @@ async def get_admin_hub_data(admin_id: str) -> Dict[str, Any]:
         }
     ]
     
-    feed_res = await db.from_("activity_feed").select("*").order("created_at", ascending=False).limit(5)
+    feed_res = await _fetch_source(
+        "activity_feed", degraded, admin_id,
+        lambda: db.from_("activity_feed").select("*").order("created_at", ascending=False).limit(5),
+    )
     feed = feed_res.data or []
     recent_activity = [{"title": f["title"], "description": f["description"], "date": f["created_at"]} for f in feed]
     if not recent_activity:
@@ -567,5 +724,6 @@ async def get_admin_hub_data(admin_id: str) -> Dict[str, Any]:
         "insights": {
             "growth": None
         },
-        "quickLinks": quick_links
+        "quickLinks": quick_links,
+        "degraded": degraded
     }

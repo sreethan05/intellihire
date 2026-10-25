@@ -22,7 +22,7 @@ jobs:
           cache-dependency-path: client/package-lock.json
 
       - name: Install Client Dependencies
-        run: npm --prefix client install
+        run: npm ci --prefix client
 
       - name: Run ESLint
         run: npm --prefix client run lint
@@ -30,8 +30,8 @@ jobs:
       - name: Run TypeScript Check
         run: npm --prefix client run check
 
-      - name: Run Client Vitest Unit Tests
-        run: npm --prefix client run test -- --run
+      - name: Run Client Vitest Unit Tests (with coverage thresholds)
+        run: npm --prefix client run test -- --run --coverage
 
   backend-pytest:
     name: FastAPI Backend Pytest
@@ -81,10 +81,15 @@ jobs:
           done
 
       - name: Run Pytest Suite with Coverage
-        run: python -m pytest server_py/tests --cov=server_py/app --cov-report=term-missing --cov-fail-under=30
+        run: python -m pytest server_py/tests --cov=server_py/app --cov-report=term-missing --cov-fail-under=70
 
       - name: Scan Python source with Bandit (fail on HIGH/CRITICAL)
         run: bandit -q -r server_py/app -s B101,B104,B105 -ll
+
+      - name: Audit installed Python packages with pip-audit
+        run: |
+          pip install pip-audit
+          pip-audit --skip-editable
 
   dependency-audit:
     name: Dependency Audit
@@ -101,7 +106,7 @@ jobs:
           cache-dependency-path: client/package-lock.json
 
       - name: Install client dependencies
-        run: npm --prefix client install
+        run: npm ci --prefix client
 
       - name: Audit client dependencies (fail on critical)
         run: npm --prefix client audit --audit-level=critical
@@ -164,13 +169,18 @@ jobs:
         run: npm install
 
       - name: Install Client Dependencies
-        run: npm --prefix client install
+        run: npm ci --prefix client
+
+      - name: Verify generated API types match the FastAPI schema (contract drift gate)
+        run: |
+          npm run gen:api-types
+          git diff --exit-code client/src/lib/api-types.gen.ts
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Run Playwright smoke suite
-        run: npx playwright test e2e/login.spec.ts e2e/hub-smoke.spec.ts e2e/api.spec.ts
+      - name: Run Playwright suite
+        run: npx playwright test
 
       - name: Upload Playwright Report
         if: always()

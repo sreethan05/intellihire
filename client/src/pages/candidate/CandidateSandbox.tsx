@@ -38,8 +38,8 @@ interface Problem {
   constraints: string[];
   starters: Record<string, string>;
   testCases: Array<{
-    inputArgs: any[];
-    expected: any;
+    inputArgs: unknown[];
+    expected: unknown;
   }>;
   solution: string;
 }
@@ -51,6 +51,17 @@ interface SandboxTestResult {
   actual: string;
   passed: boolean;
 }
+
+interface SandboxSubmissionLog {
+  time: string;
+  status: string;
+  passed: number;
+  total: number;
+  runtime: string;
+  memory: string;
+}
+
+type SandboxTab = "desc" | "sub" | "disc" | "sol";
 
 interface SandboxExecutionResult {
   success: boolean;
@@ -271,7 +282,7 @@ function lengthOfLongestSubstring(s) {
 
 export default function CandidateSandbox() {
   const [activeProblemIdx, setActiveProblemIdx] = useState(0);
-  const [activeTab, setActiveTab] = useState<"desc" | "sub" | "disc" | "sol">("desc");
+  const [activeTab, setActiveTab] = useState<SandboxTab>("desc");
   const [language, setLanguage] = useState("javascript");
   
   const problem = PROBLEMS[activeProblemIdx];
@@ -289,10 +300,10 @@ export default function CandidateSandbox() {
   const [consoleOutput, setConsoleOutput] = useState("");
   const [consoleError, setConsoleError] = useState("");
   const [submissionSuccess, setSubmissionSuccess] = useState<boolean | null>(null);
-  const [testResults, setTestResults] = useState<any[] | null>(null);
-  
+  const [testResults, setTestResults] = useState<SandboxTestResult[] | null>(null);
+
   // Custom past submissions log state
-  const [submissionLogs, setSubmissionLogs] = useState<Record<string, any[]>>({
+  const [submissionLogs, setSubmissionLogs] = useState<Record<string, SandboxSubmissionLog[]>>({
     "two-sum": [],
     "valid-parentheses": [],
     "longest-substring": [],
@@ -525,7 +536,7 @@ try {
               return (
                 <button
                   key={t.id}
-                  onClick={() => setActiveTab(t.id as any)}
+                  onClick={() => setActiveTab(t.id as SandboxTab)}
                   className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-bold transition-all border-b-2 outline-none cursor-pointer ${
                     isActive
                       ? "border-violet-600 text-violet-700 bg-white"

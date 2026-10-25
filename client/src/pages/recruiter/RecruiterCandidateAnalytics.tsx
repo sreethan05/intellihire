@@ -7,7 +7,7 @@ import {
   Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, 
   XAxis, YAxis, PieChart, Pie
 } from "recharts";
-import { recruiterAnalyticsApi, examApi, resultApi } from "@/lib/api";
+import { assetFileUrl, recruiterAnalyticsApi, examApi, resultApi } from "@/lib/api";
 import { useCollege } from "@/context/CollegeContext";
 import { toast } from "sonner";
 
@@ -27,35 +27,243 @@ const LANG_COLORS: Record<string, string> = {
   unknown: "#64748b"
 };
 
+type AnalyticsTab = "shortlist" | "proctoring" | "funnel" | "class";
+type DossierTab = "exams" | "coding" | "proctoring" | "interview" | "pipeline" | "resume";
+
+interface ShortlistCandidate {
+  candidateId: string;
+  name: string;
+  email: string;
+  branch: string;
+  cgpa: number | null;
+  examAvg: number;
+  codingScore: number;
+  interviewScore: number;
+  proctoringCleanScore: number;
+  violations: number;
+  compositeScore: number;
+  tier: string;
+  rank: number;
+}
+
+interface ShortlistData {
+  candidates: ShortlistCandidate[];
+  total: number;
+}
+
+interface ProctoringTypeCount {
+  type: string;
+  count: number;
+}
+
+interface ProctoringCandidateCount {
+  candidateId: string;
+  name: string;
+  count: number;
+}
+
+interface ProctoringAnalyticsData {
+  totalViolations: number;
+  byType: ProctoringTypeCount[];
+  byCandidate: ProctoringCandidateCount[];
+}
+
+interface PlagiarismFlag {
+  id: string;
+  attemptId: string;
+  candidateId: string;
+  matchedWith: string;
+  similarityScore: number;
+  status: string;
+}
+
+interface PlagiarismAnalyticsData {
+  totalFlags: number;
+  avgSimilarity: number;
+  highFlags: PlagiarismFlag[];
+}
+
+interface FunnelStage {
+  stage: string;
+  count: number;
+}
+
+interface ScoreBand {
+  band: string;
+  count: number;
+}
+
+interface FunnelData {
+  funnel: FunnelStage[];
+  scoreDistribution: ScoreBand[];
+  avgScores: Record<string, number>;
+  total: number;
+}
+
+interface TimeToCompleteEntry {
+  examTitle: string;
+  percentageUsed: number;
+  score: number;
+  totalMarks: number;
+}
+
+interface TimeToCompleteData {
+  data: TimeToCompleteEntry[];
+  avgTime: number;
+  avgPercentageUsed: number;
+  count: number;
+}
+
+interface LanguageUsageStat {
+  language: string;
+  count: number;
+}
+
+interface LanguagesData {
+  languages: LanguageUsageStat[];
+  totalSubmissions: number;
+}
+
+interface ExamSummary {
+  id: string;
+  title: string;
+}
+
+interface TopicAccuracy {
+  topic: string;
+  accuracy: number;
+}
+
+interface ClassPerformanceData {
+  topics: TopicAccuracy[];
+  weakest: TopicAccuracy[];
+  totalCandidates: number;
+}
+
+interface CodeComparisonData {
+  code1: string;
+  code2: string;
+  lang: string;
+  name1: string;
+  name2: string;
+}
+
+interface AtsBreakdownEntry {
+  score: number;
+  feedback?: string;
+}
+
+interface ResumeAtsAnalysis {
+  atsScore?: number;
+  tier?: string;
+  summary?: string;
+  suggestedRoles?: string[];
+  gaps?: string[];
+  breakdown?: Record<string, AtsBreakdownEntry>;
+}
+
+interface DossierCandidateProfile {
+  college?: { name?: string } | null;
+  branch?: string;
+  cgpa?: number | string;
+  documents_verified?: boolean;
+  skills?: unknown;
+  resume_url?: string;
+  resume_ats_analysis?: ResumeAtsAnalysis;
+}
+
+interface DossierCandidate {
+  name?: string;
+  email?: string;
+  roll_number?: string;
+  profile?: DossierCandidateProfile;
+}
+
+interface DossierExamStats {
+  totalAttempts: number;
+  completed: number;
+  averageScore: number;
+  passRate: number;
+}
+
+interface DossierAttempt {
+  id: string;
+  examTitle: string;
+  score?: number | null;
+  status: string;
+  startedAt?: string | null;
+}
+
+interface DossierCodingSubmission {
+  id: string;
+  title?: string;
+  difficulty?: string;
+  language: string;
+  score?: number | null;
+}
+
+interface DossierProctoringEvent {
+  id: string;
+  eventType: string;
+  capturedAt: string;
+  message?: string;
+}
+
+interface DossierInterview {
+  id: string;
+  jobTitle: string;
+  companyName: string;
+  score?: number | null;
+  selected?: boolean;
+}
+
+interface DossierPipelineEntry {
+  jobId: string;
+  jobTitle: string;
+  companyName: string;
+  status: string;
+}
+
+interface CandidateDossier {
+  candidate?: DossierCandidate;
+  examStats: DossierExamStats;
+  attempts: DossierAttempt[];
+  codingSubmissions: DossierCodingSubmission[];
+  proctoringEvents: DossierProctoringEvent[];
+  interviews: DossierInterview[];
+  pipeline: DossierPipelineEntry[];
+  profile?: DossierCandidateProfile;
+}
+
 export default function RecruiterCandidateAnalytics() {
   const { selectedCollegeId } = useCollege();
   
-  const [activeTab, setActiveTab] = useState<"shortlist" | "proctoring" | "funnel" | "class">("shortlist");
+  const [activeTab, setActiveTab] = useState<AnalyticsTab>("shortlist");
   const [loading, setLoading] = useState(true);
 
   // States for all analytics data
-  const [shortlistData, setShortlistData] = useState<any>({ candidates: [], total: 0 });
-  const [proctoringData, setProctoringData] = useState<any>({ totalViolations: 0, byType: [], byCandidate: [] });
-  const [plagiarismData, setPlagiarismData] = useState<any>({ totalFlags: 0, avgSimilarity: 0, highFlags: [] });
-  const [funnelData, setFunnelData] = useState<any>({ funnel: [], scoreDistribution: [], avgScores: {}, total: 0 });
-  const [timeData, setTimeData] = useState<any>({ data: [], avgTime: 0, avgPercentageUsed: 0, count: 0 });
-  const [languagesData, setLanguagesData] = useState<any>({ languages: [], totalSubmissions: 0 });
+  const [shortlistData, setShortlistData] = useState<ShortlistData>({ candidates: [], total: 0 });
+  const [proctoringData, setProctoringData] = useState<ProctoringAnalyticsData>({ totalViolations: 0, byType: [], byCandidate: [] });
+  const [plagiarismData, setPlagiarismData] = useState<PlagiarismAnalyticsData>({ totalFlags: 0, avgSimilarity: 0, highFlags: [] });
+  const [funnelData, setFunnelData] = useState<FunnelData>({ funnel: [], scoreDistribution: [], avgScores: {}, total: 0 });
+  const [timeData, setTimeData] = useState<TimeToCompleteData>({ data: [], avgTime: 0, avgPercentageUsed: 0, count: 0 });
+  const [languagesData, setLanguagesData] = useState<LanguagesData>({ languages: [], totalSubmissions: 0 });
   
   // Topic-wise class performance states
-  const [exams, setExams] = useState<any[]>([]);
+  const [exams, setExams] = useState<ExamSummary[]>([]);
   const [selectedExamId, setSelectedExamId] = useState<string>("");
-  const [classPerformance, setClassPerformance] = useState<any>({ topics: [], weakest: [], totalCandidates: 0 });
+  const [classPerformance, setClassPerformance] = useState<ClassPerformanceData>({ topics: [], weakest: [], totalCandidates: 0 });
   const [classPerformanceLoading, setClassPerformanceLoading] = useState(false);
 
   // Candidate Drill-Down Dossier Modal States
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
-  const [candidateDossier, setCandidateDossier] = useState<any>(null);
+  const [candidateDossier, setCandidateDossier] = useState<CandidateDossier | null>(null);
   const [dossierLoading, setDossierLoading] = useState(false);
-  const [dossierTab, setDossierTab] = useState<"exams" | "coding" | "proctoring" | "interview" | "pipeline" | "resume">("exams");
+  const [dossierTab, setDossierTab] = useState<DossierTab>("exams");
 
   // Plagiarism Code Comparison Modal States
-  const [selectedPlagFlag, setSelectedPlagFlag] = useState<any | null>(null);
-  const [codeComparisonData, setCodeComparisonData] = useState<any>(null);
+  const [selectedPlagFlag, setSelectedPlagFlag] = useState<PlagiarismFlag | null>(null);
+  const [codeComparisonData, setCodeComparisonData] = useState<CodeComparisonData | null>(null);
   const [codeComparisonLoading, setCodeComparisonLoading] = useState(false);
 
   useEffect(() => {
@@ -154,9 +362,9 @@ export default function RecruiterCandidateAnalytics() {
       // Wait, is there a route? Yes! recruiter/drives/:driveId/assign-exam or we can flag the candidate.
       // Since it's for maximum wow, we can trigger toast, update local state to reflect change instantly!
       toast.success("Candidate flagged successfully. Status updated to On Hold.");
-      setShortlistData((prev: any) => ({
+      setShortlistData((prev) => ({
         ...prev,
-        candidates: prev.candidates.map((c: any) => 
+        candidates: prev.candidates.map((c) => 
           c.candidateId === candidateId ? { ...c, proctoringCleanScore: 0, violations: 5 } : c
         )
       }));
@@ -176,13 +384,13 @@ export default function RecruiterCandidateAnalytics() {
   }
 
   // Interview funnel Recharts data
-  const chartFunnelData = funnelData.funnel?.map((f: any) => ({
+  const chartFunnelData = funnelData.funnel?.map((f) => ({
     name: f.stage,
     "Candidates": f.count
   })) || [];
 
   // Coding languages preferences data
-  const pieLanguagesData = languagesData.languages?.map((l: any) => ({
+  const pieLanguagesData = languagesData.languages?.map((l) => ({
     name: String(l.language).toUpperCase(),
     value: l.count,
     color: LANG_COLORS[String(l.language).toLowerCase()] || LANG_COLORS.unknown
@@ -200,18 +408,18 @@ export default function RecruiterCandidateAnalytics() {
 
       {/* Tab Selectors */}
       <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-px">
-        {[
+        {([
           { id: "shortlist", label: "Predictive Shortlist", icon: Users },
           { id: "proctoring", label: "Proctoring & Plagiarism", icon: ShieldAlert },
           { id: "funnel", label: "Hiring Funnel & Time", icon: BarChart3 },
           { id: "class", label: "Class Performance Analysis", icon: Award },
-        ].map((tab) => {
+        ] as const).map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold transition-all border-b-2 -mb-px outline-none ${
                 isActive
                   ? "border-violet-600 text-violet-700 font-extrabold"
@@ -258,7 +466,7 @@ export default function RecruiterCandidateAnalytics() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
-                    {shortlistData.candidates.map((c: any) => {
+                    {shortlistData.candidates.map((c) => {
                       const isTop = c.tier === "top";
                       const isBottom = c.tier === "bottom";
                       
@@ -411,14 +619,14 @@ export default function RecruiterCandidateAnalytics() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
-                    {plagiarismData.highFlags.map((flag: any) => (
+                    {plagiarismData.highFlags.map((flag) => (
                       <tr key={flag.id} className="hover:bg-slate-50/30 transition-colors">
                         <td className="p-3 font-mono text-slate-500">{flag.attemptId.slice(0, 8)}</td>
                         <td className="p-3 text-slate-900">
-                          {shortlistData.candidates?.find((c: any) => c.candidateId === flag.candidateId)?.name || "Candidate A"}
+                          {shortlistData.candidates?.find((c) => c.candidateId === flag.candidateId)?.name || "Candidate A"}
                         </td>
                         <td className="p-3 text-slate-950 font-extrabold">
-                          {shortlistData.candidates?.find((c: any) => c.candidateId === flag.matchedWith)?.name || "Candidate B"}
+                          {shortlistData.candidates?.find((c) => c.candidateId === flag.matchedWith)?.name || "Candidate B"}
                         </td>
                         <td className="p-3">
                           <span className="inline-flex rounded bg-rose-50 border border-rose-100 px-2 py-0.5 font-black text-rose-600">
@@ -502,7 +710,7 @@ export default function RecruiterCandidateAnalytics() {
                         paddingAngle={3}
                         dataKey="value"
                       >
-                        {pieLanguagesData.map((entry: any, index: number) => (
+                        {pieLanguagesData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
@@ -517,7 +725,7 @@ export default function RecruiterCandidateAnalytics() {
               )}
 
               <div className="flex flex-wrap gap-x-3 gap-y-1.5 justify-center border-t border-slate-100 pt-3">
-                {pieLanguagesData.map((lang: any) => (
+                {pieLanguagesData.map((lang) => (
                   <div key={lang.name} className="flex items-center gap-1 text-[9px] font-black text-slate-600 uppercase">
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: lang.color }} />
                     <span>{lang.name} ({lang.value})</span>
@@ -547,7 +755,7 @@ export default function RecruiterCandidateAnalytics() {
                 <div className="h-64 flex flex-col justify-between">
                   <div className="flex-1 overflow-hidden relative border border-slate-100 rounded-xl bg-slate-50/20 p-2">
                     {/* Handcrafted simple scatter plot using relative positioning */}
-                    {timeData.data.map((item: any, idx: number) => (
+                    {timeData.data.map((item, idx) => (
                       <div
                         key={idx}
                         title={`Exam: ${item.examTitle}\nTime: ${item.percentageUsed}% used\nScore: ${item.score}/${item.totalMarks}`}
@@ -622,7 +830,7 @@ export default function RecruiterCandidateAnalytics() {
                   {exams.length === 0 ? (
                     <option value="">No exams available</option>
                   ) : (
-                    exams.map((exam: any) => (
+                    exams.map((exam) => (
                       <option key={exam.id} value={exam.id}>{exam.title}</option>
                     ))
                   )}
@@ -653,7 +861,7 @@ export default function RecruiterCandidateAnalytics() {
                           <YAxis dataKey="topic" type="category" tick={{ fontSize: 10, fill: "#64748b", fontWeight: 700 }} axisLine={false} tickLine={false} />
                           <Tooltip />
                           <Bar dataKey="accuracy" name="Accuracy (%)" radius={[0, 5, 5, 0]}>
-                            {classPerformance.topics.map((t: any, i: number) => (
+                            {classPerformance.topics.map((t, i) => (
                               <Cell key={i} fill={t.accuracy < 50 ? "#ef4444" : "#3b82f6"} />
                             ))}
                           </Bar>
@@ -674,7 +882,7 @@ export default function RecruiterCandidateAnalytics() {
                     {classPerformance.weakest?.length === 0 ? (
                       <div className="text-center text-xs text-slate-400 py-6">All topics above passing averages.</div>
                     ) : (
-                      classPerformance.weakest.map((topic: any) => (
+                      classPerformance.weakest.map((topic) => (
                         <div key={topic.topic} className="flex items-center justify-between text-xs font-semibold bg-white p-3 rounded-lg border border-slate-100">
                           <span className="text-slate-800">{topic.topic}</span>
                           <span className="inline-flex rounded bg-rose-50 border border-rose-100 px-2 py-0.5 font-black text-rose-600">
@@ -784,17 +992,17 @@ export default function RecruiterCandidateAnalytics() {
                   <div className="flex-1 flex flex-col overflow-hidden">
                     {/* Tab Navigation header inside modal */}
                     <div className="flex border-b border-slate-100 bg-slate-50/50 px-4">
-                      {[
+                      {([
                         { id: "exams", label: "Exam Attempts" },
                         { id: "coding", label: "Coding Submissions" },
                         { id: "proctoring", label: "Proctor Alerts" },
                         { id: "interview", label: "AI Voice Interview" },
                         { id: "pipeline", label: "Applied Funnels" },
                         { id: "resume", label: "Resume & ATS" }
-                      ].map((t) => (
+                      ] as const).map((t) => (
                         <button
                           key={t.id}
-                          onClick={() => setDossierTab(t.id as any)}
+                          onClick={() => setDossierTab(t.id)}
                           className={`px-4 py-3 text-xs font-bold border-b-2 -mb-px outline-none transition ${
                             dossierTab === t.id 
                               ? "border-violet-600 text-violet-700 font-black" 
@@ -836,7 +1044,7 @@ export default function RecruiterCandidateAnalytics() {
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100 font-semibold text-slate-600">
-                                {candidateDossier.attempts.map((att: any) => (
+                                {candidateDossier.attempts.map((att) => (
                                   <tr key={att.id}>
                                     <td className="p-2.5 font-bold text-slate-900">{att.examTitle}</td>
                                     <td className="p-2.5 text-slate-700">{att.score ?? "Unmarked"}</td>
@@ -878,7 +1086,7 @@ export default function RecruiterCandidateAnalytics() {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
-                              {candidateDossier.codingSubmissions.map((s: any) => (
+                              {candidateDossier.codingSubmissions.map((s) => (
                                 <tr key={s.id}>
                                   <td className="p-2.5"><Code size={13} className="text-slate-400" /></td>
                                   <td className="p-2.5 font-bold text-slate-900">{s.title || "Starter Problem"}</td>
@@ -914,7 +1122,7 @@ export default function RecruiterCandidateAnalytics() {
                             </div>
                           ) : (
                             <div className="relative pl-5 border-l border-slate-100 space-y-4">
-                              {candidateDossier.proctoringEvents.map((evt: any) => (
+                              {candidateDossier.proctoringEvents.map((evt) => (
                                 <div key={evt.id} className="relative">
                                   <span className="absolute -left-[29px] top-1.5 flex h-2 w-2 rounded-full bg-rose-500 ring-4 ring-white"></span>
                                   <div className="bg-slate-50/30 border border-slate-100 rounded-xl p-3 space-y-2">
@@ -933,7 +1141,7 @@ export default function RecruiterCandidateAnalytics() {
 
                       {dossierTab === "interview" && (
                         <div className="space-y-4">
-                          {candidateDossier.interviews.map((int: any) => (
+                          {candidateDossier.interviews.map((int) => (
                             <div key={int.id} className="border border-slate-100 rounded-xl p-4 bg-slate-50/30 flex items-center justify-between gap-4">
                               <div>
                                 <div className="font-bold text-slate-900">{int.jobTitle}</div>
@@ -965,7 +1173,7 @@ export default function RecruiterCandidateAnalytics() {
 
                       {dossierTab === "pipeline" && (
                         <div className="space-y-4">
-                          {candidateDossier.pipeline.map((p: any) => (
+                          {candidateDossier.pipeline.map((p) => (
                             <div key={p.jobId} className="border border-slate-100 rounded-xl p-4 bg-slate-50/30 flex items-center justify-between gap-4 font-semibold text-slate-600">
                               <div>
                                 <div className="font-bold text-slate-900">{p.jobTitle}</div>
@@ -1013,7 +1221,7 @@ export default function RecruiterCandidateAnalytics() {
                                 </div>
                                 
                                 <a 
-                                  href={candidateDossier.profile.resume_url ? (import.meta.env.VITE_API_URL || "").replace(/\/api$/, "") + candidateDossier.profile.resume_url : ""} 
+                                  href={candidateDossier.profile.resume_url ? assetFileUrl(candidateDossier.profile.resume_url) : ""} 
                                   target="_blank" 
                                   rel="noreferrer" 
                                   className="inline-flex h-8 items-center justify-center rounded-lg bg-violet-50 border border-violet-100 px-3.5 text-[10px] font-bold text-violet-600 hover:bg-violet-100 transition self-start sm:self-center"
@@ -1086,7 +1294,7 @@ export default function RecruiterCandidateAnalytics() {
                                     <div className="border-t border-slate-100 pt-4 space-y-3">
                                       <div className="text-[10px] font-black uppercase text-slate-400 select-none tracking-wider">ATS Score Breakdown Parameters</div>
                                       <div className="grid gap-3 sm:grid-cols-2">
-                                        {Object.entries(candidateDossier.profile.resume_ats_analysis.breakdown).map(([key, data]: [string, any]) => {
+                                        {Object.entries(candidateDossier.profile.resume_ats_analysis.breakdown).map(([key, data]) => {
                                           const labelMap: Record<string, string> = {
                                             contactInfo: "Contact Detail Completeness",
                                             sectionStructure: "Heading Sections Structure",

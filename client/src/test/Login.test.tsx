@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { AxiosResponse } from "axios";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import Login from "../pages/Login";
@@ -55,7 +56,7 @@ describe("Login Component", () => {
     const mockUser = { id: "1", name: "Bob", role: "candidate", profile_complete: true };
     vi.mocked(authApi.login).mockResolvedValueOnce({
       data: { token: "fake-token", user: mockUser },
-    } as any);
+    } as AxiosResponse);
 
     render(
       <MemoryRouter>

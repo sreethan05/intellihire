@@ -34,6 +34,13 @@ import type { Exam, ExamCodingQuestion, ExamQuestion } from "@/types";
 
 const MAX_VIOLATIONS = 3;
 
+type ProctoringEventRow = {
+  id?: string;
+  event_type?: string;
+  message?: string | null;
+  captured_at?: string | null;
+};
+
 function getOptionText(question: ExamQuestion["question"], option: "a" | "b" | "c" | "d") {
   if (option === "a") return question.option_a;
   if (option === "b") return question.option_b;
@@ -438,8 +445,8 @@ export default function TakeExam() {
         if (!isSubscribed) return;
 
         const events = data.events || [];
-        const latestOverride = events.find((event: any) => event.event_type === "admin_override");
-        const latestViolation = events.find((event: any) => event.event_type === "violation");
+        const latestOverride = events.find((event: ProctoringEventRow) => event.event_type === "admin_override");
+        const latestViolation = events.find((event: ProctoringEventRow) => event.event_type === "violation");
         const isUnlocked = Boolean(latestOverride && latestViolation) &&
           String(latestOverride?.captured_at || "") >= String(latestViolation?.captured_at || "");
 

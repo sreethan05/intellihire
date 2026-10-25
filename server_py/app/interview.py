@@ -1,6 +1,5 @@
 import asyncio
 import datetime
-import re
 from urllib.parse import quote, urlencode
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -11,6 +10,16 @@ from .ai import generate_json, has_ai_key
 from .date_utils import parse_datetime, now_iso
 from .logger import logger
 from .utils import deserialize_drive_colleges
+from . import interview_core
+from .interview_core import (
+    STAGES,
+    clamp_score,
+    default_intro_questions,
+    default_speaking_questions,
+    default_technical_questions,
+    fallback_feedback,
+    score_answer,
+)
 
 router = APIRouter(prefix="/api/interview", tags=["interview"])
 
@@ -23,28 +32,6 @@ def _spawn_background(coro) -> None:
     task = asyncio.create_task(coro)
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
-
-STAGES = [
-    {"id": 1, "name": "Introduction", "questionCount": 2},
-    {"id": 2, "name": "Speaking Skills", "questionCount": 2},
-    {"id": 3, "name": "Technical", "questionCount": 3},
-]
-
-default_intro_questions = [
-    "Please introduce yourself — your name, background, and what you're currently working on or studying.",
-    "Tell me about your most impactful project or achievement and what role you played in it.",
-]
-
-default_speaking_questions = [
-    "Describe a challenge you faced recently and walk me through how you communicated it to your team or mentor.",
-    "Explain a technical concept from your domain as if you were teaching it to someone new.",
-]
-
-default_technical_questions = [
-    "What data structures would you use to solve a real-time leaderboard problem, and why?",
-    "Explain the difference between synchronous and asynchronous programming with a practical example.",
-    "How would you design a simple URL shortener service? Walk me through the key components.",
-]
 
 class ScheduleInterviewRequest(BaseModel):
     scheduled_start: str
@@ -59,27 +46,9 @@ class StartInterviewRequest(BaseModel):
     job_id: Optional[str] = None
     exam_id: Optional[str] = None
 
-def score_answer(answer: str) -> int:
-    words = len([w for w in answer.strip().split() if w])
-    has_example = bool(re.search(r"\b(project|built|implemented|improved|designed|deployed|resolved|debugged)\b", answer, re.IGNORECASE))
-    has_structure = bool(re.search(r"\b(first|then|because|therefore|result|impact)\b", answer, re.IGNORECASE))
-    score = 35 + min(words, 80)
-    if has_example:
-        score += 10
-    if has_structure:
-        score += 8
-    return max(35, min(95, score))
-
-def clamp_score(value: Any, fallback: int = 0) -> int:
-    try:
-        score = int(float(value))
-        return max(0, min(100, score))
-    except Exception:
-        return fallback
-
-def fallback_feedback(score: int) -> str:
-    return "Clear answer with useful detail." if score >= 75 else "Add more concrete examples and outcomes."
-
+# NOTE: question banks, scoring heuristics and stage tables live in
+# app.interview_core (shared with app.interview_service) and are imported
+# above; this module no longer defines its own copies.
 
 async def _assert_interview_access(interview: Dict[str, Any], user: Dict[str, Any]) -> None:
     """Raises 403 unless the user may view/manage this interview.
@@ -114,27 +83,7 @@ async def get_passed_attempts(candidate_id: str, exam_id: str = None) -> List[Di
     if exam_id:
         query = query.eq("exam_id", exam_id)
     res = await query
-    attempts = res.data or []
-    
-    passed = []
-    for att in attempts:
-        exam = att.get("exam") or {}
-        score = float(att.get("score") or 0.0)
-        pass_marks = float(exam.get("pass_marks") or 0.0)
-        total_marks = float(exam.get("total_marks") or 0.0)
-        if exam and score >= pass_marks:
-            passed.append({
-                "attemptId": att["id"],
-                "examId": att["exam_id"],
-                "examTitle": exam.get("title") or "Qualified Exam",
-                "examDescription": exam.get("description"),
-                "score": score,
-                "totalMarks": total_marks,
-                "passMarks": pass_marks,
-                "percentage": round((score / total_marks) * 100, 1) if total_marks else 0,
-                "submittedAt": att.get("submitted_at")
-            })
-    return passed
+    return interview_core.map_passed_attempts(res.data or [])
 
 @router.get("/questions")
 def get_stages():
@@ -232,82 +181,13 @@ async def get_interview_answers(interviewId: str, user: Dict[str, Any] = Depends
     return {"answers": res.data or []}
 
 async def evaluate_answer(question: str, answer: str, stage: int, job: dict = None) -> dict:
-    fallback = score_answer(answer)
-    if not has_ai_key():
-        return {
-            "score": fallback,
-            "feedback": fallback_feedback(fallback),
-            "pronunciation_score": min(100, fallback + 5) if stage == 2 else None,
-            "clarity_score": min(100, fallback - 3) if stage == 2 else None,
-        }
-        
-    persona = ""
-    custom_rubric = ""
-    examples = []
-    
-    if job and job.get("company_description"):
-        parsed_desc = deserialize_drive_colleges(job["company_description"])
-        ai_config = parsed_desc.get("aiConfig") or {}
-        persona = ai_config.get("persona") or ""
-        custom_rubric = ai_config.get("rubric") or ""
-        examples = ai_config.get("examples") or []
-            
-    try:
-        import json
-        persona_line = f"Evaluate as this interviewer persona: {persona}." if persona else ""
-        rubric_line = f"Use this specific grading rubric:\n{custom_rubric}" if custom_rubric else ""
-        
-        if stage == 2:
-            system_prompt = f"""You are evaluating a spoken voice interview answer for speaking skills, clarity, and pronunciation.
-{persona_line}
-Analyze for:
-- Overall communication quality (0-100)
-- Pronunciation quality inferred from word choice/coherence (0-100)
-- Clarity and consistency of expression (0-100)
-{rubric_line}
-Return ONLY JSON.
-Constraints:
-- "feedback" MUST be exactly one concise improvement sentence (max 18 words).
-"""
-            user_prompt = f"Question: {question}\nAnswer: {answer}"
-            result = await generate_json(user_prompt, system_prompt)
-            score = clamp_score(result.get("score"), fallback)
-            return {
-                "score": score,
-                "feedback": str(result.get("feedback") or fallback_feedback(score)).strip(),
-                "pronunciation_score": clamp_score(result.get("pronunciation_score"), score),
-                "clarity_score": clamp_score(result.get("clarity_score"), score),
-            }
-            
-        examples_str = ""
-        if examples:
-            examples_str = "\n".join([f"Example {i+1}:\nQuestion: {ex.get('question')}\nAnswer: {ex.get('answer')}\nSuggested Score: {ex.get('score')}\nSuggested Feedback: {ex.get('feedback')}" for i, ex in enumerate(examples)])
-            
-        persona_line_live = f"Evaluate as this interviewer persona: {persona}." if persona else ""
-        rubric_line_live = f"Use this specific grading rubric to judge and grade the answer:\n{custom_rubric}" if custom_rubric else ""
-        examples_line_live = f"Use the training examples to score:\n{examples_str}" if examples_str else ""
-        
-        system_prompt = f"""You are scoring a live AI interview answer.
-{persona_line_live}
-Score 0-100 for: relevance, technical clarity, communication, specificity, and evidence.
-{rubric_line_live}
-{examples_line_live}
-Return ONLY JSON.
-Constraints:
-- "feedback" MUST be exactly one concise improvement sentence (max 18 words).
-"""
-        user_prompt = f"Question: {question}\nAnswer: {answer}"
-        result = await generate_json(user_prompt, system_prompt)
-        score = clamp_score(result.get("score"), fallback)
-        return {
-            "score": score,
-            "feedback": str(result.get("feedback") or fallback_feedback(score)).strip(),
-        }
-    except Exception:
-        return {
-            "score": fallback,
-            "feedback": fallback_feedback(fallback)
-        }
+    """Adapter: inject this module's collaborators into the shared core."""
+    return await interview_core.evaluate_answer(
+        question, answer, stage, job,
+        ai_key=has_ai_key,
+        generate_json=generate_json,
+        deserialize=deserialize_drive_colleges,
+    )
 
 @router.post("/{interviewId}/answer")
 async def save_answer(interviewId: str, req: InterviewAnswerRequest, user: Dict[str, Any] = Depends(get_current_user)):
@@ -435,6 +315,10 @@ def generate_google_calendar_link(title: str, start_time: str, end_time: str, de
         }
         return f"https://calendar.google.com/calendar/render?{urlencode(params)}"
     except Exception:
+        logger.warning(
+            "interview.calendar_link_build_failed title=%r",
+            title, exc_info=True,
+        )
         return ""
 
 
@@ -470,63 +354,20 @@ async def get_interview(interviewId: str, user: Dict[str, Any] = Depends(get_cur
     await _assert_interview_access(res.data, user)
     return {"interview": res.data}
 
+async def _fetch_candidate_profile(candidate_id: str):
+    res = await db.from_("candidate_profiles").select("skills, domain_preference").eq("user_id", candidate_id).maybeSingle()
+    return res.data
+
 async def build_stage_questions(candidate_id: str, attempt: dict, job: dict = None) -> List[str]:
-    intro = default_intro_questions
-    speaking = default_speaking_questions
-    tech = default_technical_questions
-    
-    if has_ai_key():
-        try:
-            profile_res = await db.from_("candidate_profiles").select("skills, domain_preference").eq("user_id", candidate_id).maybeSingle()
-            profile = profile_res.data
-            skills = ", ".join(profile.get("skills") or []) if profile else "Not provided"
-            
-            job_desc = "Not provided"
-            persona = ""
-            custom_instructions = ""
-            if job:
-                parsed_desc = deserialize_drive_colleges(job.get("company_description") or "")
-                job_desc = parsed_desc["description"]
-                ai_config = parsed_desc.get("aiConfig") or {}
-                persona = ai_config.get("persona") or ""
-                custom_instructions = ai_config.get("instructions") or ""
-                    
-            job_context = f"Job title: {job.get('title')}\nCompany: {job.get('company_name')}\nDescription: {job_desc}\nRequired skills: {', '.join(job.get('required_skills') or [])}" if job else f"Exam: {attempt['examTitle']}\nExam description: {attempt.get('examDescription') or 'Not provided'}"
-            
-            persona_prompt = f"The interviewer persona is: {persona}. Please match this tone/style." if persona else ""
-            custom_prompt = f"Custom instructions to follow:\n{custom_instructions}" if custom_instructions else ""
-            tot_marks = attempt.get("totalMarks") or attempt.get("total_marks") or 100
-            
-            prompt = f"""
-Return only JSON.
-Generate exactly 3 technical interview questions for a campus placement AI interview.
-Questions must be specific to the job role and test practical knowledge.
-Make them conversational — suitable for a spoken voice interview, not written answers.
-
-{job_context}
-Candidate skills: {skills}
-Exam score: {attempt.get('score', 0)}/{tot_marks}
-
-{persona_prompt}
-{custom_prompt}
-
-Schema:
-{{
-  "questions": [
-    "Question 1",
-    "Question 2",
-    "Question 3"
-  ]
-}}
-"""
-            result = await generate_json(prompt)
-            generated = [str(q).strip() for q in result.get("questions", []) if q]
-            if len(generated) >= 2:
-                tech = generated[:3]
-        except Exception:
-            pass
-            
-    return intro + speaking + tech
+    """Adapter: shared core returns staged sets; this router returns the flat list."""
+    staged = await interview_core.build_stage_questions(
+        candidate_id, attempt, job,
+        ai_key=has_ai_key,
+        generate_json=generate_json,
+        deserialize=deserialize_drive_colleges,
+        get_profile=_fetch_candidate_profile,
+    )
+    return staged["all"]
 
 async def evaluate_interview_background(interview_id: str):
     try:
@@ -540,17 +381,7 @@ async def evaluate_interview_background(interview_id: str):
         answers_res = await db.from_("ai_interview_answers").select("*").eq("interview_id", interview_id).order("created_at", ascending=True)
         answers = answers_res.data or []
         
-        answers_mapped = []
-        for i, a in enumerate(answers):
-            stage = 1 if i < 2 else 2 if i < 4 else 3
-            answers_mapped.append({
-                "score": float(a.get("score") or 0.0),
-                "question": str(a.get("question") or ""),
-                "answer": str(a.get("answer") or ""),
-                "stage": stage,
-                "pronunciation_score": float(a.get("pronunciation_score")) if a.get("pronunciation_score") is not None else None,
-                "clarity_score": float(a.get("clarity_score")) if a.get("clarity_score") is not None else None,
-            })
+        answers_mapped = [interview_core.answer_view(a, i) for i, a in enumerate(answers)]
             
         # Summarize
         summary_res = await summarize_interview(answers_mapped, pass_score, interview.get("jobs"))
@@ -579,62 +410,10 @@ async def evaluate_interview_background(interview_id: str):
             logger.error(f"[Interview] Failed to mark interview {interview_id} as failed: {fallback_exc}")
 
 async def summarize_interview(answers: List[dict], pass_score: int, job: dict = None) -> dict:
-    stage1 = [a for a in answers if a["stage"] == 1]
-    stage2 = [a for a in answers if a["stage"] == 2]
-    stage3 = [a for a in answers if a["stage"] == 3]
-    
-    def avg(arr):
-        return round(sum(a["score"] for a in arr) / len(arr)) if arr else 0
-        
-    intro_score = avg(stage1)
-    speaking_score = avg(stage2)
-    pron_score = round(sum(a.get("pronunciation_score") or a["score"] for a in stage2) / len(stage2)) if stage2 else 0
-    tech_score = avg(stage3)
-    
-    overall = round(sum(a["score"] for a in answers) / len(answers)) if answers else 0
-    selected = overall >= pass_score
-    
-    fallback = {
-        "score": overall,
-        "intro_score": intro_score,
-        "speaking_score": speaking_score,
-        "pronunciation_score": pron_score,
-        "technical_score": tech_score,
-        "selected": selected,
-        "relevance_score": max(0, min(100, overall + 3)),
-        "communication_score": max(0, min(100, overall - 2)),
-        "summary": f"Candidate completed {len(answers)} interview responses with an overall score of {overall}/100.",
-        "feedback": "Strong interview performance. Keep answers concise and back them with measurable outcomes." if overall >= 75 else "Improve with stronger examples, clearer structure, and deeper technical explanation."
-    }
-    
-    if not answers or not has_ai_key():
-        return fallback
-        
-    persona = ""
-    if job and job.get("company_description"):
-        parsed_desc = deserialize_drive_colleges(job["company_description"])
-        ai_config = parsed_desc.get("aiConfig") or {}
-        persona = ai_config.get("persona") or ""
-            
-    try:
-        transcript = "\n\n".join([f"Stage {a['stage']} Q{i+1}: {a['question']}\nAnswer: {a['answer']}\nScore: {a['score']}" for i, a in enumerate(answers)])
-        system_prompt = f"""You are summarizing a completed technical placement AI interview.
-{f"The interview was conducted by the AI persona: {persona}." if persona else ""}
-Grade overall candidate relevance (0-100) and communication (0-100) based on transcript.
-Return ONLY JSON.
-Constraints:
-- "summary": Single summary paragraph (max 60 words).
-- "feedback": Short improvement paragraph (max 40 words).
-"""
-        user_prompt = f"Transcript:\n{transcript}"
-        result = await generate_json(user_prompt, system_prompt)
-        
-        return {
-            **fallback,
-            "relevance_score": clamp_score(result.get("relevance_score"), fallback["relevance_score"]),
-            "communication_score": clamp_score(result.get("communication_score"), fallback["communication_score"]),
-            "summary": str(result.get("summary") or fallback["summary"]).strip(),
-            "feedback": str(result.get("feedback") or fallback["feedback"]).strip(),
-        }
-    except Exception:
-        return fallback
+    """Adapter: inject this module's collaborators into the shared core."""
+    return await interview_core.summarize_interview(
+        answers, pass_score, job,
+        ai_key=has_ai_key,
+        generate_json=generate_json,
+        deserialize=deserialize_drive_colleges,
+    )

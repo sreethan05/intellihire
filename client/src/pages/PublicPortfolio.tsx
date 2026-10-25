@@ -3,15 +3,63 @@ import { useParams } from "react-router";
 import axios from "axios";
 import { QRCodeSVG } from "qrcode.react";
 import { Briefcase, FileText, CheckCircle, MapPin, QrCode, Github, Linkedin, Globe, Trophy, BarChart3, AlertCircle } from "lucide-react";
-import { 
-  Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, 
-  ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend 
+import { assetFileUrl } from "@/lib/api";
+import {
+  Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+  ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend
 } from "recharts";
 
 
+interface PortfolioProject {
+  title: string;
+  url?: string;
+  description?: string;
+  tech_stack?: string | string[];
+}
+
+interface PortfolioSemesterGrade {
+  semester: string | number;
+  sgpa: number;
+  cgpa: number;
+}
+
+interface PortfolioProfile {
+  id: string;
+  branch: string;
+  cgpa: number;
+  graduation_year: number;
+  photo_url?: string;
+  user?: { name?: string };
+  college?: { name?: string; code?: string };
+  documents_verified?: boolean;
+  bio?: string;
+  github_url?: string;
+  linkedin_url?: string;
+  portfolio_url?: string;
+  skills?: string[];
+  projects?: PortfolioProject[];
+  semester_grades?: PortfolioSemesterGrade[];
+  resume_url?: string;
+}
+
+interface PortfolioApplication {
+  id: string;
+  status: string;
+  updated_at: string;
+  job?: { title: string; company_name: string };
+}
+
+interface PortfolioData {
+  profile: PortfolioProfile;
+  applications?: PortfolioApplication[];
+  radarData?: Array<{ subject: string; score: number }>;
+  strengths?: string[];
+  weaknesses?: string[];
+}
+
 export default function PublicPortfolio() {
   const { slug } = useParams<{ slug: string }>();
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<PortfolioData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -170,7 +218,7 @@ export default function PublicPortfolio() {
                 <div className="pt-4 border-t border-slate-100 space-y-3">
                   <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5">Showcase Projects</h3>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    {profile.projects.map((proj: any, pidx: number) => (
+                    {profile.projects.map((proj, pidx: number) => (
                       <div key={pidx} className="rounded-xl border border-slate-100 bg-slate-50/30 p-3 flex flex-col justify-between">
                         <div>
                           <div className="flex justify-between items-start gap-1.5">
@@ -230,7 +278,7 @@ export default function PublicPortfolio() {
             <span className="text-xs text-slate-400 font-bold">VERIFIABLE PLACEMENT PASSPORT ID: {profile.id.slice(0, 8).toUpperCase()}</span>
             {profile.resume_url && (
               <a
-                href={profile.resume_url}
+                href={assetFileUrl(profile.resume_url)}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white shadow hover:bg-blue-700 transition"
@@ -302,7 +350,7 @@ export default function PublicPortfolio() {
             
             <div className="space-y-3">
               {applications && applications.length > 0 ? (
-                applications.map((app: any) => (
+                applications.map((app) => (
                   <div key={app.id} className="rounded-lg border border-slate-100 p-3 bg-slate-50/50 hover:bg-slate-50 transition">
                     <div className="font-bold text-slate-900 text-sm">{app.job?.title}</div>
                     <div className="text-xs text-slate-500 mt-0.5">{app.job?.company_name}</div>

@@ -4,16 +4,28 @@ import { assetApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+interface CertificateItem {
+  id: string;
+  issued_at: string;
+  exam?: { title: string; total_marks: number } | null;
+}
+
+interface BadgeItem {
+  id: string;
+  name: string;
+  description: string;
+}
+
 export default function CandidateCertificates() {
-  const [certificates, setCertificates] = useState<any[]>([]);
-  const [badges, setBadges] = useState<any[]>([]);
+  const [certificates, setCertificates] = useState<CertificateItem[]>([]);
+  const [badges, setBadges] = useState<BadgeItem[]>([]);
 
   useEffect(() => {
     assetApi.getCertificates().then(({ data }) => setCertificates(data.certificates || []));
     assetApi.getBadges().then(({ data }) => setBadges(data.badges || []));
   }, []);
 
-  const printCertificate = (certificate: any) => {
+  const printCertificate = (certificate: CertificateItem) => {
     const examTitle = certificate.exam?.title || "Assessment";
     const win = window.open("", "_blank");
     if (!win) return;

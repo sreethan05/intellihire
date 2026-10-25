@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { 
-  Briefcase, Calendar, CheckCircle2, Clock, 
-  Sparkles, Trophy, AlertTriangle, 
-  RefreshCw, Loader2, Info, Users, Award, 
-  TrendingUp, Activity, ShieldAlert, ArrowUpRight, 
-  Compass, ChevronRight
+import {
+  Briefcase, Calendar, CheckCircle2, Clock,
+  Sparkles, Trophy, AlertTriangle,
+  RefreshCw, Loader2, Info, Users, Award,
+  TrendingUp, Activity, ShieldAlert, ArrowUpRight,
+  Compass, ChevronRight, type LucideIcon
 } from "lucide-react";
 import { Link } from "react-router";
 import { hubApi } from "@/lib/api";
@@ -103,7 +103,7 @@ interface HubOverview {
   quickLinks: QuickLink[];
 }
 
-const STATS_MAP: Record<string, { label: string; icon: any; colorClass: string; gradient: string }> = {
+const STATS_MAP: Record<string, { label: string; icon: LucideIcon; colorClass: string; gradient: string }> = {
   completedExams: { label: "Completed Exams", icon: Award, colorClass: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20", gradient: "from-emerald-500/10 to-emerald-600/5" },
   upcomingExams: { label: "Upcoming Exams", icon: Calendar, colorClass: "text-blue-400 bg-blue-500/10 border-blue-500/20", gradient: "from-blue-500/10 to-indigo-600/5" },
   averageScore: { label: "Average Score", icon: TrendingUp, colorClass: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20", gradient: "from-indigo-500/10 to-purple-600/5" },
