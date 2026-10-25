@@ -14,6 +14,7 @@ from .db import db, transaction
 from psycopg.rows import dict_row
 from .config import JWT_SECRET, NODE_ENV
 from .rate_limit import limiter
+from .metrics import AUTH_FAILURES
 from .errors import error_response
 from .date_utils import utc_now
 
@@ -137,6 +138,43 @@ def require_roles(roles: list):
         return user
     return dependency
 
+
+# Account lockout: per-worker in-memory tracker (slowapi's limiter uses the
+# same scope). After LOCKOUT_THRESHOLD failures within LOCKOUT_WINDOW the
+# account is locked for LOCKOUT_DURATION. A successful login clears it.
+import time as _time
+
+LOCKOUT_THRESHOLD = 5
+LOCKOUT_WINDOW_SECONDS = 15 * 60
+LOCKOUT_DURATION_SECONDS = 15 * 60
+_failed_logins: dict = {}  # email -> (list[timestamps], locked_until)
+
+
+def _login_locked(identifier: str) -> int:
+    entry = _failed_logins.get(identifier)
+    if not entry:
+        return 0
+    locked_until = entry[1]
+    if locked_until and locked_until > _time.time():
+        return int(locked_until - _time.time())
+    return 0
+
+
+def _record_failed_login(identifier: str) -> None:
+    now = _time.time()
+    stamps, locked_until = _failed_logins.get(identifier, ([], 0))
+    stamps = [t for t in stamps if now - t < LOCKOUT_WINDOW_SECONDS]
+    stamps.append(now)
+    if len(stamps) >= LOCKOUT_THRESHOLD:
+        locked_until = now + LOCKOUT_DURATION_SECONDS
+        stamps = []
+    _failed_logins[identifier] = (stamps, locked_until)
+
+
+def _clear_failed_logins(identifier: str) -> None:
+    _failed_logins.pop(identifier, None)
+
+
 @router.post("/login")
 @limiter.limit("5/minute")
 async def login(req: LoginRequest, response: Response, request: Request):
@@ -144,6 +182,15 @@ async def login(req: LoginRequest, response: Response, request: Request):
         return error_response("Email and password are required", status_code=400, code="MISSING_CREDENTIALS")
 
     identifier = req.email.strip()
+    lock_remaining = _login_locked(identifier.lower() if not identifier.isalnum() else identifier)
+    if lock_remaining:
+        AUTH_FAILURES.labels("locked_out").inc()
+        return error_response(
+            f"Account temporarily locked. Try again in {lock_remaining // 60 + 1} minutes.",
+            status_code=423,
+            code="ACCOUNT_LOCKED",
+        )
+
     is_roll = bool(len(identifier) >= 5 and len(identifier) <= 20 and identifier.isalnum())
     
     lookup = identifier
@@ -165,8 +212,8 @@ async def login(req: LoginRequest, response: Response, request: Request):
         
     if res.error or not users or len(users) == 0:
         from .logger import logger
-        from .metrics import AUTH_FAILURES
         AUTH_FAILURES.labels("unknown_user").inc()
+        _record_failed_login(lookup)
         logger.warning(f"Login failed: user not found for identifier '{lookup}' (db error: {res.error})")
         return error_response("Invalid credentials", status_code=401, code="INVALID_CREDENTIALS")
         
@@ -191,11 +238,12 @@ async def login(req: LoginRequest, response: Response, request: Request):
         
     if not valid:
         from .logger import logger
-        from .metrics import AUTH_FAILURES
         AUTH_FAILURES.labels("bad_password").inc()
+        _record_failed_login(lookup)
         logger.warning(f"Login failed: invalid password for '{lookup}'")
         return error_response("Invalid credentials", status_code=401, code="INVALID_CREDENTIALS")
 
+    _clear_failed_logins(lookup)
     token = generate_token(user)
     
     # Create refresh session
