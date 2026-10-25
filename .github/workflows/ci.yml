@@ -89,6 +89,8 @@ jobs:
       - name: Audit installed Python packages with pip-audit
         run: |
           pip install pip-audit
+          # The runner image ships setuptools 79 with open advisories.
+          pip install --upgrade "setuptools>=84.1.0"
           pip-audit --skip-editable
 
   dependency-audit:
