@@ -14,7 +14,7 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line
 } from "recharts";
 
-const BRANCH_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#06b6d4"];
+const BRANCH_COLORS = ["#10b981", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#06b6d4"];
 
 interface Student {
   id?: string;
@@ -270,7 +270,7 @@ export default function TpoReports() {
           }}
           className="h-9 px-3.5 text-xs font-bold border-slate-200 text-slate-700 hover:bg-slate-50"
         >
-          <Download className="mr-2 h-4 w-4 text-blue-600" />
+          <Download className="mr-2 h-4 w-4 text-emerald-700" />
           Export Report (CSV)
         </Button>
       </div>
@@ -656,7 +656,7 @@ export default function TpoReports() {
           {/* Stats */}
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {[
-              { label: "Total Students", value: total, icon: Users, color: "text-blue-600", bg: "bg-blue-50" },
+              { label: "Total Students", value: total, icon: Users, color: "text-emerald-700", bg: "bg-blue-50" },
               { label: "Docs Verified", value: verified, icon: CheckCircle, color: "text-emerald-600", bg: "bg-emerald-50" },
               { label: "Profile Complete", value: profileComplete, icon: GraduationCap, color: "text-violet-600", bg: "bg-violet-50" },
               { label: "Avg CGPA", value: avgCgpa, icon: TrendingUp, color: "text-amber-600", bg: "bg-amber-50" },
@@ -677,7 +677,7 @@ export default function TpoReports() {
             <Card className="rounded-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
-                  <BarChart3 className="h-4 w-4 text-blue-600" />
+                  <BarChart3 className="h-4 w-4 text-emerald-700" />
                   Branch Distribution
                 </CardTitle>
               </CardHeader>

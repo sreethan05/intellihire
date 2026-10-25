@@ -175,7 +175,7 @@ export default function CreateDrive() {
         <Card className="rounded-lg h-fit">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Briefcase className="h-4 w-4 text-blue-600" />
+              <Briefcase className="h-4 w-4 text-emerald-700" />
               Drive Details
             </CardTitle>
           </CardHeader>
@@ -208,7 +208,7 @@ export default function CreateDrive() {
                                   setSelectedColleges([...selectedColleges, college.id]);
                                 }
                               }}
-                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
+                              className="rounded border-slate-300 text-emerald-700 focus:ring-blue-500 h-3.5 w-3.5"
                             />
                             <span>{college.name} ({college.code})</span>
                           </label>
@@ -272,7 +272,7 @@ export default function CreateDrive() {
           <Card className="rounded-lg shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
               <CardTitle className="flex items-center gap-2 text-base font-extrabold text-slate-900">
-                <Briefcase className="h-4 w-4 text-blue-600" />
+                <Briefcase className="h-4 w-4 text-emerald-700" />
                 Active Job Drives ({drives.length})
               </CardTitle>
               <Button variant="ghost" size="sm" onClick={fetchDrives} disabled={drivesLoading} className="h-8 w-8 p-0">
@@ -324,7 +324,7 @@ export default function CreateDrive() {
                                 CGPA: ≥{drive.min_cgpa}
                               </span>
                               {drive.required_skills && drive.required_skills.length > 0 && (
-                                <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-600">
+                                <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
                                   {drive.required_skills.length} Skills Required
                                 </span>
                               )}
@@ -347,7 +347,7 @@ export default function CreateDrive() {
                           <div className="border-t border-slate-200 bg-slate-50/50 p-4">
                             {candidatesLoading ? (
                               <div className="flex items-center justify-center py-6 text-sm text-slate-500">
-                                <RefreshCw className="mr-2 h-4 w-4 animate-spin text-blue-600" />
+                                <RefreshCw className="mr-2 h-4 w-4 animate-spin text-emerald-700" />
                                 Analyzing matched candidates...
                               </div>
                             ) : candidates.length === 0 ? (
@@ -401,7 +401,7 @@ export default function CreateDrive() {
                                                 href={candProfile.resume_url ? assetFileUrl(candProfile.resume_url) : ""}
                                                 target="_blank"
                                                 rel="noreferrer"
-                                                className="flex items-center text-[10px] font-bold text-blue-600 hover:underline"
+                                                className="flex items-center text-[10px] font-bold text-emerald-700 hover:underline"
                                               >
                                                 View Resume
                                                 <ExternalLink className="ml-1 h-2.5 w-2.5" />

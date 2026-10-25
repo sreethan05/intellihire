@@ -64,7 +64,7 @@ export default function RecruiterExamAnalytics() {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 14 }}>
         {[
-          { label: "Completion Rate", value: `${completionRate}%`, detail: `${totalCompleted} of ${totalAssigned} assignments`, color: "#2563eb", icon: CheckCircle2 },
+          { label: "Completion Rate", value: `${completionRate}%`, detail: `${totalCompleted} of ${totalAssigned} assignments`, color: "#0d9488", icon: CheckCircle2 },
           { label: "Total Attempts", value: `${totalAttempts}`, detail: "Candidate exam starts", color: "#8b5cf6", icon: Users },
           { label: "Avg Pass Rate", value: `${averagePassRate}%`, detail: "Across active exams", color: "#10b981", icon: Target },
           { label: "Needs Attention", value: attentionExam ? `${Math.round(attentionExam.passRate)}%` : "0%", detail: attentionExam?.title || "No exam data yet", color: "#f97316", icon: BarChart3 },
@@ -88,7 +88,7 @@ export default function RecruiterExamAnalytics() {
       <div style={{ ...panelStyle, display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 16 }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <MessageSquareText size={16} color="#2563eb" />
+            <MessageSquareText size={16} color="#0d9488" />
             <span style={{ fontSize: 15, fontWeight: 800, color: "#0f172a" }}>Recruiter Comment</span>
           </div>
           <p style={{ fontSize: 13, color: "#64748b", lineHeight: 1.7 }}>{analyticsComment}</p>
@@ -115,7 +115,7 @@ export default function RecruiterExamAnalytics() {
               <XAxis dataKey="title" tick={{ fill: "#64748b", fontSize: 12 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: "#64748b", fontSize: 12 }} axisLine={false} tickLine={false} />
               <Tooltip />
-              <Bar dataKey="completedCount" name="Completed" fill="#2563eb" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="completedCount" name="Completed" fill="#0d9488" radius={[6, 6, 0, 0]} />
               <Bar dataKey="assignedCount" name="Assigned" fill="#cbd5e1" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -124,7 +124,7 @@ export default function RecruiterExamAnalytics() {
 
       <div style={panelStyle}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-          <BarChart3 size={16} color="#2563eb" />
+          <BarChart3 size={16} color="#0d9488" />
           <span style={{ fontSize: 15, fontWeight: 800, color: "#0f172a" }}>Exam Breakdown</span>
         </div>
         {examPerformance.length === 0 ? (
@@ -141,7 +141,7 @@ export default function RecruiterExamAnalytics() {
                     </div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 20, fontWeight: 800, color: "#2563eb" }}>{exam.averageScore}</div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: "#0d9488" }}>{exam.averageScore}</div>
                     <div style={{ fontSize: 11, color: "#64748b" }}>avg score</div>
                   </div>
                 </div>

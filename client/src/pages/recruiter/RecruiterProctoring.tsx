@@ -121,7 +121,7 @@ export default function RecruiterProctoring() {
                   <div className="text-2xl font-extrabold text-slate-950">{item.value}</div>
                   <div className="mt-1 text-xs font-semibold uppercase text-slate-500">{item.label}</div>
                 </div>
-                <Icon className="h-5 w-5 text-blue-600" />
+                <Icon className="h-5 w-5 text-emerald-700" />
               </CardContent>
             </Card>
           );
@@ -246,7 +246,7 @@ export default function RecruiterProctoring() {
                             size="sm" 
                             variant="outline"
                             onClick={() => handleOverrideSeverity(event.id, 'medium')}
-                            className="h-6 px-2 text-[9px] font-bold border-blue-200 text-blue-700 hover:bg-blue-50 rounded"
+                            className="h-6 px-2 text-[9px] font-bold border-teal-200 text-blue-700 hover:bg-blue-50 rounded"
                           >
                             Medium
                           </Button>

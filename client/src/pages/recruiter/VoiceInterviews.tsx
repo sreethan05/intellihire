@@ -168,7 +168,7 @@ export default function VoiceInterviews() {
       {completed.length > 0 && (
         <div className="rounded-lg border border-slate-200 bg-white px-5 py-4 shadow-sm">
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-500">
-            <TrendingUp className="h-4 w-4 text-blue-600" />
+            <TrendingUp className="h-4 w-4 text-emerald-700" />
             Average Overall Score
           </div>
           <div className="mt-1 text-3xl font-extrabold text-slate-950">{avgScore}/100</div>
@@ -259,7 +259,7 @@ export default function VoiceInterviews() {
 
                   <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-slate-100 pt-4">
                     <div className="flex items-center gap-2">
-                      <Bot className="h-4 w-4 text-blue-600" />
+                      <Bot className="h-4 w-4 text-emerald-700" />
                       <span className="text-sm font-semibold text-slate-700">
                         Overall: <span className="font-extrabold text-slate-950">{interview.score || 0}/100</span>
                       </span>
@@ -291,7 +291,7 @@ export default function VoiceInterviews() {
                   )}
                   {interview.feedback && (
                     <div className="mt-2 flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm leading-6 text-blue-800">
-                      <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+                      <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
                       {interview.feedback}
                     </div>
                   )}
@@ -300,11 +300,11 @@ export default function VoiceInterviews() {
                   {expandedIds.includes(interview.id) && (
                     <div className="mt-6 border-t border-slate-100 pt-5 space-y-5">
                       <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                        <Bot className="h-4 w-4 text-blue-600 animate-pulse" /> Interview Timeline &amp; Evaluations
+                        <Bot className="h-4 w-4 text-emerald-700 animate-pulse" /> Interview Timeline &amp; Evaluations
                       </h4>
                       {details[interview.id]?.loading ? (
                         <div className="flex items-center justify-center py-8 text-slate-500 gap-2">
-                          <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                          <Loader2 className="h-5 w-5 animate-spin text-emerald-700" />
                           <span className="text-sm font-medium">Loading voice data...</span>
                         </div>
                       ) : (
@@ -328,7 +328,7 @@ export default function VoiceInterviews() {
                                     </div>
                                     <div className="flex items-center gap-1.5">
                                       <span className="text-xs text-slate-500 font-semibold">Evaluation Score:</span>
-                                      <span className="rounded-lg bg-blue-50 border border-blue-200 px-3 py-0.5 text-xs font-extrabold text-blue-700 shadow-sm">
+                                      <span className="rounded-lg bg-blue-50 border border-teal-200 px-3 py-0.5 text-xs font-extrabold text-blue-700 shadow-sm">
                                         {ans.score || 0}/100
                                       </span>
                                     </div>
@@ -351,7 +351,7 @@ export default function VoiceInterviews() {
                                       <UserRound className="h-4 w-4" />
                                     </div>
                                     <div className="flex-1 rounded-xl bg-white border border-slate-200 px-4 py-3 shadow-sm text-sm leading-relaxed text-slate-700">
-                                      <span className="text-[9px] font-bold text-blue-500 uppercase tracking-wider block mb-1">Whisper Transcription</span>
+                                      <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider block mb-1">Whisper Transcription</span>
                                       {ans.answer || <span className="italic text-slate-400">No response provided</span>}
                                     </div>
                                   </div>
@@ -371,7 +371,7 @@ export default function VoiceInterviews() {
                                     {audioUrl && (
                                       <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 max-w-lg shadow-sm flex flex-col gap-2">
                                         <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                                          <Mic className="h-3.5 w-3.5 text-blue-600 animate-pulse" /> Play voice recording
+                                          <Mic className="h-3.5 w-3.5 text-emerald-700 animate-pulse" /> Play voice recording
                                         </div>
                                         <audio src={audioUrl} controls className="w-full h-8 mt-1" />
                                       </div>

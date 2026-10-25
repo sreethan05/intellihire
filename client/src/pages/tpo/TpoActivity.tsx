@@ -47,7 +47,7 @@ export default function TpoActivity() {
       {/* Quick stats */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: "Total Students", value: students.length, icon: Activity, color: "text-blue-600", bg: "bg-blue-50" },
+          { label: "Total Students", value: students.length, icon: Activity, color: "text-emerald-700", bg: "bg-blue-50" },
           { label: "Docs Verified", value: verified.length, icon: CheckCircle, color: "text-emerald-600", bg: "bg-emerald-50" },
           { label: "Docs Pending", value: pending.length, icon: Clock, color: "text-amber-600", bg: "bg-amber-50" },
           { label: "Profile Done", value: profileComplete.length, icon: Upload, color: "text-violet-600", bg: "bg-violet-50" },

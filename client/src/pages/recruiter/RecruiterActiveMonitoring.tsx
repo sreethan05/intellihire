@@ -247,7 +247,7 @@ export default function RecruiterActiveMonitoring() {
                   <div className="text-2xl font-extrabold text-slate-900 tracking-tight">{totalActive}</div>
                   <div className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Active Candidates</div>
                 </div>
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-emerald-700 border border-blue-100">
                   <Users className="h-5 w-5" />
                 </div>
               </CardContent>
@@ -272,7 +272,7 @@ export default function RecruiterActiveMonitoring() {
             <Card className="rounded-2xl border-slate-200/70 shadow-sm overflow-hidden bg-white hover:shadow-md transition duration-200 sm:col-span-2 lg:col-span-1">
               <CardContent className="flex items-center justify-between p-5">
                 <div>
-                  <div className={`text-2xl font-extrabold tracking-tight ${complianceRate < 80 ? "text-amber-600" : complianceRate < 95 ? "text-blue-600" : "text-emerald-600"}`}>
+                  <div className={`text-2xl font-extrabold tracking-tight ${complianceRate < 80 ? "text-amber-600" : complianceRate < 95 ? "text-emerald-700" : "text-emerald-600"}`}>
                     {complianceRate}%
                   </div>
                   <div className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">Overall Compliance Rate</div>

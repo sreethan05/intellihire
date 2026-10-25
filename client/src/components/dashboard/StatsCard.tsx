@@ -10,7 +10,7 @@ interface StatsCardProps {
   trend?: string;
 }
 
-export default function StatsCard({ title, value, icon: Icon, description, color = "#3b82f6", bgColor = "#dbeafe", trend }: StatsCardProps) {
+export default function StatsCard({ title, value, icon: Icon, description, color = "#10b981", bgColor = "#dbeafe", trend }: StatsCardProps) {
   return (
     <div style={{
       background: "white", borderRadius: 8, padding: "20px 22px",

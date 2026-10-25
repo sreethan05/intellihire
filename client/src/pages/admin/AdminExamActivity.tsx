@@ -342,8 +342,8 @@ export default function AdminExamActivity() {
                   <AreaChart data={monitoringData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                     <defs>
                       <linearGradient id="monGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.25} />
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -351,7 +351,7 @@ export default function AdminExamActivity() {
                     <Area
                       type="monotone"
                       dataKey="activeCandidates"
-                      stroke="#3b82f6"
+                      stroke="#10b981"
                       strokeWidth={2.5}
                       fillOpacity={1}
                       fill="url(#monGrad)"

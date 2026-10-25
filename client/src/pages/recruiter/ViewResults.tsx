@@ -13,7 +13,7 @@ import { exportToCSV } from "@/lib/csvExport";
 import CandidateSkillRadar from "@/components/analytics/CandidateSkillRadar";
 import PlagiarismHeatmap from "@/components/analytics/PlagiarismHeatmap";
 
-const PIE_COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444"];
+const PIE_COLORS = ["#10b981", "#10b981", "#f59e0b", "#ef4444"];
 
 export default function ViewResults() {
   const { examId: paramExamId } = useParams<{ examId: string }>();
@@ -64,7 +64,7 @@ export default function ViewResults() {
 
       {/* Exam selector */}
       <div style={{ background: "white", borderRadius: 12, border: "1px solid #e8ecf0", padding: "16px 20px", marginBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
-        <BarChart3 size={16} color="#3b82f6" />
+        <BarChart3 size={16} color="#10b981" />
         <div style={{ position: "relative", flex: 1, maxWidth: 400 }}>
           <select value={selectedExam} onChange={e => setSelectedExam(e.target.value)}
             style={{ width: "100%", padding: "10px 36px 10px 14px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, fontFamily: "Inter,sans-serif", color: selectedExam ? "#0f172a" : "#94a3b8", outline: "none", appearance: "none" }}>
@@ -86,7 +86,7 @@ export default function ViewResults() {
           {/* Stat row */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 24 }}>
             {[
-              { label: "Total Attempts", value: results.length, color: "#3b82f6", bg: "#dbeafe" },
+              { label: "Total Attempts", value: results.length, color: "#10b981", bg: "#dbeafe" },
               { label: "Completed", value: completedResults.length, color: "#10b981", bg: "#dcfce7" },
               { label: "Avg Score", value: avgScore, color: "#8b5cf6", bg: "#ede9fe" },
               { label: "Pass Rate", value: `${passRate}%`, color: "#f59e0b", bg: "#fef3c7" },

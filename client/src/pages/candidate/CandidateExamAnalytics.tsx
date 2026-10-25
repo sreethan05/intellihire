@@ -610,7 +610,7 @@ export default function CandidateExamAnalytics() {
                               ? "bg-emerald-50 border border-emerald-100 text-emerald-600" 
                               : isBottom 
                                 ? "bg-rose-50 border border-rose-100 text-rose-600" 
-                                : "bg-blue-50 border border-blue-100 text-blue-600"
+                                : "bg-blue-50 border border-blue-100 text-emerald-700"
                           }`}>
                             {isTop ? "Top Tier" : isBottom ? "Below Avg" : "Average"}
                           </span>

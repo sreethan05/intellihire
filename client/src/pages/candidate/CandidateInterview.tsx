@@ -959,7 +959,7 @@ export default function CandidateInterview() {
                       <div className="text-xs text-slate-500">Live interview presence</div>
                     </div>
                   </div>
-                  <Video className="h-5 w-5 text-blue-600" />
+                  <Video className="h-5 w-5 text-emerald-700" />
                 </div>
 
                 <div className="flex flex-1 items-center justify-center">
@@ -988,7 +988,7 @@ export default function CandidateInterview() {
                 <QualifiedExam attempt={eligibility?.attempts?.[0] || null} />
                 {pendingInterview &&
                   (!pendingInterview.scheduled_start || !pendingInterview.scheduled_end) && (
-                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+                  <div className="rounded-lg border border-teal-200 bg-blue-50 p-3 text-sm text-blue-800">
                     🎉 You've been <strong>shortlisted</strong>! Your recruiter will schedule the interview start/end time shortly.
                   </div>
                 )}
@@ -1033,7 +1033,7 @@ export default function CandidateInterview() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-6 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_30px_80px_rgba(15,23,42,0.35)]">
             <div className="mb-3 flex items-center gap-3 text-slate-900">
-              <Monitor className="h-5 w-5 text-blue-600" />
+              <Monitor className="h-5 w-5 text-emerald-700" />
               <h3 className="text-lg font-bold">Interview Locked</h3>
             </div>
             <p className="text-sm leading-6 text-slate-600">{securityMessage}</p>
@@ -1180,7 +1180,7 @@ export default function CandidateInterview() {
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-md shadow-slate-100">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
               <div>
-                <div className="text-[10px] font-extrabold uppercase tracking-widest text-blue-600">Stage {currentStage} · {stageInfo.name}</div>
+                <div className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-700">Stage {currentStage} · {stageInfo.name}</div>
                 <h2 className="mt-1 text-xl font-extrabold leading-relaxed text-slate-900 tracking-tight">
                   {showQuestionText ? currentQuestion : speaking ? "🔊 AI is reading the question..." : "🎤 Answer the question below..."}
                 </h2>
@@ -1201,7 +1201,7 @@ export default function CandidateInterview() {
                 value={answerDraft}
                 onChange={(e) => setAnswerDraft(e.target.value)}
                 placeholder={currentStage === 2 ? "Speak clearly — pronunciation and clarity are being evaluated…" : "Your spoken response will compile here. You can also type or edit details directly…"}
-                className="min-h-40 resize-none text-base leading-relaxed p-4 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-300"
+                className="min-h-40 resize-none text-base leading-relaxed p-4 border-slate-200 rounded-xl focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 transition-all duration-300"
                 onCopy={(e) => { e.preventDefault(); toast.error("Copying is disabled during the interview."); }}
                 onCut={(e) => { e.preventDefault(); toast.error("Cutting is disabled during the interview."); }}
                 onPaste={(e) => { e.preventDefault(); toast.error("Pasting is disabled during the interview."); }}
@@ -1215,7 +1215,7 @@ export default function CandidateInterview() {
             </div>
 
             {localAudioPreview && (
-              <div className="mt-4 flex flex-col gap-1.5 rounded-lg border border-blue-200 bg-blue-50/50 p-3">
+              <div className="mt-4 flex flex-col gap-1.5 rounded-lg border border-teal-200 bg-blue-50/50 p-3">
                 <div className="text-xs font-bold text-blue-700 uppercase tracking-wide flex items-center gap-1.5">
                   <Volume2 className="h-3.5 w-3.5 animate-pulse" />
                   Your Recorded Audio Answer
@@ -1236,7 +1236,7 @@ export default function CandidateInterview() {
                       : "hover:bg-slate-50 border-slate-300 text-slate-700 shadow-sm"
                   }`}
                 >
-                  {listening ? <MicOff className="mr-2 h-4 w-4" /> : <Mic className="mr-2 h-4 w-4 text-blue-600" />}
+                  {listening ? <MicOff className="mr-2 h-4 w-4" /> : <Mic className="mr-2 h-4 w-4 text-emerald-700" />}
                   {listening ? "Stop Recording" : "Record Voice Response"}
                 </Button>
                 {listening && (
@@ -1285,7 +1285,7 @@ export default function CandidateInterview() {
             <CardHeader><CardTitle className="text-base">Session Status</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="h-2 rounded-full bg-slate-100">
-                <div className="h-2 rounded-full bg-blue-600 transition-all" style={{ width: `${progress}%` }} />
+                <div className="h-2 rounded-full bg-emerald-600 transition-all" style={{ width: `${progress}%` }} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Metric label="Answered" value={`${answeredCount}/${questions.length}`} />
@@ -1312,7 +1312,7 @@ export default function CandidateInterview() {
                   <p className="text-sm leading-6 text-slate-600">{lastFeedbackParsed.text || "Answer submitted for scoring."}</p>
                   {lastFeedbackParsed.audioUrl && (
                     <div className="mt-2 flex flex-col gap-1 rounded-lg border border-blue-100 bg-blue-50/30 p-2">
-                      <div className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Playback Answer Audio</div>
+                      <div className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Playback Answer Audio</div>
                       <audio src={lastFeedbackParsed.audioUrl} controls className="w-full h-8 mt-1" />
                     </div>
                   )}
@@ -1354,7 +1354,7 @@ function HeaderBar({ title, subtitle, timeLeft, live }: { title: string; subtitl
         : "border-slate-200 bg-white text-slate-950"
     }`}>
       <div>
-        <div className={`flex items-center gap-2 text-xs font-bold uppercase tracking-wider ${live ? "text-blue-400" : "text-blue-600"}`}>
+        <div className={`flex items-center gap-2 text-xs font-bold uppercase tracking-wider ${live ? "text-blue-400" : "text-emerald-700"}`}>
           <Sparkles className="h-4 w-4" />
           AI Interview Round
         </div>

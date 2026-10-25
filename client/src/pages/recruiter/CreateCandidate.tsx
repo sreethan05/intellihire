@@ -31,7 +31,7 @@ export default function CreateCandidate() {
       <div style={{ maxWidth: 520 }}>
         <div style={{ background: "white", borderRadius: 12, border: "1px solid #e8ecf0", overflow: "hidden" }}>
           <div style={{ padding: "16px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", gap: 8 }}>
-            <UserPlus size={16} color="#3b82f6" />
+            <UserPlus size={16} color="#10b981" />
             <span style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>Candidate Details</span>
           </div>
           <form onSubmit={handleSubmit} style={{ padding: 20, display: "flex", flexDirection: "column", gap: 18 }}>
@@ -47,7 +47,7 @@ export default function CreateCandidate() {
                   <input
                     type={type} required value={value} onChange={e => setter(e.target.value)} placeholder={placeholder}
                     style={{ width: "100%", padding: "10px 12px 10px 34px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, fontFamily: "Inter,sans-serif", outline: "none", boxSizing: "border-box" }}
-                    onFocus={e => e.target.style.borderColor = "#3b82f6"}
+                    onFocus={e => e.target.style.borderColor = "#10b981"}
                     onBlur={e => e.target.style.borderColor = "#d1d5db"}
                   />
                 </div>
@@ -56,7 +56,7 @@ export default function CreateCandidate() {
             <button type="submit" disabled={loading} style={{
               padding: "11px", borderRadius: 8, border: "none", fontSize: 13, fontWeight: 700,
               fontFamily: "Inter,sans-serif", cursor: loading ? "not-allowed" : "pointer",
-              background: loading ? "#93c5fd" : "linear-gradient(135deg,#3b82f6,#6366f1)", color: "white", marginTop: 4
+              background: loading ? "#93c5fd" : "linear-gradient(135deg,#10b981,#6366f1)", color: "white", marginTop: 4
             }}>
               {loading ? "Creating..." : "Create Candidate"}
             </button>

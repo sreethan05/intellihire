@@ -22,7 +22,7 @@ import {
 type Tone = "blue" | "violet" | "green" | "amber" | "rose" | "cyan";
 
 const toneClasses: Record<Tone, { box: string; text: string; badge: string }> = {
-  blue: { box: "bg-blue-50 text-blue-600", text: "text-blue-600", badge: "bg-blue-50 text-blue-700" },
+  blue: { box: "bg-blue-50 text-emerald-700", text: "text-emerald-700", badge: "bg-blue-50 text-blue-700" },
   violet: { box: "bg-violet-50 text-violet-600", text: "text-violet-600", badge: "bg-violet-50 text-violet-700" },
   green: { box: "bg-emerald-50 text-emerald-600", text: "text-emerald-600", badge: "bg-emerald-50 text-emerald-700" },
   amber: { box: "bg-amber-50 text-amber-600", text: "text-amber-600", badge: "bg-amber-50 text-amber-700" },
@@ -105,7 +105,7 @@ export function DashboardSection({
 
 export function ViewAllLink({ to }: { to: string }) {
   return (
-    <Link to={to} className="text-xs font-semibold text-blue-600 hover:text-blue-700">
+    <Link to={to} className="text-xs font-semibold text-emerald-700 hover:text-blue-700">
       View All
     </Link>
   );
@@ -125,7 +125,7 @@ export function FeatureGrid({
           <Link
             key={item.to}
             to={item.to}
-            className="group flex min-h-24 items-center gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
+            className="group flex min-h-24 items-center gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-md"
           >
             <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg ${classes.box}`}>
               <Icon className="h-6 w-6" />
@@ -134,7 +134,7 @@ export function FeatureGrid({
               <div className="truncate text-sm font-extrabold text-slate-900">{item.label}</div>
               <div className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{item.caption}</div>
             </div>
-            <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-blue-600" />
+            <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-emerald-700" />
           </Link>
         );
       })}
@@ -337,7 +337,7 @@ export function ProgressRows({
                 <span className="shrink-0 font-bold text-slate-950">{item.meta || item.value}</span>
               </div>
               <div className="h-2 rounded-full bg-slate-100">
-                <div className="h-2 rounded-full" style={{ width: `${width}%`, background: item.color || "#2563eb" }} />
+                <div className="h-2 rounded-full" style={{ width: `${width}%`, background: item.color || "#0d9488" }} />
               </div>
             </div>
           );

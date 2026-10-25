@@ -20,7 +20,7 @@ const panelStyle: CSSProperties = {
 };
 
 const LANG_COLORS: Record<string, string> = {
-  python: "#3b82f6",
+  python: "#10b981",
   java: "#f59e0b",
   cpp: "#ef4444",
   javascript: "#10b981",
@@ -862,7 +862,7 @@ export default function RecruiterCandidateAnalytics() {
                           <Tooltip />
                           <Bar dataKey="accuracy" name="Accuracy (%)" radius={[0, 5, 5, 0]}>
                             {classPerformance.topics.map((t, i) => (
-                              <Cell key={i} fill={t.accuracy < 50 ? "#ef4444" : "#3b82f6"} />
+                              <Cell key={i} fill={t.accuracy < 50 ? "#ef4444" : "#10b981"} />
                             ))}
                           </Bar>
                         </BarChart>
@@ -1021,7 +1021,7 @@ export default function RecruiterCandidateAnalytics() {
                         <div className="space-y-4">
                           <div className="grid gap-3 sm:grid-cols-4">
                             {[
-                              { label: "Assigned Exams", value: candidateDossier.examStats.totalAttempts, color: "text-blue-600" },
+                              { label: "Assigned Exams", value: candidateDossier.examStats.totalAttempts, color: "text-emerald-700" },
                               { label: "Completed", value: candidateDossier.examStats.completed, color: "text-violet-600" },
                               { label: "Class Average", value: `${candidateDossier.examStats.averageScore}%`, color: "text-indigo-600" },
                               { label: "Pass Rate", value: `${candidateDossier.examStats.passRate}%`, color: "text-emerald-600" }
@@ -1240,7 +1240,7 @@ export default function RecruiterCandidateAnalytics() {
                                         (candidateDossier.profile.resume_ats_analysis.atsScore || 0) >= 85 
                                           ? "text-emerald-600" 
                                           : (candidateDossier.profile.resume_ats_analysis.atsScore || 0) >= 70 
-                                            ? "text-blue-600" 
+                                            ? "text-emerald-700" 
                                             : (candidateDossier.profile.resume_ats_analysis.atsScore || 0) >= 50
                                               ? "text-amber-600"
                                               : "text-rose-600"

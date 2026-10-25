@@ -56,7 +56,7 @@ export default function CandidateCertificates() {
         <Card className="rounded-lg">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Award className="h-4 w-4 text-blue-600" />
+              <Award className="h-4 w-4 text-emerald-700" />
               Certificates
             </CardTitle>
           </CardHeader>
@@ -66,7 +66,7 @@ export default function CandidateCertificates() {
               return (
                 <div key={certificate.id} className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 font-bold border border-blue-100">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-emerald-700 font-bold border border-blue-100">
                       <Award className="h-5 w-5" />
                     </div>
                     <div>
@@ -74,7 +74,7 @@ export default function CandidateCertificates() {
                       <div className="mt-0.5 text-xs text-slate-500 flex items-center gap-2">
                         <span>Issued {new Date(certificate.issued_at).toLocaleDateString()}</span>
                         <span>•</span>
-                        <a href={verifyUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-600 hover:underline">
+                        <a href={verifyUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-emerald-700 hover:underline">
                           Verify Credentials
                         </a>
                       </div>
@@ -97,7 +97,7 @@ export default function CandidateCertificates() {
         <Card className="rounded-lg">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <BadgeCheck className="h-4 w-4 text-blue-600" />
+              <BadgeCheck className="h-4 w-4 text-emerald-700" />
               Badges
             </CardTitle>
           </CardHeader>

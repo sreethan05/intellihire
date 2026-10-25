@@ -60,7 +60,7 @@ export default function AdminRecruiterAnalytics() {
               <XAxis dataKey="name" tick={{ fill: "#64748b", fontSize: 12 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: "#64748b", fontSize: 12 }} axisLine={false} tickLine={false} />
               <Tooltip />
-              <Bar dataKey="Candidates" fill="#2563eb" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="Candidates" fill="#0d9488" radius={[6, 6, 0, 0]} />
               <Bar dataKey="Exams" fill="#8b5cf6" radius={[6, 6, 0, 0]} />
               <Bar dataKey="Attempts" fill="#10b981" radius={[6, 6, 0, 0]} />
             </BarChart>
@@ -70,7 +70,7 @@ export default function AdminRecruiterAnalytics() {
 
       <div style={panelStyle}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-          <Users size={16} color="#2563eb" />
+          <Users size={16} color="#0d9488" />
           <span style={{ fontSize: 15, fontWeight: 800, color: "#0f172a" }}>Recruiter Watchlist</span>
         </div>
         {recruiterSnapshots.length === 0 ? (
@@ -84,7 +84,7 @@ export default function AdminRecruiterAnalytics() {
                     <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{snapshot.name}</div>
                     <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{snapshot.email}</div>
                   </div>
-                  <span style={{ fontSize: 12, color: "#2563eb", fontWeight: 700 }}>
+                  <span style={{ fontSize: 12, color: "#0d9488", fontWeight: 700 }}>
                     {snapshot.completedCount}/{snapshot.attemptCount || 0} completed
                   </span>
                 </div>

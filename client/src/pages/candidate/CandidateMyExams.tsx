@@ -5,7 +5,7 @@ import { Pie, PieChart, ResponsiveContainer, Tooltip, Cell } from "recharts";
 import { candidateApi, proctoringApi } from "@/lib/api";
 import type { DashboardStats, ExamAssignment } from "@/types";
 
-const PIE_COLORS = ["#10b981", "#2563eb", "#f59e0b"];
+const PIE_COLORS = ["#10b981", "#0d9488", "#f59e0b"];
 
 interface ProctoringTimelineEvent {
   id?: string;
@@ -133,11 +133,11 @@ export default function CandidateMyExams() {
               style={{
                 width: `${Math.min(stats.completionRate || 0, 100)}%`,
                 height: "100%",
-                background: "linear-gradient(90deg,#2563eb,#4f46e5)",
+                background: "linear-gradient(90deg,#0d9488,#4f46e5)",
               }}
             />
           </div>
-          <div style={{ marginTop: 8, fontSize: 12, color: "#2563eb", fontWeight: 700 }}>
+          <div style={{ marginTop: 8, fontSize: 12, color: "#0d9488", fontWeight: 700 }}>
             {Math.round(stats.completionRate || 0)}% completed
           </div>
         </div>
@@ -181,7 +181,7 @@ export default function CandidateMyExams() {
               <div key={assignment.id} style={{ ...panelStyle, display: "flex", flexDirection: "column", gap: 14 }}>
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
                   <div style={{ width: 42, height: 42, borderRadius: 12, background: "#eff6ff", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <FileText size={18} color="#2563eb" />
+                    <FileText size={18} color="#0d9488" />
                   </div>
                   <span style={{ background: status.bg, color: status.color, fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 999, display: "flex", alignItems: "center", gap: 4 }}>
                     <StatusIcon size={11} />
@@ -249,7 +249,7 @@ export default function CandidateMyExams() {
                           fontSize: 13,
                           fontWeight: 700,
                           cursor: "pointer",
-                          background: "linear-gradient(135deg,#059669,#2563eb)",
+                          background: "linear-gradient(135deg,#059669,#0d9488)",
                           color: "white",
                           display: "flex",
                           alignItems: "center",
@@ -278,7 +278,7 @@ export default function CandidateMyExams() {
                       fontSize: 13,
                       fontWeight: 700,
                       cursor: availability.canAttempt ? "pointer" : "not-allowed",
-                      background: !availability.canAttempt ? "#cbd5e1" : isInProgress ? "linear-gradient(135deg,#f59e0b,#d97706)" : "linear-gradient(135deg,#2563eb,#4f46e5)",
+                      background: !availability.canAttempt ? "#cbd5e1" : isInProgress ? "linear-gradient(135deg,#f59e0b,#d97706)" : "linear-gradient(135deg,#0d9488,#4f46e5)",
                       color: "white",
                       display: "flex",
                       alignItems: "center",

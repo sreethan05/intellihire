@@ -134,7 +134,7 @@ export default function PublicPortfolio() {
                       </span>
                     )}
                   </div>
-                  <p className="text-sm font-semibold text-blue-600">{profile.branch} Department</p>
+                  <p className="text-sm font-semibold text-emerald-700">{profile.branch} Department</p>
                   <p className="mt-1 text-xs text-slate-400 flex items-center gap-1">
                     <MapPin className="h-3 w-3" /> {profile.college?.name} ({profile.college?.code})
                   </p>
@@ -224,7 +224,7 @@ export default function PublicPortfolio() {
                           <div className="flex justify-between items-start gap-1.5">
                             <h4 className="font-bold text-xs text-slate-900 line-clamp-1">{proj.title}</h4>
                             {proj.url && (
-                              <a href={proj.url} target="_blank" rel="noreferrer" className="text-[10px] text-blue-600 hover:underline font-bold shrink-0 flex items-center gap-0.5">
+                              <a href={proj.url} target="_blank" rel="noreferrer" className="text-[10px] text-emerald-700 hover:underline font-bold shrink-0 flex items-center gap-0.5">
                                 <Globe className="h-2.5 w-2.5" /> Link
                               </a>
                             )}
@@ -234,7 +234,7 @@ export default function PublicPortfolio() {
                         {proj.tech_stack && (
                           <div className="flex flex-wrap gap-1 mt-2">
                             {(typeof proj.tech_stack === "string" ? proj.tech_stack.split(",") : proj.tech_stack).map((tag: string, tidx: number) => (
-                              <span key={tidx} className="inline-block rounded bg-blue-50 px-1 py-0.5 text-[8px] font-bold text-blue-600">
+                              <span key={tidx} className="inline-block rounded bg-blue-50 px-1 py-0.5 text-[8px] font-bold text-emerald-700">
                                 {tag.trim()}
                               </span>
                             ))}
@@ -249,7 +249,7 @@ export default function PublicPortfolio() {
               {profile.semester_grades && Array.isArray(profile.semester_grades) && profile.semester_grades.length > 0 && (
                 <div className="pt-4 border-t border-slate-100 space-y-3">
                   <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
-                    <BarChart3 className="h-3.5 w-3.5 text-blue-600" /> Academic Grade Timeline
+                    <BarChart3 className="h-3.5 w-3.5 text-emerald-700" /> Academic Grade Timeline
                   </h3>
                   <div className="h-48 w-full mt-2">
                     <ResponsiveContainer width="100%" height="100%">
@@ -263,7 +263,7 @@ export default function PublicPortfolio() {
                         <YAxis tick={{ fill: '#94a3b8', fontSize: 9 }} domain={[0, 10]} />
                         <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 10 }} />
                         <Legend verticalAlign="top" height={28} iconType="circle" wrapperStyle={{ fontSize: 10, fontWeight: 600 }} />
-                        <Line name="SGPA" type="monotone" dataKey="sgpa" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 3 }} />
+                        <Line name="SGPA" type="monotone" dataKey="sgpa" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3 }} />
                         <Line name="CGPA" type="monotone" dataKey="cgpa" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3 }} />
                       </LineChart>
                     </ResponsiveContainer>
@@ -281,7 +281,7 @@ export default function PublicPortfolio() {
                 href={assetFileUrl(profile.resume_url)}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white shadow hover:bg-blue-700 transition"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white shadow hover:bg-emerald-700 transition"
               >
                 <FileText className="h-3.5 w-3.5" /> View Resume
               </a>
@@ -296,7 +296,7 @@ export default function PublicPortfolio() {
             {data.radarData && data.radarData.length > 0 && (
               <div className="border-b border-slate-100 pb-4 mb-4">
                 <h2 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                  <BarChart3 className="h-3.5 w-3.5 text-blue-600" /> Skill Radar Profile
+                  <BarChart3 className="h-3.5 w-3.5 text-emerald-700" /> Skill Radar Profile
                 </h2>
                 <div className="h-44">
                   <ResponsiveContainer width="100%" height="100%">
@@ -304,7 +304,7 @@ export default function PublicPortfolio() {
                       <PolarGrid stroke="#e2e8f0" />
                       <PolarAngleAxis dataKey="subject" tick={{ fill: '#475569', fontSize: 8, fontWeight: 600 }} />
                       <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 7 }} />
-                      <Radar name="Skills" dataKey="score" stroke="#2563eb" fill="#3b82f6" fillOpacity={0.4} />
+                      <Radar name="Skills" dataKey="score" stroke="#0d9488" fill="#10b981" fillOpacity={0.4} />
                     </RadarChart>
                   </ResponsiveContainer>
                 </div>
@@ -345,7 +345,7 @@ export default function PublicPortfolio() {
             )}
 
             <h2 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-1.5">
-              <Briefcase className="h-3.5 w-3.5 text-blue-600" /> Drive Participation
+              <Briefcase className="h-3.5 w-3.5 text-emerald-700" /> Drive Participation
             </h2>
             
             <div className="space-y-3">

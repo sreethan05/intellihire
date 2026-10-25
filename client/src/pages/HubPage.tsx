@@ -7,8 +7,12 @@ import {
   Compass, ChevronRight, type LucideIcon
 } from "lucide-react";
 import { Link } from "react-router";
+import { motion } from "framer-motion";
 import { hubApi } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import {
+  AnimatedNumber, GlassCard, LiveBadge, GradientText, Stagger, StaggerItem,
+} from "@/components/motion/primitives";
 import { 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, 
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid 
@@ -105,20 +109,20 @@ interface HubOverview {
 
 const STATS_MAP: Record<string, { label: string; icon: LucideIcon; colorClass: string; gradient: string }> = {
   completedExams: { label: "Completed Exams", icon: Award, colorClass: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20", gradient: "from-emerald-500/10 to-emerald-600/5" },
-  upcomingExams: { label: "Upcoming Exams", icon: Calendar, colorClass: "text-blue-400 bg-blue-500/10 border-blue-500/20", gradient: "from-blue-500/10 to-indigo-600/5" },
-  averageScore: { label: "Average Score", icon: TrendingUp, colorClass: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20", gradient: "from-indigo-500/10 to-purple-600/5" },
+  upcomingExams: { label: "Upcoming Exams", icon: Calendar, colorClass: "text-teal-400 bg-teal-500/10 border-teal-500/20", gradient: "from-teal-500/10 to-emerald-600/5" },
+  averageScore: { label: "Average Score", icon: TrendingUp, colorClass: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20", gradient: "from-emerald-500/10 to-teal-600/5" },
   rank: { label: "College Rank", icon: Trophy, colorClass: "text-amber-400 bg-amber-500/10 border-amber-500/20", gradient: "from-amber-500/10 to-yellow-600/5" },
-  totalRegistered: { label: "Registered Students", icon: Users, colorClass: "text-blue-400 bg-blue-500/10 border-blue-500/20", gradient: "from-blue-500/10 to-indigo-600/5" },
+  totalRegistered: { label: "Registered Students", icon: Users, colorClass: "text-teal-400 bg-teal-500/10 border-teal-500/20", gradient: "from-teal-500/10 to-emerald-600/5" },
   completeProfiles: { label: "Complete Profiles", icon: CheckCircle2, colorClass: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20", gradient: "from-emerald-500/10 to-emerald-600/5" },
-  activeDrives: { label: "Active Job Drives", icon: Briefcase, colorClass: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20", gradient: "from-indigo-500/10 to-purple-600/5" },
+  activeDrives: { label: "Active Job Drives", icon: Briefcase, colorClass: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20", gradient: "from-emerald-500/10 to-teal-600/5" },
   placed: { label: "Placed Candidates", icon: Trophy, colorClass: "text-amber-400 bg-amber-500/10 border-amber-500/20", gradient: "from-amber-500/10 to-yellow-600/5" },
   placementRate: { label: "Placement Rate", icon: TrendingUp, colorClass: "text-teal-400 bg-teal-500/10 border-teal-500/20", gradient: "from-teal-500/10 to-emerald-600/5" },
   averageCgpa: { label: "Average CGPA", icon: Award, colorClass: "text-purple-400 bg-purple-500/10 border-purple-500/20", gradient: "from-purple-500/10 to-pink-600/5" },
-  totalCandidates: { label: "Total Candidates", icon: Users, colorClass: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20", gradient: "from-indigo-500/10 to-purple-600/5" },
+  totalCandidates: { label: "Total Candidates", icon: Users, colorClass: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20", gradient: "from-emerald-500/10 to-teal-600/5" },
   completedAttempts: { label: "Completed Exams", icon: CheckCircle2, colorClass: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20", gradient: "from-emerald-500/10 to-emerald-600/5" },
   offersExtended: { label: "Offers Extended", icon: Trophy, colorClass: "text-amber-400 bg-amber-500/10 border-amber-500/20", gradient: "from-amber-500/10 to-yellow-600/5" },
-  totalUsers: { label: "Total Platform Users", icon: Users, colorClass: "text-blue-400 bg-blue-500/10 border-blue-500/20", gradient: "from-blue-500/10 to-indigo-600/5" },
-  totalExams: { label: "Total Exams Created", icon: Award, colorClass: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20", gradient: "from-indigo-500/10 to-purple-600/5" },
+  totalUsers: { label: "Total Platform Users", icon: Users, colorClass: "text-teal-400 bg-teal-500/10 border-teal-500/20", gradient: "from-teal-500/10 to-emerald-600/5" },
+  totalExams: { label: "Total Exams Created", icon: Award, colorClass: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20", gradient: "from-emerald-500/10 to-teal-600/5" },
   activeSessions: { label: "Active Live Sessions", icon: Activity, colorClass: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20", gradient: "from-emerald-500/10 to-emerald-600/5" },
   systemHealth: { label: "Core System Health", icon: ShieldAlert, colorClass: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20", gradient: "from-emerald-500/10 to-emerald-600/5" },
 };
@@ -135,10 +139,11 @@ export default function HubPage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-slate-50/50">
+      <div className="flex h-screen items-center justify-center bg-[#FAF9F6]">
         <div className="text-center space-y-4">
-          <Loader2 className="h-10 w-10 animate-spin text-blue-500 mx-auto" />
+          <Loader2 className="h-10 w-10 animate-spin text-emerald-600 mx-auto" />
           <p className="text-sm text-slate-500 font-bold tracking-wider uppercase">Assembling Control Command Hub...</p>
+          <div className="h-1 w-40 mx-auto rounded-full accent-underline" aria-hidden />
         </div>
       </div>
     );
@@ -151,7 +156,7 @@ export default function HubPage() {
           <AlertTriangle className="h-10 w-10 text-rose-500 mx-auto mb-3" />
           <h2 className="text-xl font-black text-slate-900">Hub Workspace Offline</h2>
           <p className="mt-2 text-sm text-slate-500">Failed to aggregate command dashboard telemetry.</p>
-          <button onClick={() => refetch()} className="mt-6 w-full rounded-xl bg-blue-600 hover:bg-blue-500 py-3 text-xs font-bold text-white transition shadow-lg shadow-blue-500/20">
+          <button onClick={() => refetch()} className="mt-6 w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 py-3 text-xs font-bold text-white transition shadow-lg shadow-emerald-500/20">
             Re-Initialize Hub
           </button>
         </div>
@@ -171,47 +176,55 @@ export default function HubPage() {
   return (
     <div className="space-y-8 pb-16 min-h-screen text-slate-700 p-1 sm:p-4 rounded-3xl">
       
-      {/* HEADER SECTION */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-        <div>
-          <span className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-blue-600 bg-blue-50 border border-blue-100 rounded px-2.5 py-1">
-            <Compass className="h-3 w-3" /> Secure Access // {role}
-          </span>
-          <h1 className="text-3xl font-black text-slate-900 mt-3 capitalize tracking-tight">
-            {role === "admin" ? "Platform Control Console" : `${user?.name}'s Command Hub`}
-          </h1>
-          <p className="text-xs text-slate-500 mt-1.5 flex items-center gap-1.5">
-            <Calendar className="h-3.5 w-3.5 text-slate-400" /> {todayStr}
-          </p>
+      {/* HEADER SECTION — dark navy hero with ambient sage/blue glow */}
+      <div className="relative overflow-hidden hero-theme p-6 sm:p-7 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-[0_10px_35px_-18px_rgba(15,23,42,0.18)] dark:shadow-[0_20px_60px_-30px_rgba(0,0,0,0.8)]">
+        <div aria-hidden className="pointer-events-none absolute -top-24 -right-16 h-64 w-64 rounded-full bg-emerald-400/10 blur-3xl animate-float-slow" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-28 left-1/3 h-56 w-56 rounded-full bg-teal-400/10 blur-3xl" />
+        <div className="relative flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <span className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-emerald-800 bg-emerald-600/10 border border-emerald-700/20 dark:text-emerald-300 dark:bg-emerald-400/10 dark:border-emerald-300/20 rounded-full px-3 py-1">
+              <Compass className="h-3 w-3" /> Secure Access // <GradientText>{role}</GradientText>
+            </span>
+            <h1 className="text-3xl font-black text-slate-900 dark:text-white mt-3 capitalize tracking-tight">
+              {role === "admin" ? (
+                <>Platform Control <GradientText>Console</GradientText></>
+              ) : (
+                <>{user?.name}'s <GradientText>Command Hub</GradientText></>
+              )}
+            </h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5 text-slate-500" /> {todayStr}
+            </p>
+          </div>
+          <button 
+            onClick={() => refetch()} 
+            disabled={isRefetching}
+            className="inline-flex items-center gap-2 rounded-xl border border-emerald-600/30 bg-emerald-600/10 hover:bg-emerald-600/20 dark:border-emerald-300/30 dark:bg-emerald-400/10 dark:hover:bg-emerald-400/20 backdrop-blur text-xs font-bold text-emerald-900 hover:text-emerald-950 dark:text-emerald-100 dark:hover:text-white px-4 py-2.5 transition duration-200 cursor-pointer"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isRefetching ? "animate-spin text-emerald-300" : "text-emerald-300/70"}`} />
+            {isRefetching ? "Syncing..." : "Sync Telemetry"}
+          </button>
         </div>
-        <button 
-          onClick={() => refetch()} 
-          disabled={isRefetching}
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-600 hover:text-slate-900 px-4 py-2.5 transition duration-200 shadow-sm cursor-pointer"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${isRefetching ? "animate-spin text-blue-500" : "text-slate-400"}`} />
-          {isRefetching ? "Syncing..." : "Sync Telemetry"}
-        </button>
       </div>
 
       {/* ZONE 1: ACTION CENTER */}
       {actionItems && actionItems.length > 0 && (
         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <h2 className="text-xs font-black text-slate-500 uppercase tracking-widest">Active Action Center</h2>
-            <span className="h-2 w-2 rounded-full bg-rose-500 animate-ping"></span>
+            <LiveBadge label="Live" className="text-emerald-700" />
           </div>
           
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {actionItems.map((item: ActionItem, idx: number) => {
               const isUrgent = item.priority === "urgent";
               const isHigh = item.priority === "high";
-              const borderCol = isUrgent ? "border-l-rose-500" : isHigh ? "border-l-amber-500" : "border-l-blue-500";
+              const borderCol = isUrgent ? "border-l-rose-500" : isHigh ? "border-l-amber-500" : "border-l-teal-500";
               const tagStyle = isUrgent 
                 ? "bg-rose-500/10 text-rose-700 border-rose-500/20" 
                 : isHigh 
                   ? "bg-amber-500/10 text-amber-700 border-amber-500/20" 
-                  : "bg-blue-500/10 text-blue-700 border-blue-500/20";
+                  : "bg-teal-500/10 text-teal-700 border-teal-500/20";
               
               return (
                 <div key={idx} className={`relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm border-l-4 ${borderCol} flex flex-col justify-between gap-4 hover:-translate-y-0.5 hover:shadow-md hover:bg-slate-50/30 transition duration-300`}>
@@ -229,9 +242,9 @@ export default function HubPage() {
                   {item.action_url && (
                     <Link
                       to={item.action_url}
-                      className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-500 mt-1 group"
+                      className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600 mt-1 group"
                     >
-                      Resolve Action <ChevronRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5 text-blue-600" />
+                      Resolve Action <ChevronRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5 text-emerald-700" />
                     </Link>
                   )}
                 </div>
@@ -247,32 +260,34 @@ export default function HubPage() {
         {/* LEFT COLUMN (2/3 width) */}
         <div className="lg:col-span-2 space-y-6">
           
-          {/* Stats Grid */}
-          <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
+          {/* Stats Grid — count-up values, staggered entrance, hover lift */}
+          <Stagger className="grid gap-4 grid-cols-2 sm:grid-cols-4">
             {Object.keys(stats).map((key) => {
               const config = STATS_MAP[key] || { label: key, icon: Activity, colorClass: "text-slate-500", gradient: "" };
               const IconComponent = config.icon;
               return (
-                <div key={key} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col justify-between hover:shadow-md transition duration-300">
-                  <div className="flex justify-between items-start">
-                    <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider block">
-                      {config.label}
+                <StaggerItem key={key}>
+                  <GlassCard className={`relative overflow-hidden p-5 h-full flex flex-col justify-between bg-gradient-to-br ${config.gradient || "from-white/80 to-white/60"}`}>
+                    <div className="flex justify-between items-start">
+                      <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider block">
+                        {config.label}
+                      </span>
+                      <IconComponent className={`h-4.5 w-4.5 ${config.colorClass}`} />
+                    </div>
+                    <span className="text-2xl font-black text-slate-900 mt-4 block tracking-tight">
+                      <AnimatedNumber value={stats[key]} />
                     </span>
-                    <IconComponent className={`h-4.5 w-4.5 ${config.colorClass}`} />
-                  </div>
-                  <span className="text-2xl font-black text-slate-900 mt-4 block tracking-tight">
-                    {stats[key]}
-                  </span>
-                </div>
+                  </GlassCard>
+                </StaggerItem>
               );
             })}
-          </div>
+          </Stagger>
 
           {/* Role-Specific Workflows & Funnels */}
           {role === "candidate" && insights?.trackers && insights.trackers.length > 0 && (
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
               <h3 className="text-sm font-black text-slate-900 flex items-center gap-2 border-b border-slate-200 pb-3 uppercase tracking-wider">
-                <Briefcase className="h-4 w-4 text-blue-600" /> Current Application Pipeline
+                <Briefcase className="h-4 w-4 text-emerald-700" /> Current Application Pipeline
               </h3>
               
               <div className="space-y-6">
@@ -288,7 +303,7 @@ export default function HubPage() {
                     <div key={idx} className="space-y-4 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
                       <div className="flex justify-between items-center text-xs font-bold">
                         <span className="text-slate-800 tracking-wide">{track.jobTitle} <span className="text-slate-500">at</span> {track.companyName}</span>
-                        <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 text-[9px] uppercase tracking-wider">
+                        <span className="text-emerald-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-100 text-[9px] uppercase tracking-wider">
                           Stage: {track.currentStage}
                         </span>
                       </div>
@@ -300,7 +315,7 @@ export default function HubPage() {
                             <div key={sidx} className="flex flex-col items-center">
                               <div className={`h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-black border transition-all duration-300 ${
                                 st.active 
-                                  ? "bg-blue-600 border-blue-500 text-white shadow-md scale-110" 
+                                  ? "bg-emerald-600 border-emerald-500 text-white shadow-md scale-110" 
                                   : "bg-white border-slate-200 text-slate-400"
                               }`}>
                                 {sidx + 1}
@@ -320,7 +335,7 @@ export default function HubPage() {
           {role === "tpo" && insights?.funnel && (
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-5">
               <h3 className="text-sm font-black text-slate-900 flex items-center gap-2 border-b border-slate-200 pb-3 uppercase tracking-wider">
-                <PercentIcon className="h-4 w-4 text-blue-600" /> College Recruitment Funnel
+                <PercentIcon className="h-4 w-4 text-emerald-700" /> College Recruitment Funnel
               </h3>
               
               <div className="space-y-4">
@@ -333,7 +348,12 @@ export default function HubPage() {
                         <span className="text-slate-600 font-bold">{item.count} Candidates <span className="text-slate-500 text-[10px]">({Math.round(percent)}%)</span></span>
                       </div>
                       <div className="h-3 w-full rounded-full bg-slate-100 overflow-hidden border border-slate-200">
-                        <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-500" style={{ width: `${percent}%` }}></div>
+                        <motion.div
+                          className="h-full rounded-full bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-600"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${percent}%` }}
+                          transition={{ duration: 0.9, ease: [0.21, 0.47, 0.32, 0.98], delay: 0.15 + idx * 0.08 }}
+                        />
                       </div>
                     </div>
                   );
@@ -350,13 +370,13 @@ export default function HubPage() {
               
               <div className="grid gap-4 sm:grid-cols-3">
                 {insights.candidateSpotlight.map((cand: SpotlightCandidate, idx: number) => (
-                  <div key={idx} className="rounded-2xl border border-slate-200 bg-slate-50/50 p-5 text-center space-y-3 hover:border-blue-500/30 transition duration-300 shadow-inner">
-                    <div className="h-12 w-12 rounded-full bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center font-black text-sm mx-auto shadow-inner">
+                  <div key={idx} className="rounded-2xl border border-slate-200 bg-slate-50/50 p-5 text-center space-y-3 hover:border-emerald-500/30 transition duration-300 shadow-inner">
+                    <div className="h-12 w-12 rounded-full bg-teal-50 border border-teal-100 text-emerald-700 flex items-center justify-center font-black text-sm mx-auto shadow-inner">
                       {cand.name.charAt(0)}
                     </div>
                     <div>
                       <h4 className="font-extrabold text-slate-900 text-sm">{cand.name}</h4>
-                      <span className="inline-flex rounded-full bg-blue-50 border border-blue-100 px-3 py-0.5 text-[9px] font-black text-blue-600 uppercase tracking-widest mt-2">
+                      <span className="inline-flex rounded-full bg-teal-50 border border-teal-100 px-3 py-0.5 text-[9px] font-black text-emerald-700 uppercase tracking-widest mt-2">
                         {cand.score}
                       </span>
                     </div>
@@ -385,7 +405,7 @@ export default function HubPage() {
                           <PolarGrid stroke="#e2e8f0" />
                           <PolarAngleAxis dataKey="subject" tick={{ fill: '#475569', fontSize: 9, fontWeight: 700 }} />
                           <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 8 }} />
-                          <Radar name="Proficiency" dataKey="score" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.25} />
+                          <Radar name="Proficiency" dataKey="score" stroke="#10b981" fill="#10b981" fillOpacity={0.25} />
                         </RadarChart>
                       </ResponsiveContainer>
                     </div>
@@ -412,7 +432,7 @@ export default function HubPage() {
                             <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 8, fontWeight: 600 }} />
                             <YAxis tick={{ fill: '#64748b', fontSize: 8, fontWeight: 600 }} domain={[0, 100]} />
                             <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', color: '#0f172a' }} />
-                            <Line type="monotone" dataKey="score" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, stroke: '#3b82f6', strokeWidth: 2, fill: '#fff' }} activeDot={{ r: 6 }} />
+                            <Line type="monotone" dataKey="score" stroke='#10b981' strokeWidth={3} dot={{ r: 4, stroke: '#10b981', strokeWidth: 2, fill: '#fff' }} activeDot={{ r: 6 }} />
                           </LineChart>
                         </ResponsiveContainer>
                       </div>
@@ -425,7 +445,7 @@ export default function HubPage() {
                   </div>
                   
                   {insights.peerPercentile != null && insights.peerPercentile > 0 ? (
-                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-3.5 text-center text-xs font-bold text-blue-600 mt-4">
+                    <div className="bg-teal-50 border border-teal-100 rounded-xl p-3.5 text-center text-xs font-bold text-emerald-700 mt-4">
                       Batch Percentile Performance: {insights.peerPercentile}%
                     </div>
                   ) : (
@@ -448,7 +468,7 @@ export default function HubPage() {
                   {insights.topPerformers.map((st: PerformerItem, idx: number) => (
                     <div key={idx} className="flex justify-between py-2.5 text-xs font-bold">
                       <span className="text-slate-700">{st.name}</span>
-                      <span className="text-blue-600 font-extrabold">{st.score} Average</span>
+                      <span className="text-emerald-700 font-extrabold">{st.score} Average</span>
                     </div>
                   ))}
                 </div>
@@ -481,8 +501,8 @@ export default function HubPage() {
               <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest border-b border-slate-200 pb-3">
                 Recruitment Insights Summary
               </h3>
-              <div className="flex items-start gap-3.5 text-xs text-slate-700 leading-relaxed bg-blue-50 p-5 rounded-2xl border border-blue-100">
-                <Sparkles className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+              <div className="flex items-start gap-3.5 text-xs text-slate-700 leading-relaxed bg-emerald-50/60 border border-emerald-100 p-5 rounded-2xl">
+                <Sparkles className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5 animate-pulse" />
                 <div>
                   <p className="font-black text-slate-900 text-sm">AI Copilot Recommendation:</p>
                   <p className="mt-1.5 text-slate-600">{insights?.skillGap || "Diagnostic parameters normal. Complete current drives and review candidates."}</p>
@@ -512,7 +532,7 @@ export default function HubPage() {
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between">
           <div>
             <h3 className="text-sm font-black text-slate-900 flex items-center gap-2 border-b border-slate-200 pb-3 uppercase tracking-wider mb-5">
-              <Clock className="h-4 w-4 text-blue-600" /> Recent Activities
+              <Clock className="h-4 w-4 text-emerald-700" /> Recent Activities
             </h3>
             
             <div className="relative border-l border-slate-200 pl-4 space-y-6">
@@ -520,7 +540,7 @@ export default function HubPage() {
                 recentActivity.map((feed: ActivityFeedItem, idx: number) => (
                   <div key={idx} className="relative text-xs group">
                     {/* Circle timeline dot with scale on hover */}
-                    <div className="absolute -left-[21px] top-0.5 h-2 w-2 rounded-full bg-blue-500 border-2 border-white group-hover:scale-125 transition-transform duration-200"></div>
+                    <div className="absolute -left-[21px] top-0.5 h-2 w-2 rounded-full bg-emerald-500 border-2 border-white group-hover:scale-125 transition-transform duration-200"></div>
                     <div className="font-extrabold text-slate-800">{feed.title}</div>
                     <p className="text-slate-600 mt-1 leading-relaxed">{feed.description}</p>
                     <span className="text-[9px] text-slate-500 mt-1.5 block font-bold uppercase tracking-wider">
@@ -549,7 +569,7 @@ export default function HubPage() {
         {/* Calendar Events */}
         <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h3 className="text-sm font-black text-slate-900 flex items-center gap-2 border-b border-slate-200 pb-3 uppercase tracking-wider mb-5">
-            <Calendar className="h-4 w-4 text-blue-600" /> Upcoming Calendar Events
+            <Calendar className="h-4 w-4 text-emerald-700" /> Upcoming Calendar Events
           </h3>
           
           <div className="grid gap-4 sm:grid-cols-2">
@@ -557,7 +577,7 @@ export default function HubPage() {
               upcomingSchedule.map((sched: ScheduleEvent, idx: number) => (
                 <div key={idx} className="flex gap-4 items-center rounded-2xl border border-slate-200 p-4 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 transition duration-200 shadow-sm">
                   <div className="h-10 w-10 rounded-xl bg-white border border-slate-200 flex flex-col justify-center items-center font-bold text-slate-700 shadow-inner">
-                    <span className="text-[9px] text-blue-600 uppercase font-black tracking-wider leading-none">
+                    <span className="text-[9px] text-emerald-700 uppercase font-black tracking-wider leading-none">
                       {new Date(sched.date).toLocaleDateString([], { month: 'short' })}
                     </span>
                     <span className="text-sm mt-0.5 font-black leading-none">
@@ -584,7 +604,7 @@ export default function HubPage() {
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between">
           <div>
             <h3 className="text-sm font-black text-slate-900 flex items-center gap-2 border-b border-slate-200 pb-3 uppercase tracking-wider mb-5">
-              <ArrowUpRight className="h-4 w-4 text-blue-600" /> Quick Actions
+              <ArrowUpRight className="h-4 w-4 text-emerald-700" /> Quick Actions
             </h3>
             
             <div className="grid gap-3 grid-cols-2">

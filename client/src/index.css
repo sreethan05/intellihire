@@ -72,25 +72,26 @@
   }
 
   .dark {
-    --background: 224 71% 4%;
-    --foreground: 213 31% 91%;
-    --card: 224 71% 4%;
-    --card-foreground: 213 31% 91%;
-    --popover: 224 71% 4%;
-    --popover-foreground: 215 20.2% 65.1%;
-    --primary: 262 83% 58%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 222.2 47.4% 11.2%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 223 47% 11%;
-    --muted-foreground: 215.4 16.3% 56.9%;
-    --accent: 216 34% 17%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 216 34% 17%;
-    --input: 216 34% 17%;
-    --ring: 262 83% 58%;
+    /* True black theme: near-black surfaces, light text */
+    --background: 0 0% 3%;
+    --foreground: 210 20% 95%;
+    --card: 0 0% 6%;
+    --card-foreground: 210 20% 95%;
+    --popover: 0 0% 6%;
+    --popover-foreground: 210 20% 95%;
+    --primary: 160 84% 39%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 210 20% 95%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 215 15% 65%;
+    --accent: 160 60% 12%;
+    --accent-foreground: 160 84% 70%;
+    --destructive: 0 63% 40%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 16%;
+    --input: 0 0% 16%;
+    --ring: 160 84% 45%;
   }
 }
 
@@ -98,11 +99,80 @@
   * { @apply border-border; }
   body {
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-    @apply bg-slate-50/50 dark:bg-slate-950 text-foreground;
+    /* Light: warm off-white canvas · Dark: true black (reference palette) */
+    @apply bg-[#FAF9F6] dark:bg-[#050506] text-foreground;
     font-size: 14px;
     letter-spacing: -0.1px;
   }
 }
+
+/* ------------------------------------------------------------------
+ * Full-project dark-mode overrides.
+ * Hand-built pages use Tailwind slate/white utilities directly instead
+ * of theme tokens; these unlayered rules (they win over layered
+ * utilities) remap them onto the true-black palette so the entire app
+ * flips when next-themes sets .dark. Light mode is untouched.
+ * ------------------------------------------------------------------ */
+.dark .bg-white { background-color: hsl(0 0% 6%); }
+.dark .bg-white\/90 { background-color: hsl(0 0% 7%); }
+.dark .bg-white\/80 { background-color: hsl(0 0% 8%); }
+.dark .bg-white\/70 { background-color: hsl(0 0% 9%); }
+.dark .bg-white\/60 { background-color: hsl(0 0% 10%); }
+.dark .bg-slate-50 { background-color: hsl(0 0% 8%); }
+.dark .bg-slate-50\/50 { background-color: hsl(0 0% 7%); }
+.dark .bg-slate-50\/30 { background-color: hsl(0 0% 7%); }
+.dark .bg-slate-100 { background-color: hsl(0 0% 11%); }
+.dark .bg-slate-100\/80 { background-color: hsl(0 0% 10%); }
+
+/* Hover variants that would otherwise flash light in dark mode */
+.dark .hover\:bg-slate-50:hover { background-color: hsl(0 0% 10%); }
+.dark .hover\:bg-slate-50\/30:hover { background-color: hsl(0 0% 9%); }
+.dark .hover\:bg-slate-100:hover { background-color: hsl(0 0% 12%); }
+.dark .hover\:bg-white:hover { background-color: hsl(0 0% 11%); }
+.dark .hover\:bg-slate-200\/50:hover { background-color: hsl(0 0% 12%); }
+
+.dark .text-slate-900 { color: hsl(210 20% 95%); }
+.dark .text-slate-800 { color: hsl(210 18% 90%); }
+.dark .text-slate-700 { color: hsl(212 15% 82%); }
+.dark .text-slate-750 { color: hsl(212 15% 82%); }
+.dark .text-slate-600 { color: hsl(214 13% 70%); }
+.dark .text-slate-500 { color: hsl(215 12% 60%); }
+
+.dark .border-slate-100 { border-color: hsl(0 0% 13%); }
+.dark .border-slate-200 { border-color: hsl(0 0% 16%); }
+.dark .border-slate-200\/70 { border-color: hsl(0 0% 15%); }
+.dark .border-slate-200\/90 { border-color: hsl(0 0% 15%); }
+.dark .border-slate-300 { border-color: hsl(0 0% 20%); }
+
+/* Tinted pastel chips/panels -> translucent dark tints */
+.dark .bg-blue-50 { background-color: hsl(217 60% 12%); }
+.dark .bg-emerald-50 { background-color: hsl(160 55% 10%); }
+.dark .bg-emerald-50\/60 { background-color: hsl(160 55% 10%); }
+.dark .bg-amber-50 { background-color: hsl(38 60% 11%); }
+.dark .bg-rose-50 { background-color: hsl(350 60% 11%); }
+.dark .bg-violet-50 { background-color: hsl(262 60% 12%); }
+.dark .bg-indigo-50 { background-color: hsl(230 55% 12%); }
+.dark .bg-teal-50 { background-color: hsl(175 55% 10%); }
+.dark .bg-purple-50 { background-color: hsl(270 55% 12%); }
+.dark .bg-sky-50 { background-color: hsl(200 60% 11%); }
+.dark .border-blue-100 { border-color: hsl(217 50% 20%); }
+.dark .border-emerald-100 { border-color: hsl(160 50% 18%); }
+.dark .border-amber-100 { border-color: hsl(38 50% 20%); }
+.dark .border-rose-100,
+.dark .border-rose-200 { border-color: hsl(350 50% 22%); }
+.dark .border-violet-100 { border-color: hsl(262 50% 22%); }
+.dark .border-indigo-100 { border-color: hsl(230 50% 22%); }
+
+/* Icon/text accent pairs on tinted chips stay readable in dark */
+.dark .text-blue-600 { color: hsl(217 80% 70%); }
+.dark .text-indigo-600 { color: hsl(230 80% 72%); }
+.dark .text-emerald-600 { color: hsl(160 75% 62%); }
+.dark .text-amber-600 { color: hsl(40 80% 66%); }
+.dark .text-amber-700 { color: hsl(40 80% 70%); }
+.dark .text-purple-600 { color: hsl(270 75% 72%); }
+.dark .text-teal-600 { color: hsl(175 75% 60%); }
+.dark .text-rose-600 { color: hsl(350 80% 70%); }
+.dark .text-sky-600 { color: hsl(200 80% 70%); }
 
 /* Custom glow pulse for active sidebar activity card */
 @keyframes glow-pulse {
@@ -116,3 +186,62 @@
 .pulse-glow {
   animation: glow-pulse 2s infinite;
 }
+
+/* ---- Motion design system (reference UI refresh) ---- */
+
+/* True-black hero panel with a single sage glow — no blue/navy anywhere */
+.hero-navy {
+  background:
+    radial-gradient(900px 400px at 12% -10%, rgba(91, 124, 108, 0.22), transparent 60%),
+    linear-gradient(150deg, #0a0a0b 0%, #0c0d0c 60%, #090a09 100%);
+}
+
+/* Theme-aware hero (hub header): plain white in light mode, pure black in dark */
+.hero-theme {
+  background: #ffffff;
+}
+.dark .hero-theme {
+  background:
+    radial-gradient(900px 400px at 12% -10%, rgba(91, 124, 108, 0.22), transparent 60%),
+    linear-gradient(150deg, #0a0a0b 0%, #0c0d0c 60%, #090a09 100%);
+}
+
+/* Slow ambient float for decorative hero blobs */
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-14px) scale(1.04); }
+}
+.animate-float-slow {
+  animation: float-slow 7s ease-in-out infinite;
+}
+
+/* Shimmer sweep for AI/highlight accents */
+@keyframes shimmer-sweep {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.animate-shimmer {
+  background-size: 200% 100%;
+  animation: shimmer-sweep 2.6s linear infinite;
+}
+
+/* Animated gradient bar under section headings */
+.accent-underline {
+  background: linear-gradient(90deg, #5B7C6C, #6B9AC4, #F97316, #5B7C6C);
+  background-size: 300% 100%;
+  animation: shimmer-sweep 6s linear infinite;
+}
+
+/* Respect users who prefer reduced motion: kill decorative animation */
+@media (prefers-reduced-motion: reduce) {
+  .animate-float-slow,
+  .animate-shimmer,
+  .accent-underline,
+  .pulse-glow {
+    animation: none;
+  }
+}
+
+/* Dark variants for the sage accent classes used across pages */
+.dark .text-emerald-700 { color: hsl(160 70% 62%); }
+.dark .text-teal-700 { color: hsl(175 70% 60%); }

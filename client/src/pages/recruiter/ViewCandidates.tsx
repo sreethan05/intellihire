@@ -78,7 +78,7 @@ export default function ViewCandidates() {
           style={{
             padding: "10px 18px", borderRadius: 8, border: "none", fontSize: 13, fontWeight: 700,
             fontFamily: "Inter,sans-serif", cursor: (assigning || !selectedExam || selectedCandidates.size === 0) ? "not-allowed" : "pointer",
-            background: (assigning || !selectedExam || selectedCandidates.size === 0) ? "#e2e8f0" : "linear-gradient(135deg,#3b82f6,#6366f1)",
+            background: (assigning || !selectedExam || selectedCandidates.size === 0) ? "#e2e8f0" : "linear-gradient(135deg,#10b981,#6366f1)",
             color: (assigning || !selectedExam || selectedCandidates.size === 0) ? "#94a3b8" : "white",
             display: "flex", alignItems: "center", gap: 6, transition: "all 0.15s"
           }}
@@ -87,7 +87,7 @@ export default function ViewCandidates() {
           {assigning ? "Assigning..." : selectedCandidates.size > 0 ? `Assign to ${selectedCandidates.size} candidate(s)` : "Assign Exam"}
         </button>
         {selectedCandidates.size > 0 && (
-          <span style={{ fontSize: 12, color: "#3b82f6", fontWeight: 600 }}>{selectedCandidates.size} selected</span>
+          <span style={{ fontSize: 12, color: "#10b981", fontWeight: 600 }}>{selectedCandidates.size} selected</span>
         )}
       </div>
 
@@ -147,7 +147,7 @@ export default function ViewCandidates() {
                     <td style={{ padding: "13px 16px" }}>
                       <div style={{
                         width: 16, height: 16, borderRadius: 4, border: checked ? "none" : "1.5px solid #d1d5db",
-                        background: checked ? "#3b82f6" : "transparent", display: "flex", alignItems: "center", justifyContent: "center"
+                        background: checked ? "#10b981" : "transparent", display: "flex", alignItems: "center", justifyContent: "center"
                       }}>
                         {checked && <span style={{ color: "white", fontSize: 11, fontWeight: 700, lineHeight: 1 }}>✓</span>}
                       </div>
@@ -162,7 +162,7 @@ export default function ViewCandidates() {
                     </td>
                     <td style={{ padding: "13px 16px", fontSize: 13, color: "#64748b" }}>{candidate.email}</td>
                     <td style={{ padding: "13px 16px" }}>
-                      <span style={{ fontSize: 12, color: checked ? "#3b82f6" : "#94a3b8", fontWeight: 600 }}>
+                      <span style={{ fontSize: 12, color: checked ? "#10b981" : "#94a3b8", fontWeight: 600 }}>
                         {checked ? "Selected" : "Click to select"}
                       </span>
                     </td>

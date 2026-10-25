@@ -799,7 +799,7 @@ export default function TakeExam() {
   };
 
   const getQuestionTileClass = (active: boolean, answered: boolean, reviewing: boolean) => {
-    if (active) return "border-blue-600 bg-blue-600 text-white shadow-lg shadow-blue-500/20";
+    if (active) return "border-blue-600 bg-emerald-600 text-white shadow-lg shadow-blue-500/20";
     if (answered && reviewing) return "border-purple-500/30 bg-purple-500/10 text-purple-400";
     if (reviewing) return "border-amber-500/30 bg-amber-500/10 text-amber-400";
     if (answered) return "border-emerald-500/30 bg-emerald-500/10 text-emerald-400";
@@ -812,7 +812,7 @@ export default function TakeExam() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-6 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-[#0d1527]/90 p-8 shadow-[0_30px_80px_rgba(0,0,0,0.6)] backdrop-blur-xl">
             <div className="mb-4 flex items-center gap-3 text-white">
-              <Monitor className="h-5 w-5 text-blue-500" />
+              <Monitor className="h-5 w-5 text-emerald-600" />
               <h3 className="text-lg font-black">Exam Locked</h3>
             </div>
             <p className="text-sm leading-6 text-slate-400">{securityMessage}</p>
@@ -820,7 +820,7 @@ export default function TakeExam() {
               Violations used: {violationCount}/{MAX_VIOLATIONS}
             </div>
             <div className="mt-6 flex gap-3">
-              <Button className="flex-1 rounded-xl bg-blue-600 hover:bg-blue-500" onClick={() => void requestExamFullscreen()}>
+              <Button className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-500" onClick={() => void requestExamFullscreen()}>
                 Return to Fullscreen
               </Button>
               <Button variant="outline" className="flex-1 rounded-xl border-slate-800 text-slate-450 hover:bg-slate-900" onClick={() => void handleSubmitExam("security lock")}>
@@ -930,7 +930,7 @@ export default function TakeExam() {
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
                 placeholder="Type rough notes or test case workings here (autosaved locally)..."
-                className="h-24 w-full resize-none rounded-xl border border-slate-850 bg-slate-950/40 p-3 text-xs text-white placeholder:text-slate-600 outline-none focus:border-blue-500 transition"
+                className="h-24 w-full resize-none rounded-xl border border-slate-850 bg-slate-950/40 p-3 text-xs text-white placeholder:text-slate-600 outline-none focus:border-emerald-500 transition"
               />
             </div>
           )}
@@ -979,7 +979,7 @@ export default function TakeExam() {
                             selected ? "border-blue-500 bg-blue-500/10 shadow shadow-blue-500/10" : "border-slate-800 bg-slate-950/40 hover:border-slate-700"
                           }`}
                         >
-                          <RadioGroupItem value={option.toUpperCase()} id={`opt-${option}`} className="border-slate-700 text-blue-500" />
+                          <RadioGroupItem value={option.toUpperCase()} id={`opt-${option}`} className="border-slate-700 text-emerald-600" />
                           <span className="w-8 font-black text-blue-400">{option.toUpperCase()}.</span>
                           <span className="font-bold text-slate-200">{getOptionText(currentMcqQuestion.question, option)}</span>
                           {selected && <Check className="ml-auto h-5 w-5 text-blue-400" />}
@@ -1040,7 +1040,7 @@ export default function TakeExam() {
               Question {activeQuestionIndex + 1} of {activeQuestionTotal}
             </div>
             <div className="flex justify-end">
-              <Button className="h-10 min-w-36 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold transition" onClick={goToNext} disabled={activeQuestionIndex === activeQuestionTotal - 1}>
+              <Button className="h-10 min-w-36 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-bold transition" onClick={goToNext} disabled={activeQuestionIndex === activeQuestionTotal - 1}>
                 Next
                 <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
