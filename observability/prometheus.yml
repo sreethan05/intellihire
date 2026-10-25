@@ -1,0 +1,80 @@
+# Prometheus configuration for the IntelliHire platform.
+#
+# The FastAPI backend exposes Prometheus metrics at GET /metrics via
+# prometheus-fastapi-instrumentator (server_py/app/main.py:
+# `Instrumentator().instrument(app).expose(app)`).
+#
+# /metrics is gated by MetricsGuardMiddleware
+# (server_py/app/middleware/metrics_guard.py):
+#   - In production, if METRICS_TOKEN is unset on the app, /metrics returns 503
+#     for every request ("Metrics are not configured").
+#   - If METRICS_TOKEN is set, every scrape MUST send exactly
+#     `Authorization: Bearer <METRICS_TOKEN>` (constant-time compare); anything
+#     else gets 401.
+# The `authorization` block below produces exactly that header. Set the
+# `credentials` value from the same secret store that provides METRICS_TOKEN
+# to the intellihire-app container (.env.production in the prod stack).
+#
+# Mount this file into the Prometheus container, e.g.:
+#   - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+#   - ./observability/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+# See observability/ALERTING.md for the full wiring guide.
+
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/alert_rules.yml
+
+scrape_configs:
+  # ---------------------------------------------------------------------------
+  # IntelliHire FastAPI backend (service `app` / container `intellihire-app`).
+  # In docker-compose.prod.yml the app publishes 127.0.0.1:5000 on the host and
+  # listens on 5000 inside the `backend` network.
+  #   - Prometheus running as a container on the `backend` network: use `app:5000`.
+  #   - Prometheus running on the host: use `127.0.0.1:5000`.
+  # ---------------------------------------------------------------------------
+  - job_name: intellihire-app
+    metrics_path: /metrics
+    scheme: http
+    authorization:
+      type: Bearer
+      credentials: REPLACE_WITH_METRICS_TOKEN
+    static_configs:
+      - targets:
+          - app:5000
+        labels:
+          service: intellihire
+          env: production
+
+  # ---------------------------------------------------------------------------
+  # OPTIONAL: PostgreSQL exporter (prometheus-community/postgres_exporter).
+  # Not deployed yet. When added to the `backend` network, expose it only on
+  # that network (no published ports) and uncomment:
+  # ---------------------------------------------------------------------------
+  # - job_name: postgres
+  #   scheme: http
+  #   static_configs:
+  #     - targets:
+  #         - postgres-exporter:9187
+  #       labels:
+  #         service: intellihire
+  #         env: production
+
+  # ---------------------------------------------------------------------------
+  # OPTIONAL: Redis exporter (oliver006/redis_exporter) pointed at the
+  # intellihire redis instance (REDIS_URL, default redis://redis:6379 inside
+  # the backend network). Redis backs the slowapi rate limiter and the grading
+  # / interview queues (grading-queue, interview-queue, grading-dlq,
+  # interview-dlq). Not deployed yet; uncomment when added:
+  # ---------------------------------------------------------------------------
+  # - job_name: redis
+  #   scheme: http
+  #   static_configs:
+  #     - targets:
+  #         - redis-exporter:9121
+  #       labels:
+  #         service: intellihire
+  #         env: production

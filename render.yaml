@@ -23,5 +23,7 @@ services:
         generateValue: true
       - key: SENTRY_DSN
         sync: false
+      - key: DATA_RETENTION_INTERVAL_HOURS
+        value: 24
       - key: GROQ_API_KEY
         sync: false

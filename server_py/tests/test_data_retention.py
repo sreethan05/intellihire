@@ -1,6 +1,7 @@
 import pytest
+import asyncio
 from unittest.mock import patch, MagicMock
-from app.data_retention import run_data_retention_cleanup
+from app.data_retention import run_data_retention_cleanup, run_data_retention_worker
 
 @pytest.mark.asyncio
 async def test_run_data_retention_cleanup_success():
@@ -38,3 +39,27 @@ async def test_run_data_retention_cleanup_failure():
         
         await run_data_retention_cleanup()
         mock_conn_rollback.commit.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_retention_worker_runs_cleanup_and_stops():
+    stop_event = asyncio.Event()
+    runs = 0
+
+    async def cleanup():
+        nonlocal runs
+        runs += 1
+        stop_event.set()
+
+    await run_data_retention_worker(stop_event, 0.01, cleanup)
+
+    assert runs == 1
+
+
+@pytest.mark.asyncio
+async def test_retention_worker_rejects_non_positive_intervals():
+    cleanup = MagicMock()
+
+    await run_data_retention_worker(asyncio.Event(), 0, cleanup)
+
+    cleanup.assert_not_called()

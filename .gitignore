@@ -36,9 +36,11 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+!.env.production.example
 **/.env
 **/.env.*
 !**/.env.example
+!**/.env.production.example
 
 # Editor directories and files
 .vscode/*

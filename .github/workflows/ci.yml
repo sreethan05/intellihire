@@ -92,11 +92,20 @@ jobs:
           pip-audit --skip-editable
 
   dependency-audit:
-    name: Dependency Audit
+    name: Dependency & Secret & Container Audit
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Secret scanning (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -110,6 +119,39 @@ jobs:
 
       - name: Audit client dependencies (fail on critical)
         run: npm --prefix client audit --audit-level=critical
+
+      - name: Dependency review (PRs only, fail on high)
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+      - name: Container / config / secret scan with Trivy (fail on HIGH)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true
+          scanners: vuln,misconfig,secret
+
+      - name: Generate SBOM (CycloneDX)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: cyclonedx
+          output: sbom.json
+          scanners: vuln
+          exit-code: '0'
+
+      - name: Upload SBOM artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-cyclonedx
+          path: sbom.json
 
   e2e-playwright:
     name: Playwright E2E (smoke)
@@ -166,7 +208,7 @@ jobs:
           done
 
       - name: Install Root Dependencies
-        run: npm install
+        run: npm ci
 
       - name: Install Client Dependencies
         run: npm ci --prefix client

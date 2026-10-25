@@ -913,6 +913,18 @@ The database is pre-seeded with 4 standard user accounts covering all roles:
 | **Lead Recruiter** | `recruiter@intellihire.com` | `admin123` | `/recruiter/overview` |
 | **Candidate** | `candidate@intellihire.com` | `admin123` | `/candidate/overview` |
 
+The E2E suite additionally seeds per-role test accounts (migration `20_cleanup_test_users.sql`,
+re-applied on every fresh database):
+
+| Role | Username / Email | Password |
+| :--- | :--- | :--- |
+| Recruiter (E2E) | `recruiter@example.com` | `recruiter123` |
+| TPO (E2E) | `tpo@example.com` | `tpo123` |
+| Candidate (E2E) | `candidate@example.com` | `candidate123` |
+
+> ⚠️ These are development/test credentials only — the production config rejects
+> seed data paths and requires explicit HTTPS `APP_URL` + explicit CORS origins.
+
 ---
 
 ## 🧪 Automated Quality Assurance & Testing Framework

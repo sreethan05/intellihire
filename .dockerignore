@@ -29,3 +29,24 @@ docs
 # Docker
 Dockerfile
 .dockerignore
+docker-compose*.yml
+
+# Local artifacts that must never enter the build context
+# (private uploaded documents, virtualenvs, test caches and reports)
+uploads
+**/uploads
+.venv
+**/.venv
+.hypothesis
+.pytest_cache
+**/.pytest_cache
+.coverage
+.coverage.*
+playwright-report
+test-results
+reports
+e2e
+Jenkinsfile
+TODO.md
+.env.production
+.env.production.example

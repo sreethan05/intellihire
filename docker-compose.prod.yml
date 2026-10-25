@@ -1,0 +1,494 @@
+# =============================================================================
+# IntelliHire — production (self-hosted Docker Compose)
+# =============================================================================
+#
+# Usage (secrets are REQUIRED — the stack refuses to start without them):
+#
+#   cp .env.production.example .env.production    # then fill in every value
+#   docker compose --env-file .env.production -f docker-compose.prod.yml up -d
+#
+# The --env-file flag is what satisfies the ${VAR:?...} interpolations below;
+# it must point at .env.production (git-ignored) on every compose command.
+#
+# TLS / reverse proxy assumption:
+#   This stack publishes exactly ONE port — the app on loopback
+#   (127.0.0.1:5000), plain HTTP, inside the host. TLS termination happens on
+#   the host reverse proxy (nginx / Caddy / Traefik), which owns the
+#   certificate and forwards to http://127.0.0.1:5000. The app itself must
+#   never be exposed to the internet unencrypted: APP_URL and
+#   CORS_ALLOWED_ORIGINS are https-only and enforced by app/config.py.
+#
+# Network policy (3 networks):
+#   frontend        — default bridge, internet egress. Only the app (it needs
+#                     Groq, SMTP, Sentry). No data service is attached here.
+#   backend         — internal: true = NO internet egress and no published
+#                     ports, ever. app <-> postgres/redis/minio only.
+#   judge0-isolated — internal: true = NO internet egress. Carries untrusted
+#                     code-execution traffic only; user-submitted code running
+#                     inside judge0 has no route to the internet or to the
+#                     data tier. The app joins it solely to reach judge0.
+#
+# Judge0: the code-execution services live under the "judge0" compose profile
+# (docker compose --profile judge0 ...) because isolate, judge0's sandbox,
+# requires privileged containers. See the judge0 block below for the full
+# setup note. Code execution is optional — the API runs degraded without it.
+#
+# Resource limits are sane single-host defaults; tune per host before scaling.
+# =============================================================================
+
+name: intellihire-prod
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # ---------------------------------------------------------------------------
+  # App (FastAPI + built React SPA) — hardened runtime
+  # ---------------------------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: intellihire/app:1.0.0
+    container_name: intellihire-app
+    # All app secrets and settings come from the git-ignored env file.
+    env_file:
+      - .env.production
+    environment:
+      # Pin the deployment mode regardless of what the env file carries.
+      NODE_ENV: production
+      # In-network endpoints override anything in .env.production so traffic
+      # always flows over the internal networks, never via published ports.
+      DATABASE_URL: postgresql://intellihire:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}@postgres:5432/intellihire
+      REDIS_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env.production}@redis:6379/0
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-intellihire-uploads}
+      # Dedicated least-privilege MinIO user (created by minio-init below) —
+      # never run the app with the MinIO root credentials.
+      S3_ACCESS_KEY_ID: ${MINIO_APP_ACCESS_KEY:?Set MINIO_APP_ACCESS_KEY in .env.production}
+      S3_SECRET_ACCESS_KEY: ${MINIO_APP_SECRET_KEY:?Set MINIO_APP_SECRET_KEY in .env.production}
+      # Private uploads (resumes/offers/grading queue) live on a named volume
+      # because the container root filesystem is read-only.
+      FILE_STORAGE_DIR: /app/uploads
+      # JUDGE0_API_URL / JUDGE0_API_KEY intentionally come straight from
+      # .env.production: set JUDGE0_API_URL=http://judge0-server:2358 when the
+      # judge0 profile below is enabled. Production refuses the public
+      # ce.judge0.com endpoint (see app/compiler.py).
+    networks:
+      - frontend
+      - backend
+      - judge0-isolated
+    # Loopback-only publish: only the host reverse proxy (TLS terminator) may
+    # connect. Never map this port to 0.0.0.0.
+    ports:
+      - "127.0.0.1:5000:5000"
+    # Immutable root filesystem: the app may only write to /tmp (tmpfs) and
+    # /app/uploads (named volume). PYTHONDONTWRITEBYTECODE is set in the
+    # Dockerfile so no __pycache__ writes are attempted.
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m
+    volumes:
+      - app_uploads:/app/uploads
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      # Bucket + app user must exist before the app starts using S3.
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      # /api/health returns 503 while Postgres is unreachable, so this is a
+      # real dependency check, not a process-liveness ping.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/api/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2g
+        reservations:
+          cpus: "0.25"
+          memory: 512m
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL — internal network only (no published ports at all)
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:15.19-alpine
+    container_name: intellihire-postgres
+    environment:
+      POSTGRES_DB: intellihire
+      POSTGRES_USER: intellihire
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    # Deliberately NO `ports:` — reachable only from the backend network.
+    expose:
+      - "5432"
+    shm_size: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U intellihire -d intellihire"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    # no-new-privileges only: the postgres entrypoint needs CAP_CHOWN/SETUID
+    # to step down from root to the postgres user, so cap_drop is not used.
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 1g
+        reservations:
+          cpus: "0.25"
+          memory: 256m
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  # Redis — internal network only, password required, cache-mode eviction
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7.4.7-alpine
+    container_name: intellihire-redis
+    # maxmemory + allkeys-lru: Redis here is a cache/session store; under
+    # pressure oldest keys are evicted instead of refusing writes. If you ever
+    # store durable work queues in Redis, switch to --maxmemory-policy
+    # noeviction and enable --appendonly yes.
+    command:
+      [
+        "redis-server",
+        "--requirepass", "${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env.production}",
+        "--maxmemory", "512mb",
+        "--maxmemory-policy", "allkeys-lru",
+        "--save", "",
+        "--appendonly", "no",
+      ]
+    environment:
+      # Read by the healthcheck inside the container ($$ = literal $ for compose).
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env.production}
+    volumes:
+      - redis_data:/data
+    networks:
+      - backend
+    # Deliberately NO `ports:` — reachable only from the backend network.
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    # Container limit sized above the 512mb data maxmemory so the Redis
+    # process itself (fragmentation, replication buffers) has headroom.
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 768m
+        reservations:
+          cpus: "0.1"
+          memory: 128m
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  # MinIO (S3-compatible object storage) — internal network only
+  #
+  # REGISTRY NOTE: MinIO removed its community images from Docker Hub (Oct
+  # 2025); RELEASE.2025-09-07T16-13-09Z is the last free community release.
+  # The default below points at MinIO's own quay.io registry — if pulls are
+  # refused in your environment, override MINIO_IMAGE in .env.production with
+  # an internal mirror, the Chainguard build (cgr.dev/chainguard/minio), or a
+  # source-built image. Any S3-compatible endpoint works for the app; keep
+  # S3_ENDPOINT=http://minio:9000 unchanged.
+  #
+  # The S3 web console (--console-address ":9001") is bound only on the
+  # internal backend network — never published. For admin access use an SSH
+  # tunnel: ssh -L 9001:minio:9001 <host>.
+  # ---------------------------------------------------------------------------
+  minio:
+    image: ${MINIO_IMAGE:-quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z}
+    container_name: intellihire-minio
+    command: server /data --address ":9000" --console-address ":9001"
+    environment:
+      # Strong root credentials are mandatory — the example placeholders are
+      # rejected by .env.production discipline, not by this file. Rotate them
+      # like any other secret.
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in .env.production}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env.production}
+    volumes:
+      - minio_data:/data
+    networks:
+      - backend
+    # Deliberately NO `ports:` — the app reaches MinIO over the backend
+    # network at http://minio:9000 (S3_ENDPOINT).
+    healthcheck:
+      # Official check; `mc` ships inside the MinIO server image.
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1g
+        reservations:
+          cpus: "0.1"
+          memory: 256m
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  # MinIO one-shot initializer — private bucket + least-privilege app user
+  # ---------------------------------------------------------------------------
+  minio-init:
+    image: ${MINIO_IMAGE:-quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z}
+    container_name: intellihire-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - backend
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in .env.production}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env.production}
+      MINIO_APP_ACCESS_KEY: ${MINIO_APP_ACCESS_KEY:?Set MINIO_APP_ACCESS_KEY in .env.production}
+      MINIO_APP_SECRET_KEY: ${MINIO_APP_SECRET_KEY:?Set MINIO_APP_SECRET_KEY in .env.production}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-intellihire-uploads}
+    # Uses the `mc` client bundled in the image. Idempotent: safe on re-run.
+    # The app user is scoped to the single bucket via a custom inline policy —
+    # the app never holds the MinIO root credentials.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb --ignore-existing "local/$$S3_BUCKET_NAME"
+        # Buckets stay private: no anonymous access (explicit, not default-trust).
+        mc anonymous set none "local/$$S3_BUCKET_NAME"
+        mc admin user add local "$$MINIO_APP_ACCESS_KEY" "$$MINIO_APP_SECRET_KEY"
+        printf '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:*"],"Resource":["arn:aws:s3:::%s","arn:aws:s3:::%s/*"]}]}' "$$S3_BUCKET_NAME" "$$S3_BUCKET_NAME" > /tmp/app-policy.json
+        mc admin policy create local intellihire-app-rw /tmp/app-policy.json 2>/dev/null || true
+        mc admin policy attach local intellihire-app-rw --user "$$MINIO_APP_ACCESS_KEY"
+        echo "MinIO ready: bucket '$$S3_BUCKET_NAME' (private) + scoped app user '$$MINIO_APP_ACCESS_KEY'"
+    restart: "no"
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+
+  # ===========================================================================
+  # Judge0 — private self-hosted code execution (compose profile: judge0)
+  #
+  # Not started by a plain `up -d`. Enable with:
+  #   docker compose --env-file .env.production -f docker-compose.prod.yml \
+  #     --profile judge0 up -d
+  # ...and set in .env.production:
+  #   JUDGE0_API_URL=http://judge0-server:2358
+  #
+  # WHY privileged: judge0 executes untrusted submissions inside `isolate`
+  # (https://github.com/ioi/isolate), which needs privileged mode to set up
+  # cgroups/namespaces. That is judge0's own sandbox boundary. Our compensating
+  # control is the network: every judge0 service sits ONLY on the
+  # judge0-isolated network (internal: true, no internet egress, no published
+  # ports), and its postgres/redis are separate from the app's data tier.
+  #
+  # If you would rather not run privileged containers from this file, deploy
+  # the official judge0 stack instead
+  # (https://github.com/judge0/judge0/blob/master/docker-compose.yml) and:
+  #   1. attach its containers to this project's judge0-isolated network:
+  #        docker network connect intellihire-prod_judge0-isolated <judge0-ct>
+  #   2. point JUDGE0_API_URL at it (e.g. http://judge0-server:2358 — the
+  #      hostname is judge0-server below; adapt if yours differs).
+  # Auth: a bare self-hosted judge0 accepts anonymous submissions; the app
+  # sends JUDGE0_API_KEY as X-Auth-Token only when it is set, so leave it
+  # empty unless you enable judge0 user tokens.
+  # ===========================================================================
+  judge0-db:
+    image: postgres:15.19-alpine
+    container_name: intellihire-judge0-db
+    profiles:
+      - judge0
+    environment:
+      POSTGRES_DB: judge0
+      POSTGRES_USER: judge0
+      POSTGRES_PASSWORD: ${JUDGE0_DB_PASSWORD:?Set JUDGE0_DB_PASSWORD in .env.production}
+    volumes:
+      - judge0_db_data:/var/lib/postgresql/data
+    networks:
+      - judge0-isolated
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U judge0 -d judge0"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512m
+    logging: *default-logging
+
+  judge0-redis:
+    image: redis:7.4.7-alpine
+    container_name: intellihire-judge0-redis
+    profiles:
+      - judge0
+    # noeviction: judge0's Sidekiq queues are durable work, not cache —
+    # eviction here would silently drop submissions.
+    command:
+      [
+        "redis-server",
+        "--requirepass", "${JUDGE0_REDIS_PASSWORD:?Set JUDGE0_REDIS_PASSWORD in .env.production}",
+        "--maxmemory", "256mb",
+        "--maxmemory-policy", "noeviction",
+      ]
+    environment:
+      JUDGE0_REDIS_PASSWORD: ${JUDGE0_REDIS_PASSWORD:?Set JUDGE0_REDIS_PASSWORD in .env.production}
+    volumes:
+      - judge0_redis_data:/data
+    networks:
+      - judge0-isolated
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$JUDGE0_REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 384m
+    logging: *default-logging
+
+  judge0-server:
+    image: judge0/judge0:1.13.1
+    container_name: intellihire-judge0-server
+    profiles:
+      - judge0
+    privileged: true
+    command: ["./scripts/server"]
+    environment:
+      RAILS_ENV: production
+      RAILS_MAX_THREADS: 5
+      RAILS_MIN_THREADS: 5
+      DATABASE_HOST: judge0-db
+      DATABASE_PORT: "5432"
+      DATABASE_NAME: judge0
+      DATABASE_USERNAME: judge0
+      DATABASE_PASSWORD: ${JUDGE0_DB_PASSWORD:?Set JUDGE0_DB_PASSWORD in .env.production}
+      REDIS_HOST: judge0-redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${JUDGE0_REDIS_PASSWORD:?Set JUDGE0_REDIS_PASSWORD in .env.production}
+    networks:
+      - judge0-isolated
+    # Deliberately NO `ports:` — the app calls it at http://judge0-server:2358
+    # over the isolated network; nothing else can reach it.
+    depends_on:
+      judge0-db:
+        condition: service_healthy
+      judge0-redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1g
+    logging: *default-logging
+
+  judge0-worker:
+    image: judge0/judge0:1.13.1
+    container_name: intellihire-judge0-worker
+    profiles:
+      - judge0
+    privileged: true
+    # Workers are what actually run untrusted submissions in isolate.
+    command: ["./scripts/workers"]
+    environment:
+      RAILS_ENV: production
+      RAILS_MAX_THREADS: 5
+      RAILS_MIN_THREADS: 5
+      DATABASE_HOST: judge0-db
+      DATABASE_PORT: "5432"
+      DATABASE_NAME: judge0
+      DATABASE_USERNAME: judge0
+      DATABASE_PASSWORD: ${JUDGE0_DB_PASSWORD:?Set JUDGE0_DB_PASSWORD in .env.production}
+      REDIS_HOST: judge0-redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${JUDGE0_REDIS_PASSWORD:?Set JUDGE0_REDIS_PASSWORD in .env.production}
+    networks:
+      - judge0-isolated
+    depends_on:
+      judge0-server:
+        condition: service_started
+      judge0-db:
+        condition: service_healthy
+      judge0-redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 1g
+    logging: *default-logging
+
+# =============================================================================
+# Volumes — all persistent state. Back these up (see DEPLOYMENT_GUIDE.md).
+# =============================================================================
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  app_uploads:
+  judge0_db_data:
+  judge0_redis_data:
+
+# =============================================================================
+# Networks
+#   backend / judge0-isolated are internal: containers on them have no route
+#   to the outside world — only peer-to-peer traffic between the services
+#   attached to each. Image pulls are unaffected (the daemon pulls, not the
+#   container).
+# =============================================================================
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
+    internal: true
+  judge0-isolated:
+    driver: bridge
+    internal: true

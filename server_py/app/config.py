@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     SMTP_PORT: int = Field(587, validation_alias="SMTP_PORT")
     LOG_LEVEL: str = Field("INFO", validation_alias="LOG_LEVEL")
     SENTRY_DSN: str = Field("", validation_alias="SENTRY_DSN")
+    DATA_RETENTION_INTERVAL_HOURS: int = Field(24, validation_alias="DATA_RETENTION_INTERVAL_HOURS")
     FILE_STORAGE_DIR: str = Field("uploads", validation_alias="FILE_STORAGE_DIR")
     S3_ENDPOINT: str = Field("http://localhost:9000", validation_alias="S3_ENDPOINT")
     S3_REGION: str = Field("us-east-1", validation_alias="S3_REGION")
@@ -84,6 +85,7 @@ SMTP_FROM = settings.SMTP_FROM
 SMTP_PORT = settings.SMTP_PORT
 LOG_LEVEL = settings.LOG_LEVEL
 SENTRY_DSN = settings.SENTRY_DSN
+DATA_RETENTION_INTERVAL_HOURS = settings.DATA_RETENTION_INTERVAL_HOURS
 FILE_STORAGE_DIR = settings.FILE_STORAGE_DIR
 S3_ENDPOINT = settings.S3_ENDPOINT
 S3_REGION = settings.S3_REGION

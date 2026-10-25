@@ -1,0 +1,240 @@
+# Prometheus alert rules for the IntelliHire platform.
+#
+# Every metric referenced here is exposed by the FastAPI backend at /metrics
+# via prometheus-fastapi-instrumentator 8.1.0 with ALL-DEFAULT settings
+# (server_py/app/main.py: Instrumentator().instrument(app).expose(app)).
+# The default metrics bundle (`metrics.default`) provides:
+#
+#   http_requests_total{method,status,handler}            Counter
+#       - `status` is GROUPED into 2xx/3xx/4xx/5xx (should_group_status_codes=True)
+#       - `handler` is the route template, e.g. "/api/health"
+#   http_request_size_bytes{handler}                      Summary
+#   http_response_size_bytes{handler}                     Summary
+#   http_request_duration_highr_seconds                   Histogram (no labels,
+#       buckets 0.01 ... 60 +Inf) — use for p95/p99 quantiles
+#   http_request_duration_seconds{method,handler}         Histogram (buckets
+#       0.1, 0.5, 1 +Inf) — per-handler, coarse
+#
+# There is no http_requests_inprogress gauge (default off), no queue-depth
+# gauge, no auth-failure counter, and no DB/Redis health gauge yet. Rules that
+# would need those missing metrics are marked with TODO blocks below.
+#
+# Runbook links point to docs/INCIDENT_RESPONSE.md section anchors.
+
+groups:
+  - name: intellihire-app
+    rules:
+      # -----------------------------------------------------------------------
+      # Availability
+      # -----------------------------------------------------------------------
+      - alert: IntelliHireAppDown
+        expr: up{job="intellihire-app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: intellihire
+        annotations:
+          summary: "IntelliHire app is not scrapeable"
+          description: >-
+            Prometheus cannot scrape GET /metrics from the intellihire-app
+            target for over 1 minute. Either the process is down, the backend
+            network path is broken, or the METRICS_TOKEN was rotated on one
+            side only (a token mismatch yields persistent 401s -> up=0).
+          runbook_url: "docs/INCIDENT_RESPONSE.md#first-hour-playbook"
+          dashboard: "IntelliHire / Overview (observability/grafana-dashboard.json)"
+
+      # -----------------------------------------------------------------------
+      # Error rate (5xx ratio)
+      # -----------------------------------------------------------------------
+      - alert: IntelliHireHigh5xxErrorRate
+        expr: >-
+          (
+            sum(rate(http_requests_total{job="intellihire-app",status="5xx"}[5m]))
+            /
+            clamp_min(sum(rate(http_requests_total{job="intellihire-app"}[5m])), 0.01)
+          ) > 0.05
+          and sum(rate(http_requests_total{job="intellihire-app"}[5m])) > 0.1
+        for: 10m
+        labels:
+          severity: critical
+          service: intellihire
+        annotations:
+          summary: "5xx error rate above 5% for 10m"
+          description: >-
+            More than 5% of requests served by the FastAPI backend are 5xx
+            (traffic floor 0.1 req/s applied to avoid noise from an idle
+            system). A common cause: GET /api/health returning 503 because
+            Postgres is unreachable — that failure mode has its own rule
+            (IntelliHireHealthEndpointFailing) below.
+          runbook_url: "docs/INCIDENT_RESPONSE.md#first-hour-playbook"
+
+      - alert: IntelliHireElevated5xxErrorRate
+        expr: >-
+          (
+            sum(rate(http_requests_total{job="intellihire-app",status="5xx"}[5m]))
+            /
+            clamp_min(sum(rate(http_requests_total{job="intellihire-app"}[5m])), 0.01)
+          ) > 0.01
+          and sum(rate(http_requests_total{job="intellihire-app"}[5m])) > 0.1
+        for: 15m
+        labels:
+          severity: warning
+          service: intellihire
+        annotations:
+          summary: "5xx error rate above 1% for 15m"
+          description: >-
+            Sustained elevated 5xx ratio. Investigate the handler label of
+            http_requests_total to find the failing route before it grows into
+            a critical breach.
+          runbook_url: "docs/INCIDENT_RESPONSE.md#first-hour-playbook"
+
+      # -----------------------------------------------------------------------
+      # Latency SLO (PROPOSED: p95 < 1s over 5m windows, all routes)
+      # -----------------------------------------------------------------------
+      - alert: IntelliHireLatencySLOBreachP95
+        expr: >-
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(http_request_duration_highr_seconds_bucket{job="intellihire-app"}[5m]))
+          ) > 1
+        for: 10m
+        labels:
+          severity: warning
+          service: intellihire
+        annotations:
+          summary: "p95 latency above 1s (proposed SLO breach)"
+          description: >-
+            PROPOSED SLO: 95% of requests complete in under 1 second, measured
+            on the label-free high-resolution histogram
+            http_request_duration_highr_seconds. Sustained breach for 10m.
+            Note: login intentionally costs one bcrypt check (~300-600ms in a
+            worker thread) and POST /api/auth/login is rate-limited to 5/min,
+            so login traffic alone should not breach this; look at slow DB
+            queries or Groq/Judge0 call paths.
+          runbook_url: "docs/INCIDENT_RESPONSE.md#first-hour-playbook"
+
+      - alert: IntelliHireLatencyP95Critical
+        expr: >-
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(http_request_duration_highr_seconds_bucket{job="intellihire-app"}[5m]))
+          ) > 2.5
+        for: 5m
+        labels:
+          severity: critical
+          service: intellihire
+        annotations:
+          summary: "p95 latency above 2.5s for 5m"
+          description: >-
+            Latency is far past the proposed 1s SLO. Typical causes: Postgres
+            saturation, event-loop blocking (bcrypt must stay in
+            asyncio.to_thread), or downstream Groq/Judge0 hangs.
+          runbook_url: "docs/INCIDENT_RESPONSE.md#first-hour-playbook"
+
+      # -----------------------------------------------------------------------
+      # Database down — detected through the app itself.
+      # GET /api/health (server_py/app/main.py) performs a live query against
+      # the users table and returns HTTP 503 with status "unhealthy" when
+      # Postgres is unreachable, so orchestrators stop routing traffic.
+      # That 503 shows up as http_requests_total{handler="/api/health",status="5xx"}.
+      # -----------------------------------------------------------------------
+      - alert: IntelliHireHealthEndpointFailing
+        expr: sum(rate(http_requests_total{job="intellihire-app",handler="/api/health",status="5xx"}[5m])) > 0
+        for: 2m
+        labels:
+          severity: critical
+          service: intellihire
+        annotations:
+          summary: "/api/health is returning 503 — Postgres unreachable"
+          description: >-
+            The health endpoint (server_py/app/main.py health_check) queries
+            the users table on every call and returns 503 only when
+            postgres_healthy is False. This rule watches the /api/health path
+            specifically; /api/v1/health is the same function registered under
+            a second path and therefore reports its own handler label, and
+            external uptime monitoring hits /api/health every 60s so there is
+            always traffic to evaluate. Treat this as a database failure, not
+            an app failure.
+          runbook_url: "docs/INCIDENT_RESPONSE.md#db-failure"
+
+      # TODO(gauge): POST /api/auth/login failures are NOT separately
+      # counted. No auth-failure metric exists yet. The rule below is a
+      # PROXY: the login handler returns 400/401/429 grouped into the `4xx`
+      # status bucket of http_requests_total, so a spike there is a
+      # credential-stuffing / brute-force / lockout signal. A dedicated
+      # counter (e.g. intellihire_auth_failures_total{reason="invalid_credentials"|"rate_limited"})
+      # should be added to auth_router.py to separate bad passwords from
+      # rate-limit 429s. Until then this proxy fires on >1 4xx/s sustained.
+      - alert: IntelliHireAuthFailureSpike
+        expr: sum(rate(http_requests_total{job="intellihire-app",handler="/api/auth/login",status="4xx"}[5m])) > 1
+        for: 10m
+        labels:
+          severity: warning
+          service: intellihire
+        annotations:
+          summary: "Sustained 4xx spike on POST /api/auth/login"
+          description: >-
+            More than 1 failed login-class response per second for 10m.
+            400 (missing credentials), 401 (invalid credentials) and 429
+            (slowapi limit 5/minute per IP) all land in this bucket. Cross-
+            check audit_logs and the "Login failed" warnings in app logs.
+          runbook_url: "docs/INCIDENT_RESPONSE.md#security-breach"
+
+      # -----------------------------------------------------------------------
+      # TODO(metric) — Queue backlog. NO gauge exists for queue depth.
+      # BackgroundGradingQueue (server_py/app/queue_manager.py) keeps work in
+      # Redis lists `grading-queue` and `interview-queue`, dead-letters into
+      # `grading-dlq` / `interview-dlq`, and falls back to a local
+      # grading_queue.json file when Redis is unavailable. None of this is
+      # exported to Prometheus. Before this rule can be enabled, add an app
+      # gauge, e.g.:
+      #   intellihire_queue_depth{queue="grading-queue|interview-queue|grading-dlq|interview-dlq"}
+      # (LLEN on each list; export grading_queue.json length as
+      #  queue="local-disk-fallback") and a corresponding counter for DLQ
+      # growth. Once the gauge exists, enable:
+      #
+      # - alert: IntelliHireGradingQueueBacklog
+      #   expr: intellihire_queue_depth{queue="grading-queue"} > 50
+      #   for: 15m
+      #   labels:
+      #     severity: warning
+      #     service: intellihire
+      #   annotations:
+      #     summary: "Grading queue backlog above 50 attempts for 15m"
+      #     description: >-
+      #       Results and shortlisting are delayed: grading runs through
+      #       Judge0 with 3 retries before dead-lettering to grading-dlq.
+      #     runbook_url: "docs/INCIDENT_RESPONSE.md#judge0-outage"
+      # -----------------------------------------------------------------------
+
+      # -----------------------------------------------------------------------
+      # TODO(metric) — Redis down. NO app-exported Redis health metric exists:
+      # /api/health checks Postgres, Groq config, SMTP config and the question
+      # bank pipeline, but NOT Redis. Redis unavailability is only visible as
+      # the log warning "Redis unavailable: ... — using local/disk queue for
+      # background grading" (queue_manager.py init_queue) and as slowapi
+      # limiter degradation. Once a gauge exists (e.g.
+      # intellihire_redis_up, or the optional redis_exporter job in
+      # prometheus.yml), enable:
+      #
+      # - alert: IntelliHireRedisDown
+      #   expr: intellihire_redis_up == 0
+      #   for: 5m
+      #   labels:
+      #     severity: warning
+      #     service: intellihire
+      #   annotations:
+      #     summary: "Redis unreachable — grading falls back to local disk queue"
+      #     description: >-
+      #       The background grading/interview workers lose queueing and the
+      #       rate limiter degrades. Results publication is delayed.
+      #     runbook_url: "docs/INCIDENT_RESPONSE.md#first-hour-playbook"
+      # -----------------------------------------------------------------------
+
+      # -----------------------------------------------------------------------
+      # TODO(metric) — Direct Postgres health gauge. The app has no
+      # intellihire_db_up-style gauge; DB failure is currently only observable
+      # through /api/health 5xxs (rule above) or the optional postgres_exporter
+      # job (commented in prometheus.yml). Prefer postgres_exporter for a real
+      # `up{job="postgres"}` + pg_stat metrics once deployed.
+      # -----------------------------------------------------------------------

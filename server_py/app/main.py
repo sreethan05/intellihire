@@ -12,7 +12,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-from .config import PORT, APP_URL, NODE_ENV, INTERNAL_API_SECRET, GROQ_API_KEY, SMTP_HOST, SMTP_USER, SMTP_PASS, JUDGE0_API_URL, SENTRY_DSN, CORS_ALLOWED_ORIGINS
+from .config import PORT, APP_URL, NODE_ENV, INTERNAL_API_SECRET, GROQ_API_KEY, SMTP_HOST, SMTP_USER, SMTP_PASS, JUDGE0_API_URL, SENTRY_DSN, CORS_ALLOWED_ORIGINS, DATA_RETENTION_INTERVAL_HOURS
 from .rate_limit import limiter
 from .compiler import router as compiler_router
 from .ai import router as ai_router
@@ -43,6 +43,7 @@ from .utils import storage_root
 from .migration_runner import run_migrations
 from .ml_ranker import ranker
 from .sentry_integration import init_sentry
+from .data_retention import run_data_retention_worker
 
 class RankCandidateRequest(BaseModel):
     mcq_score_pct: Optional[float] = 50.0
@@ -56,6 +57,15 @@ IS_PRODUCTION = NODE_ENV == "production"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_sentry()
+    retention_stop_event = asyncio.Event()
+    retention_task = None
+    if IS_PRODUCTION:
+        retention_task = asyncio.create_task(
+            run_data_retention_worker(
+                retention_stop_event,
+                DATA_RETENTION_INTERVAL_HOURS * 60 * 60,
+            )
+        )
     # Startup migrations runner
     try:
         run_migrations()
@@ -64,7 +74,16 @@ async def lifespan(app: FastAPI):
             raise e
         else:
             from .logger import logger
-    yield
+    try:
+        yield
+    finally:
+        retention_stop_event.set()
+        if retention_task:
+            retention_task.cancel()
+            try:
+                await retention_task
+            except asyncio.CancelledError:
+                pass
     # Graceful connection pool shutdown
     try:
         from .db import close_pool
