@@ -1,3 +1,4 @@
+import asyncio
 import hmac
 import os
 from contextlib import asynccontextmanager
@@ -74,6 +75,17 @@ async def lifespan(app: FastAPI):
             raise e
         else:
             from .logger import logger
+    # Start the background grading/interview queue workers. The singleton's
+    # __init__ self-start only fires when an event loop is already running —
+    # at boot the module is imported before the loop exists, so without this
+    # the Redis workers never start and the queue/service gauges never
+    # initialize.
+    try:
+        from .queue_manager import gradingQueue
+        await gradingQueue.init_queue()
+    except Exception as e:
+        from .logger import logger
+        logger.warning(f"Background queue init failed at startup: {e}")
     try:
         yield
     finally:

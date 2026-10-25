@@ -165,6 +165,8 @@ async def login(req: LoginRequest, response: Response, request: Request):
         
     if res.error or not users or len(users) == 0:
         from .logger import logger
+        from .metrics import AUTH_FAILURES
+        AUTH_FAILURES.labels("unknown_user").inc()
         logger.warning(f"Login failed: user not found for identifier '{lookup}' (db error: {res.error})")
         return error_response("Invalid credentials", status_code=401, code="INVALID_CREDENTIALS")
         
@@ -189,6 +191,8 @@ async def login(req: LoginRequest, response: Response, request: Request):
         
     if not valid:
         from .logger import logger
+        from .metrics import AUTH_FAILURES
+        AUTH_FAILURES.labels("bad_password").inc()
         logger.warning(f"Login failed: invalid password for '{lookup}'")
         return error_response("Invalid credentials", status_code=401, code="INVALID_CREDENTIALS")
 

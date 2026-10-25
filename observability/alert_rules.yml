@@ -157,79 +157,54 @@ groups:
             an app failure.
           runbook_url: "docs/INCIDENT_RESPONSE.md#db-failure"
 
-      # TODO(gauge): POST /api/auth/login failures are NOT separately
-      # counted. No auth-failure metric exists yet. The rule below is a
-      # PROXY: the login handler returns 400/401/429 grouped into the `4xx`
-      # status bucket of http_requests_total, so a spike there is a
-      # credential-stuffing / brute-force / lockout signal. A dedicated
-      # counter (e.g. intellihire_auth_failures_total{reason="invalid_credentials"|"rate_limited"})
-      # should be added to auth_router.py to separate bad passwords from
-      # rate-limit 429s. Until then this proxy fires on >1 4xx/s sustained.
+      # Dedicated counter wired in server_py/app/metrics.py and incremented by
+      # auth_router.py (reason="unknown_user" | "bad_password"). slowapi 429
+      # throttles stay in the http_requests_total 4xx proxy below.
       - alert: IntelliHireAuthFailureSpike
-        expr: sum(rate(http_requests_total{job="intellihire-app",handler="/api/auth/login",status="4xx"}[5m])) > 1
+        expr: sum(rate(intellihire_auth_failures_total[5m])) > 1
         for: 10m
         labels:
           severity: warning
           service: intellihire
         annotations:
-          summary: "Sustained 4xx spike on POST /api/auth/login"
+          summary: "Sustained failed-login spike (unknown users / bad passwords)"
           description: >-
-            More than 1 failed login-class response per second for 10m.
-            400 (missing credentials), 401 (invalid credentials) and 429
-            (slowapi limit 5/minute per IP) all land in this bucket. Cross-
-            check audit_logs and the "Login failed" warnings in app logs.
+            More than 1 failed login per second for 10m by reason label —
+            a credential-stuffing / brute-force signal. Cross-check
+            audit_logs and the "Login failed" warnings in app logs; the
+            5/minute slowapi limit is already enforced per IP.
           runbook_url: "docs/INCIDENT_RESPONSE.md#security-breach"
 
-      # -----------------------------------------------------------------------
-      # TODO(metric) — Queue backlog. NO gauge exists for queue depth.
-      # BackgroundGradingQueue (server_py/app/queue_manager.py) keeps work in
-      # Redis lists `grading-queue` and `interview-queue`, dead-letters into
-      # `grading-dlq` / `interview-dlq`, and falls back to a local
-      # grading_queue.json file when Redis is unavailable. None of this is
-      # exported to Prometheus. Before this rule can be enabled, add an app
-      # gauge, e.g.:
-      #   intellihire_queue_depth{queue="grading-queue|interview-queue|grading-dlq|interview-dlq"}
-      # (LLEN on each list; export grading_queue.json length as
-      #  queue="local-disk-fallback") and a corresponding counter for DLQ
-      # growth. Once the gauge exists, enable:
-      #
-      # - alert: IntelliHireGradingQueueBacklog
-      #   expr: intellihire_queue_depth{queue="grading-queue"} > 50
-      #   for: 15m
-      #   labels:
-      #     severity: warning
-      #     service: intellihire
-      #   annotations:
-      #     summary: "Grading queue backlog above 50 attempts for 15m"
-      #     description: >-
-      #       Results and shortlisting are delayed: grading runs through
-      #       Judge0 with 3 retries before dead-lettering to grading-dlq.
-      #     runbook_url: "docs/INCIDENT_RESPONSE.md#judge0-outage"
-      # -----------------------------------------------------------------------
+      # Gauge wired in server_py/app/metrics.py; queue_manager.py refreshes it
+      # via LLEN after every push/pop/dead-letter on the Redis-backed queues.
+      - alert: IntelliHireGradingQueueBacklog
+        expr: intellihire_queue_depth{queue="grading-queue"} > 50
+        for: 15m
+        labels:
+          severity: warning
+          service: intellihire
+        annotations:
+          summary: "Grading queue backlog above 50 attempts for 15m"
+          description: >-
+            Results and shortlisting are delayed: grading runs through
+            Judge0 with 3 retries before dead-lettering to grading-dlq.
+          runbook_url: "docs/INCIDENT_RESPONSE.md#judge0-outage"
 
-      # -----------------------------------------------------------------------
-      # TODO(metric) — Redis down. NO app-exported Redis health metric exists:
-      # /api/health checks Postgres, Groq config, SMTP config and the question
-      # bank pipeline, but NOT Redis. Redis unavailability is only visible as
-      # the log warning "Redis unavailable: ... — using local/disk queue for
-      # background grading" (queue_manager.py init_queue) and as slowapi
-      # limiter degradation. Once a gauge exists (e.g.
-      # intellihire_redis_up, or the optional redis_exporter job in
-      # prometheus.yml), enable:
-      #
-      # - alert: IntelliHireRedisDown
-      #   expr: intellihire_redis_up == 0
-      #   for: 5m
-      #   labels:
-      #     severity: warning
-      #     service: intellihire
-      #   annotations:
-      #     summary: "Redis unreachable — grading falls back to local disk queue"
-      #     description: >-
-      #       The background grading/interview workers lose queueing and the
-      #       rate limiter degrades. Results publication is delayed.
-      #     runbook_url: "docs/INCIDENT_RESPONSE.md#first-hour-playbook"
-      # -----------------------------------------------------------------------
+      # Gauge wired in server_py/app/metrics.py; queue_manager.py sets it to
+      # 1 after a successful preflight ping and 0 when Redis is unreachable
+      # (local-disk fallback engaged).
+      - alert: IntelliHireRedisDown
+        expr: intellihire_service_up{service="redis"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          service: intellihire
+        annotations:
+          summary: "Redis unreachable — grading falls back to local disk queue"
+          description: >-
+            The background grading/interview workers lose queueing and the
+            rate limiter degrades. Results publication is delayed.
+          runbook_url: "docs/INCIDENT_RESPONSE.md#first-hour-playbook"
 
       # -----------------------------------------------------------------------
       # TODO(metric) — Direct Postgres health gauge. The app has no

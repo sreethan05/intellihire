@@ -8,6 +8,16 @@ from .config import APP_URL
 from .db import db
 from .logger import logger
 from .utils import record_pipeline_stage, storage_root
+from .metrics import QUEUE_DEPTH, SERVICE_UP
+
+
+def _report_queue_depth(redis_client, queue_name: str) -> None:
+    """Refresh the Prometheus gauge for a Redis-backed queue via LLEN."""
+    try:
+        QUEUE_DEPTH.labels(queue_name).set(redis_client.llen(queue_name))
+    except Exception:
+        # Redis hiccup: the worker loop's error path will surface SERVICE_UP=0.
+        pass
 
 
 async def send_result_published_email(
@@ -58,11 +68,15 @@ class BackgroundGradingQueue:
             try:
                 # Run ping in thread pool to avoid blocking async loop if redis hangs
                 await asyncio.to_thread(self.redis_client.ping)
+                SERVICE_UP.labels("redis").set(1)
+                for _q in ("grading-queue", "interview-queue", "grading-dlq", "interview-dlq"):
+                    _report_queue_depth(self.redis_client, _q)
                 logger.info("Bull/Python Redis queue connection preflight successful")
                 # Start Redis worker loops
                 asyncio.create_task(self.redis_grading_worker())
                 asyncio.create_task(self.redis_interview_worker())
             except Exception as err:
+                SERVICE_UP.labels("redis").set(0)
                 logger.warning(f"Redis unavailable: {err} — using local/disk queue for background grading")
                 self.redis_client = None
                 await self.init_local_queue()
@@ -70,6 +84,7 @@ class BackgroundGradingQueue:
             await self.init_local_queue()
 
     async def init_local_queue(self):
+        QUEUE_DEPTH.labels("local-disk-fallback").set(len(self.local_queue))
         try:
             os.makedirs(self.storage_root, exist_ok=True)
             if os.path.exists(self.queue_file_path):
@@ -85,6 +100,7 @@ class BackgroundGradingQueue:
             logger.warning(f"Local queue file not found or invalid: {e}")
 
     async def save_local_queue(self):
+        QUEUE_DEPTH.labels("local-disk-fallback").set(len(self.local_queue))
         try:
             os.makedirs(self.storage_root, exist_ok=True)
             with open(self.queue_file_path, "w", encoding="utf-8") as f:
@@ -100,6 +116,7 @@ class BackgroundGradingQueue:
             try:
                 # LPUSH / RPUSH queue model
                 self.redis_client.rpush("grading-queue", json.dumps({"attemptId": attempt_id}))
+                _report_queue_depth(self.redis_client, "grading-queue")
                 logger.info(f"Added attempt {attempt_id} to Redis grading queue")
                 return
             except Exception as e:
@@ -120,6 +137,7 @@ class BackgroundGradingQueue:
         if self.redis_client:
             try:
                 self.redis_client.rpush("interview-queue", json.dumps({"interviewId": interview_id}))
+                _report_queue_depth(self.redis_client, "interview-queue")
                 logger.info(f"Added interview {interview_id} to Redis interview queue")
                 return
             except Exception as e:
@@ -142,6 +160,7 @@ class BackgroundGradingQueue:
                     continue
                 # Poll Redis queue
                 data_str = await asyncio.to_thread(self.redis_client.lpop, "grading-queue")
+                _report_queue_depth(self.redis_client, "grading-queue")
                 if data_str:
                     attempt_id = None
                     retries = 0
@@ -178,6 +197,7 @@ class BackgroundGradingQueue:
                                 })
                                 try:
                                     await asyncio.to_thread(self.redis_client.rpush, "grading-dlq", dlq_payload)
+                                    _report_queue_depth(self.redis_client, "grading-dlq")
                                 except Exception as dlq_err:
                                     logger.error(f"Failed to push to grading-dlq: {dlq_err}")
                 else:
@@ -194,6 +214,7 @@ class BackgroundGradingQueue:
                     continue
                 # Poll Redis queue
                 data_str = await asyncio.to_thread(self.redis_client.lpop, "interview-queue")
+                _report_queue_depth(self.redis_client, "interview-queue")
                 if data_str:
                     interview_id = None
                     retries = 0
@@ -231,6 +252,7 @@ class BackgroundGradingQueue:
                                 })
                                 try:
                                     await asyncio.to_thread(self.redis_client.rpush, "interview-dlq", dlq_payload)
+                                    _report_queue_depth(self.redis_client, "interview-dlq")
                                 except Exception as dlq_err:
                                     logger.error(f"Failed to push to interview-dlq: {dlq_err}")
                 else:
