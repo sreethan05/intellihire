@@ -54,6 +54,7 @@ test.describe("Accessibility (axe core, WCAG A/AA)", () => {
   test("login page has no violations", async ({ page }) => {
     await page.goto("/login");
     await expect(page.locator('button[type="submit"]')).toBeVisible({ timeout: 15000 });
+    await page.waitForTimeout(1200); // allow framer-motion entry transitions to settle
     const violations = await scan(page);
     expect(describeViolations(violations)).toBe("");
   });
