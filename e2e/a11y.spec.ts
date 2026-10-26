@@ -49,6 +49,8 @@ async function login(page: Page, email: string, password: string, landing: RegEx
 }
 
 test.describe("Accessibility (axe core, WCAG A/AA)", () => {
+  test.slow(); // Triples test timeout to 180s for deep full-page axe-core scans in CI
+
   test("login page has no violations", async ({ page }) => {
     await page.goto("/login");
     await expect(page.locator('button[type="submit"]')).toBeVisible({ timeout: 15000 });

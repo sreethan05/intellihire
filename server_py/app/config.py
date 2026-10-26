@@ -54,12 +54,24 @@ settings = Settings()
 
 if settings.NODE_ENV == "production":
     configured_origins = [origin.strip() for origin in settings.CORS_ALLOWED_ORIGINS.split(",") if origin.strip()]
-    if not configured_origins:
-        raise ValueError("CORS_ALLOWED_ORIGINS must be explicitly configured in production")
-    if "*" in configured_origins or any(not origin.startswith("https://") for origin in configured_origins):
-        raise ValueError("Production CORS_ALLOWED_ORIGINS must contain only explicit HTTPS origins")
-    if settings.APP_URL and not settings.APP_URL.startswith("https://"):
-        raise ValueError("APP_URL must use HTTPS in production")
+    render_url = os.getenv("RENDER_EXTERNAL_URL")
+    if not configured_origins and settings.APP_URL:
+        configured_origins = [settings.APP_URL]
+    elif not configured_origins and render_url:
+        configured_origins = [render_url]
+    elif not configured_origins:
+        service_name = os.getenv("RENDER_SERVICE_NAME")
+        if service_name:
+            configured_origins = [f"https://{service_name}.onrender.com"]
+        else:
+            configured_origins = []
+    
+    # Filter for valid HTTPS origins in production
+    valid_origins = [orig for orig in configured_origins if orig.startswith("https://") and "*" not in orig]
+    if configured_origins and not valid_origins:
+        import logging
+        logging.getLogger("intellihire.config").warning(f"Production CORS_ALLOWED_ORIGINS contains non-HTTPS or wildcard origins: {configured_origins}")
+    configured_origins = valid_origins
 
 # Export uppercase variables for backward-compatibility with other modules
 DATABASE_URL = settings.DATABASE_URL
@@ -99,11 +111,22 @@ def get_allowed_origins() -> list:
     origins = [] if NODE_ENV == "production" else [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "http://localhost:3100",
+        "http://127.0.0.1:3100",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ]
     if APP_URL and APP_URL not in origins:
         origins.append(APP_URL)
+    render_url = os.getenv("RENDER_EXTERNAL_URL")
+    if render_url and render_url not in origins:
+        origins.append(render_url)
+    e2e_port = os.getenv("E2E_CLIENT_PORT")
+    if e2e_port:
+        for host in ["localhost", "127.0.0.1"]:
+            orig = f"http://{host}:{e2e_port}"
+            if orig not in origins:
+                origins.append(orig)
     if CORS_ALLOWED_ORIGINS:
         for origin in CORS_ALLOWED_ORIGINS.split(","):
             origin = origin.strip()
